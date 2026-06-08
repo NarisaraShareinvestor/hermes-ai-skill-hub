@@ -1,0 +1,1 @@
+psql -U narisara -d postgres

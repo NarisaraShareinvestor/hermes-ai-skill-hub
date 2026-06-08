@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise Personal AI Skill Hub | Hostinger + n8n + Telegram + AI Agent</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --surface: #ffffff;
+      --surface-2: #eef4ff;
+      --ink: #14213d;
+      --muted: #5c677d;
+      --blue: #2563eb;
+      --blue-2: #1d4ed8;
+      --cyan: #06b6d4;
+      --green: #16a34a;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --line: #dbe4f0;
+      --shadow: 0 18px 45px rgba(20, 33, 61, 0.10);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Noto Sans", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 32%),
+        radial-gradient(circle at top right, rgba(6, 182, 212, 0.16), transparent 30%),
+        var(--bg);
+      color: var(--ink);
+      line-height: 1.75;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+      padding: 34px 0 70px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 62%, #06b6d4 100%);
+      color: #fff;
+      border-radius: 32px;
+      padding: 54px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      right: -150px;
+      top: -140px;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      left: 42%;
+      bottom: -160px;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 920px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      backdrop-filter: blur(8px);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(34px, 5vw, 64px);
+      line-height: 1.08;
+      margin: 0 0 20px;
+      letter-spacing: -1.8px;
+    }
+
+    .hero p {
+      font-size: 20px;
+      color: rgba(255, 255, 255, 0.90);
+      margin: 0;
+      max-width: 850px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 34px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-card {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 18px;
+      padding: 18px;
+      backdrop-filter: blur(8px);
+    }
+
+    .hero-card strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .hero-card span {
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 14px;
+    }
+
+    section {
+      margin-top: 34px;
+    }
+
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 34px;
+      box-shadow: 0 10px 30px rgba(20, 33, 61, 0.06);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .icon {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: var(--surface-2);
+      color: var(--blue);
+      font-size: 23px;
+      font-weight: 800;
+    }
+
+    h2 {
+      font-size: clamp(25px, 3vw, 38px);
+      margin: 0;
+      letter-spacing: -0.7px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 22px;
+      margin: 0 0 10px;
+      letter-spacing: -0.2px;
+    }
+
+    .lead {
+      color: var(--muted);
+      font-size: 18px;
+      margin: 6px 0 0;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .mini-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+    }
+
+    .mini-card.highlight {
+      background: linear-gradient(180deg, #ffffff, #f1f7ff);
+      border-color: #c7d8ff;
+    }
+
+    .mini-card .emoji {
+      font-size: 30px;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: var(--blue-2);
+      font-size: 13px;
+      font-weight: 800;
+      margin: 4px 4px 4px 0;
+      white-space: nowrap;
+    }
+
+    .pill.green {
+      background: #ecfdf5;
+      color: #047857;
+    }
+
+    .pill.orange {
+      background: #fffbeb;
+      color: #b45309;
+    }
+
+    .pill.red {
+      background: #fef2f2;
+      color: #b91c1c;
+    }
+
+    .architecture {
+      background: #0f172a;
+      border-radius: 24px;
+      padding: 28px;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .arch-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .arch-box {
+      background: rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 18px;
+      padding: 18px;
+      min-height: 138px;
+      position: relative;
+    }
+
+    .arch-box strong {
+      display: block;
+      font-size: 17px;
+      margin-bottom: 6px;
+    }
+
+    .arch-box span {
+      display: block;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: #93c5fd;
+      font-size: 30px;
+      font-weight: 900;
+    }
+
+    .arch-flow {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr 44px 1fr 44px 1fr;
+      gap: 10px;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .flow-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+    }
+
+    .flow-number {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .timeline {
+      position: relative;
+      display: grid;
+      gap: 16px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 20px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+    }
+
+    .phase {
+      font-weight: 900;
+      color: var(--blue);
+    }
+
+    .code {
+      background: #0f172a;
+      color: #dbeafe;
+      border-radius: 18px;
+      padding: 22px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      line-height: 1.65;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    th, td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f6ff;
+      color: var(--ink);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .telegram {
+      border-radius: 22px;
+      padding: 24px;
+      background: linear-gradient(180deg, #e0f2fe, #ffffff);
+      border: 1px solid #bae6fd;
+    }
+
+    .telegram-message {
+      background: #fff;
+      border: 1px solid #bae6fd;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 20px rgba(6, 182, 212, 0.10);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 14px;
+      white-space: pre-wrap;
+      line-height: 1.7;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .btn {
+      padding: 9px 14px;
+      border-radius: 12px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .btn.reject {
+      background: var(--red);
+    }
+
+    .btn.edit {
+      background: var(--orange);
+    }
+
+    .deployment {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 20px;
+    }
+
+    .footer {
+      margin-top: 38px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .print-note {
+      margin-top: 20px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+    }
+
+    @media (max-width: 980px) {
+      .hero {
+        padding: 34px;
+      }
+
+      .hero-grid,
+      .grid-4,
+      .grid-3,
+      .grid-2,
+      .deployment {
+        grid-template-columns: 1fr;
+      }
+
+      .arch-row {
+        grid-template-columns: 1fr;
+      }
+
+      .arch-flow {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+      }
+
+      .timeline-item {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .page {
+        width: 100%;
+        padding: 0;
+      }
+
+      .hero,
+      .section-card {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+
+      section {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="hero-content">
+        <div class="badge">🚀 Hostinger + n8n + Telegram + AI Agent</div>
+        <h1>Enterprise Personal AI Skill Hub</h1>
+        <p>
+          ระบบผู้ช่วย AI ส่วนตัวสำหรับพนักงานแต่ละคน พร้อมพื้นที่ทีม แผนก และศูนย์กลางแชร์ Skill
+          โดยใช้ Hostinger เป็น Server, n8n เป็น Workflow Automation, Telegram เป็น Approval/Notification
+          และ AI Agent เป็นสมองหลักของระบบ
+        </p>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-card">
+          <strong>Hostinger VPS</strong>
+          <span>รันระบบทั้งหมดบน server เดียวด้วย Docker</span>
+        </div>
+        <div class="hero-card">
+          <strong>n8n</strong>
+          <span>จัด workflow, approval, indexing, alert</span>
+        </div>
+        <div class="hero-card">
+          <strong>Telegram</strong>
+          <span>แจ้งเตือนและกด Approve/Reject skill</span>
+        </div>
+        <div class="hero-card">
+          <strong>AI Agent</strong>
+          <span>ผู้ช่วยส่วนตัว + skill execution engine</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">01</div>
+        <div>
+          <h2>Concept หลักของระบบ</h2>
+          <p class="lead">ไม่ใช่ chatbot ตัวเดียวที่ทุกคนใช้รวมกัน แต่เป็นระบบ AI Assistant แบบองค์กร</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="mini-card highlight">
+          <span class="emoji">👤</span>
+          <h3>Personal AI Assistant</h3>
+          <p class="muted">
+            พนักงานแต่ละคนมี AI ผู้ช่วยส่วนตัวของตัวเอง จำงาน สไตล์การเขียน เอกสารที่ใช้บ่อย และ skill ที่ใช้ประจำ
+          </p>
+          <span class="pill">Private Context</span>
+          <span class="pill">Personal Memory</span>
+        </div>
+
+        <div class="mini-card highlight">
+          <span class="emoji">🏢</span>
+          <h3>Team Workspace</h3>
+          <p class="muted">
+            แยกพื้นที่ตามทีม เช่น IR, Dev, Content, QA, Sales เพื่อเก็บ skill และ workflow ของแต่ละแผนก
+          </p>
+          <span class="pill">Department Skills</span>
+          <span class="pill">Team Permission</span>
+        </div>
+
+        <div class="mini-card highlight">
+          <span class="emoji">🧠</span>
+          <h3>Company Skill Store</h3>
+          <p class="muted">
+            Skill ที่ดีสามารถส่งเข้า review แล้ว publish ให้ทีมอื่นนำไปใช้ต่อได้อย่างปลอดภัย
+          </p>
+          <span class="pill">Skill Registry</span>
+          <span class="pill">Version Control</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">02</div>
+        <div>
+          <h2>System Architecture</h2>
+          <p class="lead">โครงสร้างระบบที่ใช้ Hostinger + Docker เป็นฐาน และให้ n8n เชื่อม Telegram กับ AI Agent</p>
+        </div>
+      </div>
+
+      <div class="architecture">
+        <div class="arch-row">
+          <div class="arch-box">
+            <strong>Users</strong>
+            <span>พนักงานแต่ละคนใช้งานผ่าน Web Portal หรือ Telegram</span>
+          </div>
+          <div class="arch-box">
+            <strong>AI Portal</strong>
+            <span>หน้า Chat, Skill Store, Team Workspace, Admin Dashboard</span>
+          </div>
+          <div class="arch-box">
+            <strong>Backend API</strong>
+            <span>จัดการ users, permissions, skills, logs, documents</span>
+          </div>
+          <div class="arch-box">
+            <strong>AI Agent</strong>
+            <span>เลือก skill, วิเคราะห์งาน, เรียก tool, สร้างผลลัพธ์</span>
+          </div>
+          <div class="arch-box">
+            <strong>Skill Registry</strong>
+            <span>เก็บ skill, version, owner, approval status และ policy</span>
+          </div>
+        </div>
+
+        <div class="arch-flow">
+          <div class="arch-box">
+            <strong>Hostinger VPS</strong>
+            <span>Ubuntu + Docker + Reverse Proxy + HTTPS</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="arch-box">
+            <strong>n8n</strong>
+            <span>Workflow automation, approval, document indexing, alert</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="arch-box">
+            <strong>Telegram Bot</strong>
+            <span>แจ้งเตือน skill review และให้กด approve/reject</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="arch-box">
+            <strong>PostgreSQL + Vector DB</strong>
+            <span>ข้อมูล users, teams, skills, logs, documents, embeddings</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">03</div>
+        <div>
+          <h2>แยกตามแผนกอย่างไร</h2>
+          <p class="lead">แยกเป็น Workspace แต่ยังอยู่ใน platform เดียวกัน เพื่อไม่ให้ข้อมูลและ skill ปนกัน</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="mini-card">
+          <h3>IR Team</h3>
+          <p class="muted">ใช้กับงาน Investor Relations, Annual Report, Financial Highlight, ESG, Announcement</p>
+          <span class="pill">Annual Report Summarizer</span>
+          <span class="pill">Dividend Policy Finder</span>
+          <span class="pill">AGM FAQ Generator</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Dev Team</h3>
+          <p class="muted">ใช้กับงาน technical, bug, API, deploy, log, code review</p>
+          <span class="pill">Code Review Assistant</span>
+          <span class="pill">Log Analyzer</span>
+          <span class="pill">API Doc Generator</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Content / SEO Team</h3>
+          <p class="muted">ใช้กับงานเขียนบทความ, meta description, translation, website copy</p>
+          <span class="pill">SEO Article Writer</span>
+          <span class="pill">IR Copy Reviewer</span>
+          <span class="pill">EN/TH Translator</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>QA Team</h3>
+          <p class="muted">ใช้กับ test case, bug reproduction, checklist, regression summary</p>
+          <span class="pill">Test Case Generator</span>
+          <span class="pill">Bug Summary Bot</span>
+          <span class="pill">UI Checklist</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Sales / Support Team</h3>
+          <p class="muted">ใช้กับการตอบลูกค้า, สรุป lead, draft email, meeting summary</p>
+          <span class="pill">Client Email Draft</span>
+          <span class="pill">Lead Summary</span>
+          <span class="pill">FAQ Answer Bot</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Management</h3>
+          <p class="muted">ใช้ดูภาพรวม usage, skill quality, risk, performance และ adoption</p>
+          <span class="pill">Daily AI Report</span>
+          <span class="pill">Team Usage Summary</span>
+          <span class="pill">Risk Review</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">04</div>
+        <div>
+          <h2>Skill Sharing Flow</h2>
+          <p class="lead">เปลี่ยน workflow ที่ใช้บ่อยให้กลายเป็น Skill แล้วแชร์ให้ทีมอื่นใช้ต่อได้</p>
+        </div>
+      </div>
+
+      <div class="arch-flow">
+        <div class="flow-card">
+          <div class="flow-number">1</div>
+          <h3>Create Skill</h3>
+          <p class="muted">ผู้ใช้สร้าง skill จาก prompt, instruction, input/output format และ tool ที่อนุญาต</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="flow-card">
+          <div class="flow-number">2</div>
+          <h3>Team Testing</h3>
+          <p class="muted">ทดลองใช้ในทีมก่อน เพื่อดูว่า skill ใช้งานจริงได้ไหมและผลลัพธ์นิ่งหรือไม่</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="flow-card">
+          <div class="flow-number">3</div>
+          <h3>Submit Review</h3>
+          <p class="muted">ส่ง skill เข้า review ผ่าน n8n แล้วแจ้งเตือน Telegram channel</p>
+        </div>
+        <div class="arrow">→</div>
+        <div class="flow-card">
+          <div class="flow-number">4</div>
+          <h3>Publish</h3>
+          <p class="muted">เมื่อ approve แล้ว skill จะเข้า Company Skill Store ให้ทีมอื่นใช้ต่อ</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">05</div>
+        <div>
+          <h2>Telegram Approval Channel</h2>
+          <p class="lead">Telegram ไม่ใช่ตัวหลักของระบบ แต่ใช้เป็นช่องทางแจ้งเตือนและอนุมัติ skill</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="telegram">
+          <h3>ตัวอย่างข้อความใน Telegram</h3>
+          <div class="telegram-message">🧠 New Skill Submitted
+
+Skill Name:
+IR Website Copy Reviewer
+
+Created by:
+Content Team
+
+Purpose:
+ตรวจ grammar, tone, clarity ของข้อความบน IR Website
+
+Input:
+Draft website copy
+
+Output:
+Improved copy + comments + risk note
+
+Risk Level:
+Low
+
+Target Visibility:
+Company Skill Store</div>
+          <div class="buttons">
+            <span class="btn">Approve</span>
+            <span class="btn reject">Reject</span>
+            <span class="btn edit">Request Edit</span>
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <h3>Telegram Channel ที่ควรมี</h3>
+          <p>
+            <span class="pill">#ai-skill-review</span>
+            <span class="pill">#ai-alerts</span>
+            <span class="pill">#ir-ai-assistant</span>
+            <span class="pill">#dev-ai-assistant</span>
+            <span class="pill">#content-ai-assistant</span>
+          </p>
+
+          <h3 style="margin-top:22px;">กฎสำคัญ</h3>
+          <p class="muted">
+            ทุก skill ที่จะ publish ให้ทั้งบริษัทใช้ ต้องผ่าน approval ก่อนเสมอ
+            โดยเฉพาะ skill ที่แตะข้อมูลลูกค้า เอกสารภายใน หรือคำสั่งที่มีผลต่อระบบ production
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">06</div>
+        <div>
+          <h2>n8n Workflows ที่ต้องมี</h2>
+          <p class="lead">n8n ทำหน้าที่เป็น automation layer คอยเชื่อมระบบต่าง ๆ เข้าด้วยกัน</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Workflow</th>
+            <th>Trigger</th>
+            <th>Action</th>
+            <th>Output</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Skill Review Workflow</strong></td>
+            <td>มี skill ใหม่ถูก submit</td>
+            <td>ส่งรายละเอียดไป Telegram พร้อมปุ่ม Approve/Reject</td>
+            <td>อัปเดตสถานะ skill</td>
+          </tr>
+          <tr>
+            <td><strong>Document Indexing Workflow</strong></td>
+            <td>มี PDF/เอกสารใหม่ถูกอัปโหลด</td>
+            <td>ส่งให้ AI Agent แปลง text, split chunks, embedding</td>
+            <td>เอกสารพร้อมค้นหา</td>
+          </tr>
+          <tr>
+            <td><strong>Daily AI Usage Summary</strong></td>
+            <td>ทุกวัน 18:00</td>
+            <td>สรุป usage, top skills, failed tasks, risk logs</td>
+            <td>ส่ง report เข้า Telegram</td>
+          </tr>
+          <tr>
+            <td><strong>Skill Quality Monitor</strong></td>
+            <td>มี feedback หรือ error สูง</td>
+            <td>แจ้ง owner ให้ปรับ skill version ใหม่</td>
+            <td>ลดความเสี่ยง skill เสื่อมคุณภาพ</td>
+          </tr>
+          <tr>
+            <td><strong>Admin Approval Workflow</strong></td>
+            <td>มี action เสี่ยง เช่น publish, delete, external share</td>
+            <td>ขออนุมัติจาก admin</td>
+            <td>ทำ action หลัง approve เท่านั้น</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">07</div>
+        <div>
+          <h2>AI Agent ทำหน้าที่อะไร</h2>
+          <p class="lead">AI Agent คือสมองของระบบ ไม่ใช่แค่ตอบข้อความ แต่ต้องเลือก skill และจัดการ workflow ได้</p>
+        </div>
+      </div>
+
+      <div class="grid-4">
+        <div class="mini-card">
+          <span class="emoji">🎯</span>
+          <h3>Intent Detection</h3>
+          <p class="muted">เข้าใจว่าผู้ใช้ต้องการสรุปเอกสาร เขียน email ตรวจ code หรือสร้าง skill</p>
+        </div>
+
+        <div class="mini-card">
+          <span class="emoji">🧩</span>
+          <h3>Skill Selection</h3>
+          <p class="muted">เลือก skill ที่เหมาะที่สุดจาก Personal, Team หรือ Company Skill Store</p>
+        </div>
+
+        <div class="mini-card">
+          <span class="emoji">🛠️</span>
+          <h3>Tool Calling</h3>
+          <p class="muted">เรียกใช้ tools เช่น document search, database, n8n webhook, Telegram alert</p>
+        </div>
+
+        <div class="mini-card">
+          <span class="emoji">🛡️</span>
+          <h3>Policy Guard</h3>
+          <p class="muted">ตรวจ permission, risk level, sensitive data และ approval requirement ก่อนทำงาน</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">08</div>
+        <div>
+          <h2>Hostinger Deployment Design</h2>
+          <p class="lead">ออกแบบให้รันบน Hostinger VPS ด้วย Docker เพื่อเริ่มง่ายและขยายต่อได้</p>
+        </div>
+      </div>
+
+      <div class="deployment">
+        <div>
+          <h3>Container ที่ควรมี</h3>
+          <div class="code">hostinger-vps
+├── nginx-proxy
+│   └── HTTPS / domain routing
+│
+├── ai-portal
+│   └── Frontend: Chat UI + Skill Store
+│
+├── backend-api
+│   └── FastAPI / Node.js API
+│
+├── ai-agent
+│   └── Hermes / OpenAI / Local LLM connector
+│
+├── n8n
+│   └── Workflow automation
+│
+├── postgres
+│   └── users, teams, skills, logs
+│
+├── vector-db
+│   └── document embeddings
+│
+└── redis
+    └── queue / cache / background jobs</div>
+        </div>
+
+        <div>
+          <h3>Domain ที่แนะนำ</h3>
+          <table>
+            <tbody>
+              <tr>
+                <td><strong>ai.company.com</strong></td>
+                <td>AI Portal</td>
+              </tr>
+              <tr>
+                <td><strong>api.company.com</strong></td>
+                <td>Backend API</td>
+              </tr>
+              <tr>
+                <td><strong>n8n.company.com</strong></td>
+                <td>n8n Admin</td>
+              </tr>
+              <tr>
+                <td><strong>agent.company.com</strong></td>
+                <td>AI Agent Internal API</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="print-note">
+            Production จริงควรปิด n8n admin ด้วย login, VPN หรือ IP allowlist และอย่า expose internal agent API แบบ public
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">09</div>
+        <div>
+          <h2>Skill Status และ Permission</h2>
+          <p class="lead">หัวใจสำคัญคือ skill ต้องมี owner, version, visibility และ approval status</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini-card">
+          <h3>Skill Lifecycle</h3>
+          <p>
+            <span class="pill orange">Draft</span>
+            <span class="pill">Team Testing</span>
+            <span class="pill orange">Submitted</span>
+            <span class="pill green">Approved</span>
+            <span class="pill green">Published</span>
+            <span class="pill red">Deprecated</span>
+            <span class="pill red">Blocked</span>
+          </p>
+          <p class="muted">
+            Skill ที่ยังเป็น Draft ใช้ได้เฉพาะเจ้าของ ส่วน Published คือผ่าน review แล้วและใช้ได้ตาม permission
+          </p>
+        </div>
+
+        <div class="mini-card">
+          <h3>Visibility Level</h3>
+          <p>
+            <span class="pill">Private</span>
+            <span class="pill">Team</span>
+            <span class="pill">Shared</span>
+            <span class="pill">Company</span>
+          </p>
+          <p class="muted">
+            ไม่ควรให้ทุก skill เป็น Company ทันที เพราะบาง skill อาจเกี่ยวกับข้อมูลส่วนตัว ลูกค้า หรือระบบ production
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">10</div>
+        <div>
+          <h2>Database Design แบบ MVP</h2>
+          <p class="lead">โครงสร้างข้อมูลหลักที่ต้องมีสำหรับทำ Skill Hub</p>
+        </div>
+      </div>
+
+      <div class="code">users
+- id
+- name
+- email
+- department_id
+- role
+- personal_memory_policy
+- created_at
+
+departments
+- id
+- name
+- description
+- manager_user_id
+
+skills
+- id
+- name
+- description
+- owner_user_id
+- owner_department_id
+- visibility
+- status
+- current_version
+- risk_level
+- created_at
+- updated_at
+
+skill_versions
+- id
+- skill_id
+- version
+- system_prompt
+- input_schema
+- output_schema
+- allowed_tools
+- change_log
+- created_by
+- created_at
+
+skill_permissions
+- id
+- skill_id
+- department_id
+- permission_level
+
+skill_reviews
+- id
+- skill_id
+- submitted_by
+- review_status
+- reviewed_by
+- telegram_message_id
+- review_comment
+- created_at
+
+skill_usage_logs
+- id
+- skill_id
+- user_id
+- input_summary
+- output_summary
+- status
+- latency_ms
+- feedback_score
+- created_at</div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">11</div>
+        <div>
+          <h2>API Endpoints ที่ควรมี</h2>
+          <p class="lead">Backend API เป็นตัวกลางระหว่าง Portal, AI Agent, n8n และ Database</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Endpoint</th>
+            <th>Method</th>
+            <th>หน้าที่</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>/api/chat</strong></td>
+            <td>POST</td>
+            <td>คุยกับ Personal AI Assistant และให้ agent เลือก skill ที่เหมาะ</td>
+          </tr>
+          <tr>
+            <td><strong>/api/skills</strong></td>
+            <td>GET / POST</td>
+            <td>ดู skill ทั้งหมดหรือสร้าง skill ใหม่</td>
+          </tr>
+          <tr>
+            <td><strong>/api/skills/{id}/run</strong></td>
+            <td>POST</td>
+            <td>เรียกใช้ skill ตาม input ที่ส่งมา</td>
+          </tr>
+          <tr>
+            <td><strong>/api/skills/{id}/submit-review</strong></td>
+            <td>POST</td>
+            <td>ส่ง skill เข้า review และ trigger n8n workflow</td>
+          </tr>
+          <tr>
+            <td><strong>/api/reviews/{id}/approve</strong></td>
+            <td>POST</td>
+            <td>อนุมัติ skill หลังจากกดจาก Telegram หรือ Admin Portal</td>
+          </tr>
+          <tr>
+            <td><strong>/api/documents/index</strong></td>
+            <td>POST</td>
+            <td>ส่งเอกสารเข้า indexing pipeline</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">12</div>
+        <div>
+          <h2>Security & Governance</h2>
+          <p class="lead">เพราะระบบนี้เกี่ยวกับข้อมูลบริษัท ต้องออกแบบ permission และ approval ตั้งแต่แรก</p>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="mini-card">
+          <h3>Access Control</h3>
+          <p class="muted">
+            ผู้ใช้เห็นเฉพาะ skill และเอกสารที่ตัวเองมีสิทธิ์ใช้งาน แยกตาม user, role, department
+          </p>
+          <span class="pill">RBAC</span>
+          <span class="pill">Department Permission</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Human Approval</h3>
+          <p class="muted">
+            Skill ที่จะ publish หรือแตะข้อมูลสำคัญ ต้องมีคน approve ก่อนเสมอผ่าน Telegram หรือ Admin Portal
+          </p>
+          <span class="pill">Approve</span>
+          <span class="pill">Reject</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Audit Log</h3>
+          <p class="muted">
+            ทุกการใช้ skill, การแก้ version, การ approve และการส่งออกข้อมูล ต้องมี log ย้อนหลังได้
+          </p>
+          <span class="pill">Logs</span>
+          <span class="pill">Traceability</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Data Boundary</h3>
+          <p class="muted">
+            แยก public document, internal document และ confidential document เพื่อป้องกันการตอบข้อมูลผิดชั้น
+          </p>
+          <span class="pill">Public</span>
+          <span class="pill orange">Internal</span>
+          <span class="pill red">Confidential</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Safe Tools</h3>
+          <p class="muted">
+            Phase แรกให้ AI อ่าน/สรุป/เขียนเท่านั้น อย่าเพิ่งให้ delete, deploy, restart หรือส่งข้อมูลออกนอกระบบเอง
+          </p>
+          <span class="pill green">Read Only</span>
+          <span class="pill orange">Approval Required</span>
+        </div>
+
+        <div class="mini-card">
+          <h3>Skill Risk Level</h3>
+          <p class="muted">
+            แบ่ง skill เป็น Low, Medium, High risk เพื่อควบคุมว่า skill ไหนต้อง review เข้มกว่าปกติ
+          </p>
+          <span class="pill green">Low</span>
+          <span class="pill orange">Medium</span>
+          <span class="pill red">High</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">13</div>
+        <div>
+          <h2>MVP Roadmap</h2>
+          <p class="lead">เริ่มจากเล็ก แต่ให้โครงสร้างต่อยอดเป็นระบบ enterprise ได้</p>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-item">
+          <div>
+            <div class="phase">Phase 1</div>
+            <strong>Personal AI + Skill Draft</strong>
+          </div>
+          <div>
+            <p class="muted">
+              ทำหน้า chat, login mock, สร้าง skill ส่วนตัว, run skill ได้ และเก็บ skill ลง database
+            </p>
+            <span class="pill">Chat UI</span>
+            <span class="pill">Create Skill</span>
+            <span class="pill">Run Skill</span>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div>
+            <div class="phase">Phase 2</div>
+            <strong>Team Workspace</strong>
+          </div>
+          <div>
+            <p class="muted">
+              เพิ่ม department workspace, permission, team skill และการแชร์ skill ภายในทีม
+            </p>
+            <span class="pill">IR Team</span>
+            <span class="pill">Dev Team</span>
+            <span class="pill">Permission</span>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div>
+            <div class="phase">Phase 3</div>
+            <strong>n8n + Telegram Approval</strong>
+          </div>
+          <div>
+            <p class="muted">
+              เมื่อ submit skill ให้ n8n ส่งข้อความไป Telegram พร้อมปุ่ม Approve/Reject แล้วอัปเดตสถานะอัตโนมัติ
+            </p>
+            <span class="pill">n8n Workflow</span>
+            <span class="pill">Telegram Bot</span>
+            <span class="pill">Approval</span>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div>
+            <div class="phase">Phase 4</div>
+            <strong>Company Skill Store</strong>
+          </div>
+          <div>
+            <p class="muted">
+              เปิดหน้า skill store กลาง ให้ทีมอื่น search, install, rate และใช้งาน skill ที่ publish แล้ว
+            </p>
+            <span class="pill">Skill Store</span>
+            <span class="pill">Versioning</span>
+            <span class="pill">Feedback</span>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div>
+            <div class="phase">Phase 5</div>
+            <strong>Enterprise Governance</strong>
+          </div>
+          <div>
+            <p class="muted">
+              เพิ่ม audit log, risk review, document permission, analytics dashboard และ daily AI usage summary
+            </p>
+            <span class="pill">Audit Log</span>
+            <span class="pill">Risk Control</span>
+            <span class="pill">Analytics</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">14</div>
+        <div>
+          <h2>ตัวอย่าง Skill Card</h2>
+          <p class="lead">ตัวอย่าง skill ที่เหมาะกับ ShareInvestor / IR Website</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="mini-card highlight">
+          <h3>Annual Report Summarizer</h3>
+          <p class="muted">
+            สรุปรายงานประจำปีให้เป็นภาษาที่นักลงทุนและทีม content เข้าใจง่าย พร้อมแยกหัวข้อสำคัญ
+          </p>
+          <table>
+            <tbody>
+              <tr>
+                <td><strong>Owner</strong></td>
+                <td>IR Team</td>
+              </tr>
+              <tr>
+                <td><strong>Visibility</strong></td>
+                <td>Company</td>
+              </tr>
+              <tr>
+                <td><strong>Input</strong></td>
+                <td>Annual Report PDF</td>
+              </tr>
+              <tr>
+                <td><strong>Output</strong></td>
+                <td>Business overview, financial highlight, risk, ESG, dividend summary</td>
+              </tr>
+              <tr>
+                <td><strong>Risk</strong></td>
+                <td>Medium — ต้องตอบจากเอกสารเท่านั้น</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mini-card highlight">
+          <h3>IR Website Copy Reviewer</h3>
+          <p class="muted">
+            ตรวจเนื้อหาหน้าเว็บไซต์ IR ให้เป็นภาษาอังกฤษที่เป็นมืออาชีพ ชัดเจน และเหมาะกับนักลงทุน
+          </p>
+          <table>
+            <tbody>
+              <tr>
+                <td><strong>Owner</strong></td>
+                <td>Content Team</td>
+              </tr>
+              <tr>
+                <td><strong>Visibility</strong></td>
+                <td>Shared / Company</td>
+              </tr>
+              <tr>
+                <td><strong>Input</strong></td>
+                <td>Draft website copy</td>
+              </tr>
+              <tr>
+                <td><strong>Output</strong></td>
+                <td>Improved copy, grammar comments, tone suggestions</td>
+              </tr>
+              <tr>
+                <td><strong>Risk</strong></td>
+                <td>Low — ไม่แตะข้อมูล financial โดยตรง</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card">
+      <div class="section-title">
+        <div class="icon">15</div>
+        <div>
+          <h2>สรุปภาพเดียว</h2>
+          <p class="lead">แกนของโปรเจกต์นี้คือ Personal AI → Team Skill → Company Skill Store</p>
+        </div>
+      </div>
+
+      <div class="code">User แต่ละคน
+  ↓
+Personal AI Assistant
+  ↓
+สร้าง Skill จากงานที่ทำซ้ำ
+  ↓
+แชร์เข้า Team Workspace
+  ↓
+ทดสอบในทีม
+  ↓
+Submit Review
+  ↓
+n8n ส่งเข้า Telegram Approval Channel
+  ↓
+Approve / Reject
+  ↓
+Company Skill Store
+  ↓
+ทีมอื่นนำ Skill ไปใช้ต่อได้อย่างปลอดภัย</div>
+
+      <div class="print-note">
+        Version แรกควรทำแค่ Personal Assistant + IR Team Workspace + Skill Review ผ่าน Telegram ก่อน
+        อย่าเริ่มจากระบบใหญ่ทั้งหมด เพราะจะใช้เวลามากและ debug ยาก
+      </div>
+    </section>
+
+    <footer class="footer">
+      Enterprise Personal AI Skill Hub — Designed for Hostinger + n8n + Telegram + AI Agent
+    </footer>
+  </main>
+</body>
+</html>

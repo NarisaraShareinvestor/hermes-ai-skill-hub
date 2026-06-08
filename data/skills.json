@@ -1,0 +1,126 @@
+[
+  {
+    "id": "skill_001",
+    "name": "Annual Report Summarizer",
+    "department": "ir",
+    "visibility": "company",
+    "status": "company_published",
+    "skill_type": "summarizer",
+    "version": "1.0.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["ir", "financial", "annual-report", "investor"],
+    "description": "Summarizes annual reports into investor-friendly bullet points.",
+    "prompt_template": "You are an expert financial analyst specializing in Investor Relations. Given the following annual report content, produce a concise structured summary covering: (1) Business Overview, (2) Financial Highlights, (3) Key Risk Factors, (4) ESG Summary, (5) Dividend Policy. Use formal language suitable for institutional investors. Be precise and factual.",
+    "input": "Annual Report PDF content or text",
+    "output": [
+      "Business overview",
+      "Financial highlights",
+      "Risk factors",
+      "ESG summary",
+      "Dividend policy summary"
+    ]
+  },
+  {
+    "id": "skill_002",
+    "name": "IR Website Copy Reviewer",
+    "department": "content",
+    "visibility": "team",
+    "status": "team_available",
+    "skill_type": "reviewer",
+    "version": "1.0.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["ir", "content", "seo", "copywriting"],
+    "description": "Reviews and improves English copy for Investor Relations websites.",
+    "prompt_template": "You are a professional copy editor with expertise in Investor Relations and SEO. Review the following website draft copy and provide: (1) Grammar and clarity corrections, (2) Tone adjustments for a professional IR audience, (3) SEO keyword integration suggestions, (4) A final polished version of the copy. Keep the language formal, accurate, and investor-appropriate.",
+    "input": "Website draft copy (text)",
+    "output": [
+      "Grammar suggestions",
+      "Tone improvement",
+      "SEO-friendly wording",
+      "Final polished copy"
+    ]
+  },
+  {
+    "id": "skill_003",
+    "name": "Bug Summary Assistant",
+    "department": "dev",
+    "visibility": "shared",
+    "status": "pending_team_review",
+    "skill_type": "analyzer",
+    "version": "1.0.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["dev", "qa", "bug-report", "debugging"],
+    "description": "Summarizes bug reports into structured developer-ready documentation.",
+    "prompt_template": "You are a senior software engineer and QA specialist. Given the following bug report, console log, or screenshot description, produce a structured bug summary including: (1) Bug Summary (one sentence), (2) Steps to Reproduce, (3) Expected Behavior, (4) Actual Behavior, (5) Possible Root Cause, (6) Severity and Priority (Low/Medium/High/Critical). Format clearly for the development team.",
+    "input": "Bug report description, console log, or error message",
+    "output": [
+      "Bug summary",
+      "Steps to reproduce",
+      "Expected vs actual behavior",
+      "Possible root cause",
+      "Severity and priority"
+    ]
+  },
+  {
+    "id": "skill_004",
+    "name": "Meeting Minutes Generator",
+    "department": "general",
+    "visibility": "company",
+    "status": "company_published",
+    "skill_type": "generator",
+    "version": "1.0.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["meeting", "minutes", "documentation", "general"],
+    "description": "Converts meeting notes or transcripts into formal meeting minutes.",
+    "prompt_template": "You are an executive assistant specializing in corporate documentation. Convert the following meeting notes or transcript into formal meeting minutes. Include: (1) Meeting title, date, and attendees (if mentioned), (2) Agenda items discussed, (3) Key decisions made, (4) Action items with responsible parties and deadlines, (5) Next meeting date (if mentioned). Use a formal, concise writing style suitable for corporate records.",
+    "input": "Meeting notes, transcript, or key points",
+    "output": [
+      "Formal meeting minutes",
+      "Key decisions",
+      "Action items with owners",
+      "Next steps"
+    ]
+  },
+  {
+    "id": "skill_005",
+    "name": "Financial Data Analyst",
+    "department": "ir",
+    "visibility": "team",
+    "status": "team_available",
+    "skill_type": "analyzer",
+    "version": "1.0.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["ir", "financial", "analysis", "data"],
+    "description": "Analyzes financial statements and produces structured commentary for investor presentations.",
+    "prompt_template": "You are a chartered financial analyst (CFA). Analyze the following financial data and produce a structured commentary covering: (1) Revenue and growth trends, (2) Profitability margins (gross, operating, net), (3) Balance sheet health (liquidity, leverage), (4) Cash flow analysis, (5) Year-over-year comparison, (6) Key insights for investor presentations. Use precise financial terminology.",
+    "input": "Financial statement data (income statement, balance sheet, cash flow)",
+    "output": [
+      "Revenue analysis",
+      "Profitability commentary",
+      "Balance sheet health",
+      "Cash flow summary",
+      "Investor-ready insights"
+    ]
+  },
+  {
+    "id": "skill_006",
+    "name": "Code Review Assistant",
+    "department": "dev",
+    "visibility": "team",
+    "status": "draft",
+    "skill_type": "reviewer",
+    "version": "0.9.0",
+    "owner": "narisara.pa@shareinvestor.com",
+    "tags": ["dev", "code-review", "quality", "security"],
+    "description": "Reviews code changes and provides structured feedback on quality, security, and best practices.",
+    "prompt_template": "You are a senior software engineer conducting a code review. Review the following code and provide structured feedback on: (1) Code correctness and logic errors, (2) Security vulnerabilities (SQL injection, XSS, auth issues, etc.), (3) Performance considerations, (4) Readability and maintainability, (5) Adherence to best practices and design patterns. Be specific, actionable, and constructive.",
+    "input": "Code snippet, diff, or pull request description",
+    "output": [
+      "Logic and correctness issues",
+      "Security concerns",
+      "Performance suggestions",
+      "Code quality feedback",
+      "Summary verdict"
+    ]
+  }
+]

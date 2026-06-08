@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hermes_postgres
+    environment:
+      POSTGRES_USER: hermes_user
+      POSTGRES_PASSWORD: hermes_password
+      POSTGRES_DB: hermes_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - hermes_network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: hermes_backend
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://hermes_user:hermes_password@postgres:5432/hermes_db
+      BACKEND_URL: http://localhost:8000
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 8000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
+    volumes:
+      - ./backend:/app/backend
+    ports:
+      - "8000:8000"
+    networks:
+      - hermes_network
+    command: >
+      sh -c "python backend/init_db.py &&
+             uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n
+    container_name: hermes_n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password
+      - N8N_HOST=localhost
+      - GENERIC_TIMEZONE=Asia/Bangkok
+    volumes:
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    networks:
+      - hermes_network
+
+  # Redis for caching and queue
+  redis:
+    image: redis:7-alpine
+    container_name: hermes_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - hermes_network
+
+networks:
+  hermes_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n_data:

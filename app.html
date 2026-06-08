@@ -1,0 +1,3963 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hermes AI Skill Hub</title>
+<style>
+  :root {
+    --sidebar-bg: #111827;
+    --sidebar-hover: #1f2937;
+    --sidebar-active: #1e3a5f;
+    --sidebar-text: #6b7280;
+    --sidebar-text-active: #ffffff;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-light: #eff6ff;
+    --success: #059669;
+    --success-light: #ecfdf5;
+    --warning: #b45309;
+    --warning-light: #fffbeb;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --surface: #ffffff;
+    --bg: #f1f5f9;
+    --border: #e5e7eb;
+    --ink: #111827;
+    --ink-2: #374151;
+    --muted: #6b7280;
+    --radius: 6px;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    line-height: 1.5;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-brand {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .sidebar-brand-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: .3px;
+  }
+  .sidebar-brand-sub {
+    font-size: 11px;
+    color: #4a6080;
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+
+  .sidebar-section {
+    padding: 16px 0 4px;
+  }
+  .sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #3d5470;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 0 18px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 18px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--sidebar-text);
+    transition: background .12s, color .12s;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { background: var(--sidebar-hover); color: #cbd5e1; }
+  .nav-item.active {
+    background: var(--sidebar-active);
+    color: var(--sidebar-text-active);
+    border-left-color: var(--accent);
+  }
+  .nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: .7;
+  }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 14px 18px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  /* User profile card in sidebar */
+  .user-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 6px 0;
+  }
+  .user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    letter-spacing: .5px;
+  }
+  .user-card-info { min-width: 0; flex: 1; }
+  .user-card-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .user-card-role {
+    font-size: 10px;
+    color: #4a6080;
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .tg-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+  }
+  .tg-dot.unlinked { background: #3d5470; }
+
+  .user-email-input {
+    width: 100%;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 11px;
+    outline: none;
+    transition: border-color .15s;
+    margin-top: 8px;
+  }
+  .user-email-input:focus { border-color: rgba(37,99,235,.5); }
+  .user-email-input::placeholder { color: #3d5470; }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  /* ── Panels ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── Stat Cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: -.5px;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 7px;
+    font-weight: 600;
+  }
+  .stat-sublabel {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    font-weight: 400;
+  }
+  .stat-card.accent .stat-value  { color: var(--accent); }
+  .stat-card.success .stat-value { color: var(--success); }
+  .stat-card.warning .stat-value { color: var(--warning); }
+  .stat-card.muted .stat-value   { color: #9ca3af; }
+
+  /* ── Section header ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  /* ── Skill List (table style) ── */
+  .skill-table {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .skill-table-header {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 140px 160px;
+    padding: 9px 16px;
+    background: #f9fafb;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+  }
+  .skill-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 100px 140px 160px;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    transition: background .1s;
+  }
+  .skill-row:last-child { border-bottom: none; }
+  .skill-row:hover { background: #f9fafb; }
+  .skill-name { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .skill-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .skill-dept {
+    font-size: 11px;
+    color: #6b7280;
+    background: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: .4px;
+    border: 1px solid #e5e7eb;
+  }
+
+  /* ── Status Badge ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1px;
+  }
+  .badge::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .65;
+    flex-shrink: 0;
+  }
+  .badge-draft       { background: #f3f4f6; color: #4b5563; }
+  .badge-private     { background: #f3f4f6; color: #4b5563; }
+  .badge-pending     { background: #fef3c7; color: #92400e; }
+  .badge-team        { background: #d1fae5; color: #065f46; }
+  .badge-published   { background: #dbeafe; color: #1e40af; }
+  .badge-rejected    { background: #fee2e2; color: #991b1b; }
+  .badge-edit        { background: #fef9c3; color: #854d0e; }
+
+  /* ── Action Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 13px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background .12s, border-color .12s, opacity .12s;
+    white-space: nowrap;
+    letter-spacing: .1px;
+  }
+  .btn:hover { opacity: .9; }
+  .btn:active { opacity: .8; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary   { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn-success   { background: var(--success); color: #fff; border-color: var(--success); }
+  .btn-danger    { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .btn-warning   { background: #d97706; color: #fff; border-color: #d97706; }
+  .btn-outline   { background: transparent; color: var(--accent); border-color: #bfdbfe; }
+  .btn-outline:hover { background: #eff6ff; }
+  .btn-ghost     { background: #f9fafb; color: var(--ink-2); border-color: var(--border); }
+  .btn-ghost:hover { background: #f3f4f6; }
+  .btn-sm        { padding: 3px 10px; font-size: 11px; }
+  .btn-row       { display: flex; gap: 5px; align-items: center; }
+
+  /* ── Form ── */
+  .form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    letter-spacing: .2px;
+  }
+  .form-control {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 11px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    width: 100%;
+  }
+  .form-control:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+  }
+  textarea.form-control { resize: vertical; min-height: 80px; line-height: 1.5; }
+  select.form-control { cursor: pointer; }
+  .form-hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .form-actions { display: flex; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* ── Chat ── */
+  .chat-layout {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 16px;
+    height: calc(100vh - 100px);
+  }
+  .chat-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .chat-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+  }
+  .chat-header-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .chat-header-sub { font-size: 11px; color: var(--muted); }
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .msg { display: flex; flex-direction: column; max-width: 78%; }
+  .msg-user { align-self: flex-end; align-items: flex-end; }
+  .msg-bot  { align-self: flex-start; align-items: flex-start; }
+  .msg-sender {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+    letter-spacing: .2px;
+  }
+  .msg-bubble {
+    padding: 14px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .msg-user .msg-bubble {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 8px 8px 2px 8px;
+  }
+  .msg-bot .msg-bubble {
+    background: #f1f5f9;
+    color: var(--ink);
+    border-radius: 8px 8px 8px 2px;
+  }
+  .chat-input-area {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    background: #f8fafc;
+  }
+  .chat-textarea {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 40px;
+    max-height: 200px;
+    background: var(--surface);
+    transition: border-color .15s;
+  }
+  .chat-textarea:focus { border-color: var(--accent); }
+
+  .skills-side {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+  }
+  .skills-side-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    background: #f8fafc;
+  }
+  .skill-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .skill-item:hover { background: var(--accent-light); }
+  .skill-item:last-child { border-bottom: none; }
+  .skill-item-name { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .skill-item-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,36,.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 10px;
+    width: 520px;
+    max-width: 94vw;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .modal-header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-title { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 4px;
+  }
+  .modal-close:hover { color: var(--ink); }
+  .modal-body { padding: 20px 22px; }
+  .modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    background: #f8fafc;
+    border-radius: 0 0 10px 10px;
+  }
+
+  /* ── Info Box ── */
+  .info-box {
+    background: var(--accent-light);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #1e40af;
+    line-height: 1.6;
+  }
+  .result-box {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+    color: var(--ink);
+    margin-top: 12px;
+    font-family: inherit;
+  }
+
+  /* ── Login Screen ── */
+  #loginScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 44px;
+    width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.1);
+  }
+  .login-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .login-brand-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--sidebar-bg);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-brand-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .login-brand-sub {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+  .login-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .login-subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+  .login-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .login-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 13px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--ink);
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    margin-bottom: 8px;
+  }
+  .login-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+  }
+  .login-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin-bottom: 12px;
+    min-height: 18px;
+  }
+  .login-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 11px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .login-btn:hover { background: var(--accent-hover); }
+  .login-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .login-divider {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    margin: 20px 0 16px;
+    position: relative;
+  }
+  .login-divider::before, .login-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 42%;
+    height: 1px;
+    background: var(--border);
+  }
+  .login-divider::before { left: 0; }
+  .login-divider::after  { right: 0; }
+  .login-footer {
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  /* Logout button */
+  .logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: #3d5470;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 0 0;
+    transition: color .15s;
+    text-align: left;
+  }
+  .logout-btn:hover { color: #8fa3b8; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 999;
+    background: var(--ink);
+    color: #fff;
+    padding: 11px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    display: none;
+    box-shadow: var(--shadow-md);
+    max-width: 340px;
+  }
+  #toast.show { display: block; animation: fadeUp .2s ease; }
+  #toast.toast-success { background: var(--success); }
+  #toast.toast-error   { background: var(--danger); }
+  @keyframes fadeUp {
+    from { transform: translateY(8px); opacity: 0; }
+    to   { transform: translateY(0);   opacity: 1; }
+  }
+
+  /* ── Loading ── */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .65s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state-title { font-size: 14px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+  .empty-state-text  { font-size: 13px; }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* ── Meeting Actions Panel ── */
+  .meeting-section {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .meeting-section-label {
+    font-size: 10px; font-weight: 600; color: #9ca3af;
+    text-transform: uppercase; letter-spacing: .6px;
+    margin-bottom: 7px;
+  }
+  .meeting-info-title {
+    font-size: 12px; font-weight: 600; color: var(--ink);
+    line-height: 1.4; margin-bottom: 3px;
+  }
+  .meeting-info-date { font-size: 11px; color: var(--muted); }
+  .meeting-participant {
+    display: inline-flex; font-size: 11px;
+    background: #f3f4f6; color: var(--ink-2);
+    padding: 2px 8px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .action-item-card {
+    padding: 7px 9px;
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    margin-bottom: 5px;
+  }
+  .action-item-task { font-size: 11px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+  .action-item-meta { font-size: 10px; color: var(--muted); }
+  .meeting-action-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 7px 0;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500; letter-spacing: .1px;
+    cursor: pointer; border: 1px solid var(--border);
+    background: #fff; color: var(--ink-2);
+    font-family: inherit;
+    transition: background .12s, border-color .12s;
+    margin-bottom: 5px;
+  }
+  .meeting-action-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+  .meeting-action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .meeting-action-btn.primary:hover { background: var(--accent-hover); }
+
+  /* ── Skill Cards (My Skills redesign) ── */
+  .skill-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+  }
+  .skill-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: box-shadow .18s, transform .18s;
+    display: flex;
+    flex-direction: column;
+  }
+  .skill-card:hover {
+    box-shadow: 0 4px 18px rgba(0,0,0,.09);
+    transform: translateY(-1px);
+  }
+  .skill-card-accent { height: 2px; width: 100%; }
+  .skill-card-body { padding: 15px 16px 12px; flex: 1; }
+  .skill-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .skill-card-icon {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .skill-card-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--ink); line-height: 1.35;
+  }
+  .skill-card-desc {
+    font-size: 12px; color: var(--muted);
+    margin-top: 3px; line-height: 1.55;
+  }
+  .skill-card-tags {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+  }
+  .skill-card-footer {
+    border-top: 1px solid var(--border);
+    padding: 8px 14px;
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .skill-date-tag {
+    font-size: 11px; color: #9ca3af;
+    margin-left: auto; white-space: nowrap;
+  }
+  .ms-tab-bar {
+    display: flex; gap: 2px;
+    background: #f3f4f6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .ms-tab-btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none;
+    font-family: inherit;
+    transition: background .12s, color .12s, box-shadow .12s;
+    color: var(--muted);
+    background: transparent;
+    letter-spacing: .1px;
+  }
+  .ms-tab-btn.active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    font-weight: 600;
+  }
+  .ms-tab-count {
+    background: #e5e7eb; color: var(--muted);
+    font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 999px;
+  }
+  .ms-tab-btn.active .ms-tab-count { background: var(--accent); color: #fff; }
+  .my-skills-page-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .my-skills-title { font-size: 17px; font-weight: 600; color: var(--ink); }
+  .my-skills-subtitle { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  @media (max-width: 900px) {
+    .sidebar { width: 180px; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .skill-table-header,
+    .skill-row { grid-template-columns: 1fr 100px 120px; }
+    .skill-table-header > *:nth-child(4),
+    .skill-table-header > *:nth-child(5),
+    .skill-row > *:nth-child(4),
+    .skill-row > *:nth-child(5) { display: none; }
+    .chat-layout { grid-template-columns: 1fr; }
+    .skills-side { display: none; }
+    .form-grid { grid-template-columns: 1fr; }
+    .dir-layout { grid-template-columns: 1fr; }
+    .dir-assistant-panel { display: none; }
+  }
+
+  /* ── Company Directory ── */
+  .dir-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .dir-stats {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .dir-stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow);
+    flex: 0 1 280px;
+  }
+
+  .dir-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dir-stat-icon.blue  { background: #eff6ff; color: #2563eb; }
+  .dir-stat-icon.purple { background: #f5f3ff; color: #7c3aed; }
+  .dir-stat-icon.green { background: #ecfdf5; color: #059669; }
+  .dir-stat-icon.orange { background: #fff7ed; color: #ea580c; }
+
+  .dir-stat-value { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+  .dir-stat-label { font-size: 12px; color: var(--muted); }
+
+  .dir-filters {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+  }
+
+  .dir-search {
+    flex: 1;
+    min-width: 200px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+  }
+  .dir-search:focus { border-color: var(--accent); }
+
+  .dir-filter-select {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--surface);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .dir-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .dir-table-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .dir-table-title { font-weight: 600; font-size: 14px; }
+  .dir-table-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  table.dir-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .dir-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .dir-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+
+  .dir-table tr:last-child td { border-bottom: none; }
+  .dir-table tr:hover td { background: #f8fafc; }
+
+  .dir-emp-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dir-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dir-name-text { font-weight: 500; color: var(--ink); }
+  .dir-email-text { font-size: 11px; color: var(--muted); }
+
+  .presence-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .presence-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .presence-active  { background: #ecfdf5; color: #059669; }
+  .presence-active::before  { background: #059669; }
+  .presence-away    { background: #fffbeb; color: #b45309; }
+  .presence-away::before    { background: #f59e0b; }
+  .presence-busy    { background: #fef2f2; color: #dc2626; }
+  .presence-busy::before    { background: #dc2626; }
+  .presence-offline { background: #f3f4f6; color: #6b7280; }
+  .presence-offline::before { background: #9ca3af; }
+
+  .dir-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .dir-page-btns { display: flex; gap: 4px; }
+  .dir-page-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dir-page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .dir-page-btn:hover:not(.active) { background: #f1f5f9; }
+  .dir-page-btn:disabled { opacity: .4; cursor: default; }
+
+  /* ── Assistant Panel ── */
+  .dir-assistant-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .dir-assist-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .dir-assist-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dir-assist-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .dir-assist-title { font-weight: 600; font-size: 13px; }
+  .dir-assist-sub   { font-size: 11px; color: var(--muted); }
+
+  .dir-assist-quick-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dir-quick-btn {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--ink-2);
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .dir-quick-btn:hover { background: #eff6ff; border-color: var(--accent); color: var(--accent); }
+
+  .dir-assist-messages {
+    min-height: 80px;
+    max-height: 260px;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dir-assist-result {
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+
+  .dir-assist-contact {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .dir-assist-contact:last-child { border-bottom: none; }
+
+  .dir-assist-contact-info { flex: 1; }
+  .dir-assist-contact-name { font-weight: 500; font-size: 12px; }
+  .dir-assist-contact-role { font-size: 11px; color: var(--muted); }
+  .dir-assist-contact-email { font-size: 11px; color: var(--accent); }
+
+  .dir-assist-input-wrap {
+    display: flex;
+    gap: 6px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .dir-assist-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+  }
+  .dir-assist-input:focus { border-color: var(--accent); }
+
+  .dir-assist-disclaimer {
+    padding: 6px 14px 10px;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .dir-groups-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+  }
+
+  .dir-groups-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .dir-groups-title { font-weight: 600; font-size: 13px; }
+
+  .dir-group-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .dir-group-item:last-child { border-bottom: none; }
+
+  .dir-group-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .dir-group-name  { font-weight: 500; font-size: 13px; }
+  .dir-group-count { font-size: 11px; color: var(--muted); }
+
+  .dir-group-avatars {
+    display: flex;
+    margin-left: auto;
+  }
+  .dir-group-av {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    margin-left: -6px;
+  }
+  .dir-group-av:first-child { margin-left: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-brand-icon">
+        <svg width="22" height="22" viewBox="0 0 16 16" fill="white"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4L2 5h4z"/></svg>
+      </div>
+      <div>
+        <div class="login-brand-name">Hermes AI Skill Hub</div>
+        <div class="login-brand-sub">Enterprise Platform</div>
+      </div>
+    </div>
+
+    <!-- ── Mode: Login ── -->
+    <div id="modeLogin">
+      <div class="login-title">ลงชื่อเข้าใช้งาน</div>
+      <div class="login-subtitle">ใช้ email และรหัสผ่านองค์กรเพื่อเข้าถึงระบบ</div>
+
+      <label class="login-label">Email องค์กร</label>
+      <input type="email" id="loginEmail" class="login-input"
+        placeholder="yourname@shareinvestor.com"
+        onkeydown="if(event.key==='Enter') $('loginPassword').focus()" />
+
+      <label class="login-label">รหัสผ่าน</label>
+      <div style="position:relative;margin-bottom:8px;">
+        <input type="password" id="loginPassword" class="login-input" style="margin-bottom:0;padding-right:40px;"
+          placeholder="รหัสผ่าน"
+          onkeydown="if(event.key==='Enter') doLogin()" />
+        <button onclick="togglePwd('loginPassword',this)" tabindex="-1"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;">แสดง</button>
+      </div>
+
+      <div class="login-error" id="loginError"></div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
+
+      <div class="login-divider">ยังไม่มีบัญชี?</div>
+      <button onclick="switchMode('register')"
+        style="width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit;">
+        ลงทะเบียนบัญชีใหม่
+      </button>
+    </div>
+
+    <!-- ── Mode: Register ── -->
+    <div id="modeRegister" style="display:none;">
+      <div class="login-title">ลงทะเบียน</div>
+      <div class="login-subtitle">สร้างบัญชีด้วย email องค์กร ข้อมูลจะปรากฏใน Company Directory อัตโนมัติ</div>
+
+      <label class="login-label">Email องค์กร <span style="color:var(--danger)">*</span></label>
+      <input type="email" id="regEmail" class="login-input" placeholder="yourname@shareinvestor.com" />
+
+      <label class="login-label">ชื่อ-นามสกุล <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="regFullName" class="login-input" placeholder="เช่น สมชาย ใจดี" />
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;">
+        <div>
+          <label class="login-label">แผนก</label>
+          <input type="text" id="regDepartment" class="login-input" placeholder="เช่น Engineering" />
+        </div>
+        <div>
+          <label class="login-label">ตำแหน่งงาน</label>
+          <input type="text" id="regJobTitle" class="login-input" placeholder="เช่น Senior Engineer" />
+        </div>
+      </div>
+
+      <label class="login-label">รหัสผ่าน <span style="color:var(--muted);font-weight:400;">(อย่างน้อย 8 ตัวอักษร)</span></label>
+      <div style="position:relative;margin-bottom:8px;">
+        <input type="password" id="regPassword" class="login-input" style="margin-bottom:0;padding-right:40px;"
+          placeholder="ตั้งรหัสผ่าน" />
+        <button onclick="togglePwd('regPassword',this)" tabindex="-1"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;">แสดง</button>
+      </div>
+
+      <label class="login-label">ยืนยันรหัสผ่าน</label>
+      <input type="password" id="regPasswordConfirm" class="login-input"
+        placeholder="พิมพ์รหัสผ่านอีกครั้ง"
+        onkeydown="if(event.key==='Enter') doRegister()" />
+
+      <div class="login-error" id="registerError"></div>
+      <button class="login-btn" id="registerBtn" onclick="doRegister()">สร้างบัญชี</button>
+
+      <div class="login-divider">มีบัญชีแล้ว?</div>
+      <button onclick="switchMode('login')"
+        style="width:100%;background:transparent;border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;font-family:inherit;">
+        กลับไป Login
+      </button>
+    </div>
+
+    <div class="login-footer">
+      Hermes AI Skill Hub &nbsp;|&nbsp; ShareInvestor &nbsp;|&nbsp; Internal Use Only
+    </div>
+  </div>
+</div>
+
+<!-- ── SIDEBAR ── -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-name">Hermes AI Skill Hub</div>
+    <div class="sidebar-brand-sub">Enterprise Platform</div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Overview</div>
+    <div class="nav-item active" data-panel="chat" onclick="showPanel('chat')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H5l-3 2V3a1 1 0 0 1 1-1z"/></svg>
+      Chat Assistant
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Skills</div>
+    <div class="nav-item" data-panel="skills" onclick="showPanel('skills')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4L2 5h4z"/></svg>
+      My Skills
+    </div>
+    <div class="nav-item" data-panel="store" onclick="showPanel('store')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2h14v2l-1 9H2L1 4V2zm4 6a3 3 0 0 0 6 0"/></svg>
+      Skill Store
+    </div>
+    <div class="nav-item" data-panel="create" onclick="showPanel('create')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      Create Skill
+    </div>
+  </div>
+
+
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">People</div>
+    <div class="nav-item" data-panel="directory" onclick="showPanel('directory')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm11-6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm1 5h-1v-1a3 3 0 0 0-.5-1.658C13.898 10.13 15 10.78 15 12v1z"/></svg>
+      Company Directory
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-card" onclick="openMyProfile()" style="cursor:pointer;" title="แก้ไขโปรไฟล์">
+      <div class="user-avatar" id="userAvatar">U</div>
+      <div class="user-card-info">
+        <div class="user-card-name" id="userDisplayName">ผู้ใช้งาน</div>
+        <div class="user-card-role" id="userRole">member</div>
+      </div>
+      <div class="tg-dot unlinked" id="tgDot" title="Telegram ยังไม่ได้เชื่อม"></div>
+    </div>
+    <input type="hidden" id="userEmail" />
+    <button class="logout-btn" onclick="doLogout()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"/></svg>
+      ออกจากระบบ
+    </button>
+  </div>
+</aside>
+
+<!-- ── MAIN ── -->
+<main class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="panelTitle">Dashboard</span>
+    <div class="topbar-actions" id="topbarActions"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- CHAT -->
+    <div id="panel-chat" class="panel active">
+      <div class="chat-layout">
+        <div class="chat-panel">
+          <div class="chat-header">
+            <div class="chat-status-dot"></div>
+            <div>
+              <div class="chat-header-title">Hermes AI Assistant</div>
+              <div class="chat-header-sub">Powered by GPT-4o mini</div>
+            </div>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="msg msg-bot">
+              <div class="msg-sender">HERMES</div>
+              <div class="msg-bubble">สวัสดีครับ ผมคือ Hermes AI Assistant สามารถสอบถาม เรียกใช้ Skill หรือขอความช่วยเหลือเกี่ยวกับงานได้เลยครับ</div>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <textarea class="chat-textarea" id="chatInput" placeholder="พิมพ์ข้อความ..." rows="1"
+              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+            <button class="btn btn-primary" onclick="sendChat()" id="sendBtn">Send</button>
+          </div>
+        </div>
+        <div class="skills-side" id="chatSidebar">
+          <!-- Post-Meeting Actions (shown when meeting report detected) -->
+          <div id="meetingActionsPanel" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
+            <div class="skills-side-header" style="display:flex;align-items:center;justify-content:space-between;">
+              Post-Meeting Actions
+              <button onclick="hideMeetingActions()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);line-height:1;">&times;</button>
+            </div>
+            <div id="meetingActionsContent" style="flex:1;overflow-y:auto;"></div>
+          </div>
+          <!-- Suggested Skills (default) -->
+          <div id="suggestedSkillsPanel" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
+            <div class="skills-side-header">Suggested Skills</div>
+            <div id="suggestedSkills" style="flex:1;overflow-y:auto;">
+              <div style="padding:14px;font-size:12px;color:var(--muted);">Skills will appear as you type...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY SKILLS -->
+    <div id="panel-skills" class="panel">
+      <!-- Page header -->
+      <div class="my-skills-page-header">
+        <div>
+          <div class="my-skills-title">My Skills</div>
+          <div class="my-skills-subtitle">จัดการ Skill ที่สร้างและติดตั้งไว้</div>
+        </div>
+        <button class="btn btn-primary" onclick="showPanel('create')" style="font-size:13px;">
+          + New Skill
+        </button>
+      </div>
+
+      <!-- Modern tabs -->
+      <div style="margin-bottom:18px;">
+        <div class="ms-tab-bar">
+          <button id="tabCreated" class="ms-tab-btn active" onclick="switchSkillTab('created')">
+            สร้างโดยฉัน <span id="tabCreatedCount" class="ms-tab-count">0</span>
+          </button>
+          <button id="tabInstalled" class="ms-tab-btn" onclick="switchSkillTab('installed')">
+            ที่ติดตั้งไว้ <span id="tabInstalledCount" class="ms-tab-count">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Created tab -->
+      <div id="tabPaneCreated">
+        <div id="myCreatedTable"></div>
+      </div>
+
+      <!-- Installed tab -->
+      <div id="tabPaneInstalled" style="display:none;">
+        <div id="myInstalledTable"></div>
+      </div>
+    </div>
+
+    <!-- SKILL STORE -->
+    <div id="panel-store" class="panel">
+      <div class="section-header">
+        <span class="section-title">Skill Store</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="form-control" id="searchStore" placeholder="ค้นหา Skill..." style="width:200px;font-size:12px;"
+            oninput="renderStoreFilter()" />
+          <select class="form-control" id="filterDept" style="width:140px;font-size:12px;" onchange="renderStoreFilter()">
+            <option value="">All Departments</option>
+            <option value="ir">IR Team</option>
+            <option value="dev">Dev Team</option>
+            <option value="content">Content</option>
+            <option value="sales">Sales</option>
+            <option value="qa">QA</option>
+          </select>
+        </div>
+      </div>
+      <div id="storeTable"></div>
+    </div>
+
+    <!-- CREATE SKILL -->
+    <div id="panel-create" class="panel">
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface);width:fit-content;margin-bottom:16px;">
+        <button id="modeSimpleBtn" onclick="switchCreateMode('simple')"
+          style="padding:7px 20px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#fff;font-family:inherit;">
+          Simple Mode
+        </button>
+        <button id="modeAdvancedBtn" onclick="switchCreateMode('advanced')"
+          style="padding:7px 20px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;">
+          Advanced
+        </button>
+      </div>
+
+      <!-- SIMPLE MODE -->
+      <div id="createSimplePane" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+        <!-- Left: Form -->
+        <div class="form-section" style="display:flex;flex-direction:column;gap:16px;">
+          <div class="form-group">
+            <label class="form-label">1. Skill นี้ชื่ออะไร? <span style="color:var(--danger)">*</span></label>
+            <input class="form-control" id="simName" placeholder="เช่น Meeting Minutes Generator" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">2. Skill นี้ช่วยทำอะไร?</label>
+            <textarea class="form-control" id="simWhat" rows="3" placeholder="เช่น สร้างรายงานการประชุมจากบันทึกการประชุม"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">3. ผู้ใช้ต้องใส่อะไรเข้าไป?</label>
+            <input class="form-control" id="simInput" placeholder="เช่น ข้อความบันทึกการประชุม, รายชื่อผู้เข้าร่วม" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">4. อยากให้ผลลัพธ์ออกมาแบบไหน?</label>
+            <input class="form-control" id="simOutput" placeholder="เช่น รายงานการประชุมรูปแบบมาตรฐาน พร้อม Action Items" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+              <label class="form-label">5. ใช้กับแผนกไหน?</label>
+              <select class="form-control" id="simDept">
+                <option value="general">ทั่วไป</option>
+                <option value="ir">IR Team</option>
+                <option value="dev">Dev Team</option>
+                <option value="content">Content</option>
+                <option value="sales">Sales</option>
+                <option value="qa">QA</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">6. ประเภท Skill</label>
+              <select class="form-control" id="simType">
+                <option value="generator">Generator (สร้างเนื้อหา)</option>
+                <option value="summarizer">Summarizer (สรุป)</option>
+                <option value="reviewer">Reviewer (ตรวจสอบ)</option>
+                <option value="analyzer">Analyzer (วิเคราะห์)</option>
+                <option value="assistant">Assistant (ช่วยงาน)</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:auto;padding-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-outline" id="simGenBtn" onclick="simGeneratePrompt()">Generate Prompt</button>
+            <button class="btn btn-ghost" id="simTestBtn" onclick="simTestSkill()" style="display:none;">Test Skill</button>
+            <button class="btn btn-primary" id="simCreateBtn" onclick="simCreateSkill()">+ Create as Draft</button>
+          </div>
+        </div>
+
+        <!-- Right: Prompt preview — same card height as left -->
+        <div class="form-section" style="display:flex;flex-direction:column;gap:10px;padding:0;overflow:hidden;">
+
+          <!-- Placeholder state -->
+          <div id="simPromptPlaceholder" style="display:flex;flex:1;align-items:center;justify-content:center;padding:40px;text-align:center;color:var(--muted);">
+            <div>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 16px;display:block;opacity:.3;"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75z"/></svg>
+              <div style="font-size:14px;font-weight:600;color:var(--ink-2);margin-bottom:6px;">System Prompt จะแสดงที่นี่</div>
+              <div style="font-size:12px;line-height:1.7;color:var(--muted);">กรอกข้อมูลฝั่งซ้ายแล้วกด<br><strong style="color:var(--ink-2);">Generate Prompt</strong></div>
+            </div>
+          </div>
+
+          <!-- Generated prompt state -->
+          <div id="simPromptWrap" style="display:none;flex-direction:column;flex:1;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;">
+              <span class="form-label">System Prompt</span>
+              <button class="btn btn-ghost btn-sm" onclick="$('simPromptWrap').style.display='none';$('simPromptPlaceholder').style.display='flex'">ล้าง</button>
+            </div>
+            <textarea class="form-control" id="simGeneratedPrompt" style="flex:1;font-size:12px;font-family:monospace;resize:none;border:none;border-top:1px solid var(--border);border-radius:0;margin-top:10px;padding:16px 20px;outline:none;box-shadow:none;"></textarea>
+          </div>
+
+          <!-- Test output -->
+          <div id="simTestWrap" style="display:none;flex-direction:column;gap:8px;padding:16px 20px;border-top:1px solid var(--border);">
+            <span class="form-label">ผลลัพธ์ทดสอบ</span>
+            <div class="result-box" id="simTestResult" style="max-height:180px;overflow-y:auto;font-size:12px;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ADVANCED MODE -->
+      <div id="createAdvancedPane" style="display:none;">
+        <div class="form-section" style="max-width:720px;">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label class="form-label">Skill Name <span style="color:var(--danger)">*</span></label>
+              <input class="form-control" id="newName" placeholder="e.g. Annual Report Summarizer" />
+            </div>
+            <div class="form-group full">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" id="newDesc" placeholder="Describe what this skill does..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Department</label>
+              <select class="form-control" id="newDept">
+                <option value="ir">IR Team</option>
+                <option value="dev">Dev Team</option>
+                <option value="content">Content</option>
+                <option value="sales">Sales</option>
+                <option value="qa">QA</option>
+                <option value="general">General</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Type</label>
+              <select class="form-control" id="newType">
+                <option value="summarizer">Summarizer</option>
+                <option value="generator">Generator</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="analyzer">Analyzer</option>
+                <option value="assistant">Assistant</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label class="form-label">System Prompt</label>
+              <div class="form-hint" style="margin-bottom:6px;">ไม่รู้จะเขียนยังไง? กรอก Name + Description แล้วกด Generate Prompt</div>
+              <textarea class="form-control" id="newPrompt" rows="6" placeholder="Instructions for the AI when running this skill..."></textarea>
+            </div>
+            <div class="form-group full">
+              <label class="form-label">Tags</label>
+              <input class="form-control" id="newTags" placeholder="ir, financial, report (comma separated)" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="createSkill()">Create Skill</button>
+            <button class="btn btn-ghost" onclick="generatePrompt()">Generate Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPANY DIRECTORY -->
+    <div id="panel-directory" class="panel">
+
+      <!-- Stats Row -->
+      <div class="dir-stats" id="dirStats">
+        <div class="dir-stat-card">
+          <div class="dir-stat-icon blue">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm8-6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm1 5h-1v-1a3 3 0 0 0-.5-1.658C13.898 10.13 15 10.78 15 12v1z"/></svg>
+          </div>
+          <div>
+            <div class="dir-stat-value" id="statEmployees">—</div>
+            <div class="dir-stat-label">Total Employees</div>
+          </div>
+        </div>
+        <div class="dir-stat-card">
+          <div class="dir-stat-icon purple">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5V5h2V2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5V5H7v.5A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm7.5 0a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zM1 10.5A1.5 1.5 0 0 1 2.5 9h3A1.5 1.5 0 0 1 7 10.5v3A1.5 1.5 0 0 1 5.5 15h-3A1.5 1.5 0 0 1 1 13.5v-3zm1.5-.5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 .5.5h3a.5.5 0 0 0 .5-.5v-3a.5.5 0 0 0-.5-.5h-3zm6.5.5A1.5 1.5 0 0 1 10.5 9h3a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 13.5v-3z"/></svg>
+          </div>
+          <div>
+            <div class="dir-stat-value" id="statDepts">—</div>
+            <div class="dir-stat-label">Departments</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main layout: table left, assistant right -->
+      <div class="dir-layout">
+
+        <!-- LEFT: Employee Table -->
+        <div>
+          <!-- Filters -->
+          <div class="dir-filters">
+            <input class="dir-search" id="dirSearch" placeholder="Search by name, email, or keyword..."
+              oninput="dirDebounce()" />
+            <select class="dir-filter-select" id="dirFilterDept" onchange="loadDirectoryEmployees(1)">
+              <option value="">Department: All</option>
+            </select>
+            <select class="dir-filter-select" id="dirFilterStatus" onchange="loadDirectoryEmployees(1)">
+              <option value="">Status: All</option>
+              <option value="active">Active</option>
+              <option value="away">Away</option>
+              <option value="busy">Busy</option>
+              <option value="offline">Offline</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="clearDirFilters()" style="font-size:12px;">Clear</button>
+            <button class="btn btn-ghost btn-sm" onclick="openCreateTeam()" style="font-size:12px;">+ Create Team</button>
+            <button class="btn btn-primary btn-sm" onclick="openAddEmployeeModal()" style="font-size:12px;margin-left:auto;">+ Add Employee</button>
+          </div>
+
+          <!-- Table -->
+          <div class="dir-table-wrap">
+            <div class="dir-table-head">
+              <div>
+                <div class="dir-table-title">Employee Directory</div>
+                <div class="dir-table-sub" id="dirTableSub">Loading...</div>
+              </div>
+              <button class="btn btn-ghost btn-sm" style="font-size:12px;" onclick="exportDirCSV()">Export CSV</button>
+            </div>
+            <div id="dirTableBody"></div>
+            <div class="dir-pagination" id="dirPagination" style="display:none;">
+              <span id="dirPagLabel"></span>
+              <div class="dir-page-btns" id="dirPageBtns"></div>
+              <select class="dir-filter-select" id="dirPageLimit" onchange="loadDirectoryEmployees(1)" style="padding:4px 8px;">
+                <option value="8">8</option>
+                <option value="15">15</option>
+                <option value="30">30</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /panel-directory -->
+
+  </div>
+</main>
+
+<!-- ── MODAL: Run Skill ── -->
+<div class="modal-overlay" id="runModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="runModalTitle">Run Skill</span>
+      <button class="modal-close" onclick="closeModal('runModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="runSkillId" />
+      <div class="form-group">
+        <label class="form-label">Input</label>
+        <textarea class="form-control" id="runInput" rows="5" placeholder="Enter text, content, or instructions for this skill..."></textarea>
+      </div>
+      <div id="runOutputWrap" style="display:none;">
+        <div class="divider"></div>
+        <div class="form-label" style="margin-bottom:6px;">Output</div>
+        <div class="result-box" id="runResult"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="doRunSkill()" id="runBtn">Run</button>
+      <button class="btn btn-ghost" onclick="closeModal('runModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── MODAL: Draft Email ── -->
+<div class="modal-overlay" id="draftEmailModal">
+  <div class="modal" style="width:540px;">
+    <div class="modal-header">
+      <span class="modal-title">Draft Email</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="openContactsModal()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-size:11px;color:var(--muted);cursor:pointer;font-family:inherit;">Address Book</button>
+        <button class="modal-close" onclick="closeModal('draftEmailModal')">&times;</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px;position:relative;">
+        <label class="form-label">To</label>
+        <input class="form-control" id="emailTo" placeholder="พิมพ์ชื่อ, ชื่อเล่น หรือ email..." autocomplete="off"
+          oninput="showEmailSuggestions(this.value)" onblur="setTimeout(()=>hideEmailSuggestions(),200)" />
+        <div id="emailToSuggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:9999;max-height:200px;overflow-y:auto;"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Subject</label>
+        <input class="form-control" id="emailSubject" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Body</label>
+        <textarea class="form-control" id="emailBody" rows="9" style="font-size:12px;line-height:1.6;"></textarea>
+      </div>
+      <div id="emailDraftLoading" style="display:none;text-align:center;padding:12px;font-size:12px;color:var(--muted);">กำลังร่างอีเมล...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="openInMailApp()">Open in Mail App</button>
+      <button class="btn btn-outline" onclick="copyEmailDraft()">Copy</button>
+      <button class="btn btn-ghost" onclick="closeModal('draftEmailModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Calendar / Follow-up ── -->
+<div class="modal-overlay" id="calendarModal">
+  <div class="modal" style="width:460px;">
+    <div class="modal-header">
+      <span class="modal-title">Create Follow-up Meeting</span>
+      <button class="modal-close" onclick="closeModal('calendarModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Meeting Title</label>
+        <input class="form-control" id="calTitle" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input class="form-control" type="date" id="calDate" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Time</label>
+          <input class="form-control" type="time" id="calTime" value="09:00" />
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Duration</label>
+        <select class="form-control" id="calDuration">
+          <option value="30">30 min</option>
+          <option value="60" selected>1 hour</option>
+          <option value="90">1.5 hours</option>
+          <option value="120">2 hours</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes / Agenda</label>
+        <textarea class="form-control" id="calNotes" rows="4" style="font-size:12px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="downloadICS()">Download .ics</button>
+      <button class="btn btn-ghost" onclick="closeModal('calendarModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Contacts Manager ── -->
+<div class="modal-overlay" id="contactsModal">
+  <div class="modal" style="width:440px;">
+    <div class="modal-header">
+      <span class="modal-title">Address Book</span>
+      <button class="modal-close" onclick="closeModal('contactsModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+        บันทึก alias ของคนในทีม เช่น "คุณเอ" → email จริง ระบบจะ auto-fill ให้ทุกครั้ง
+      </div>
+
+      <!-- Add form -->
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:14px;align-items:end;">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">ชื่อ / Alias</div>
+          <input class="form-control" id="newContactAlias" placeholder="คุณเอ" style="font-size:12px;" />
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:4px;">Email</div>
+          <input class="form-control" id="newContactEmail" placeholder="email@company.com" style="font-size:12px;" />
+        </div>
+        <button class="btn btn-primary" style="font-size:12px;padding:7px 12px;" onclick="saveContact()">Add</button>
+      </div>
+
+      <!-- Contacts list -->
+      <div id="contactsList" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('contactsModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Skill Detail ── -->
+<div class="modal-overlay" id="skillDetailModal">
+  <div class="modal" style="width:580px;">
+    <div class="modal-header">
+      <span class="modal-title" id="detailModalTitle">Skill Detail</span>
+      <button class="modal-close" onclick="closeModal('skillDetailModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="skillDetailBody" style="padding:20px 22px;">
+      <div style="text-align:center;padding:30px;color:var(--muted);">กำลังโหลด...</div>
+    </div>
+    <div class="modal-footer" id="skillDetailFooter">
+      <button class="btn btn-ghost" onclick="closeModal('skillDetailModal')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const API = 'http://localhost:8000';
+let chatHistory = [];
+let lastSkillId = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const getUserEmail = () => $('userEmail').value.trim() || 'user@example.com';
+
+function toast(msg, type = '') {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' toast-' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 3500);
+}
+
+function openModal(id)  { $(id).classList.add('open'); }
+function closeModal(id) {
+  const el = $(id);
+  if (!el) return;
+  // support both CSS-class-based modals (.open) and display:flex modals
+  el.classList.remove('open');
+  if (el.style.display !== '') el.style.display = 'none';
+}
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  $('panel-' + name).classList.add('active');
+
+  const titles = { chat:'Chat Assistant', skills:'My Skills',
+                   store:'Skill Store', create:'Create Skill',
+                   directory:'Company Directory' };
+  $('panelTitle').textContent = titles[name] || name;
+
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.dataset.panel === name) n.classList.add('active');
+  });
+
+  if (name === 'skills')    loadMySkills();
+  if (name === 'store')     loadStore();
+  if (name === 'directory') loadDirectory();
+}
+
+// ── Status Badge ──────────────────────────────────────────────────────────────
+function statusBadge(status) {
+  const map = {
+    draft:                   ['badge-draft',     'Draft'],
+    private:                 ['badge-private',   'Private'],
+    pending_team_review:     ['badge-pending',   'Pending Team Review'],
+    pending_company_review:  ['badge-pending',   'Pending Company Review'],
+    team_available:          ['badge-team',      'Team Available'],
+    company_published:       ['badge-published', 'Published'],
+    rejected:                ['badge-rejected',  'Rejected'],
+    request_edit:            ['badge-edit',      'Edit Required'],
+  };
+  const [cls, label] = map[(status||'').toLowerCase()] || ['badge-draft', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+// ── Skill Table ───────────────────────────────────────────────────────────────
+function renderSkillTable(skills, options = {}) {
+  if (!skills || !skills.length) {
+    return `<div class="empty-state">
+      <div class="empty-state-title">No skills found</div>
+      <div class="empty-state-text">Create a new skill to get started.</div>
+    </div>`;
+  }
+
+  const email = getUserEmail();
+  const filteredSkills = skills.filter(s => {
+    const isOwner = s.owner === email;
+    const isDraftOrPrivate = s.status === 'draft' || s.status === 'private';
+    return isOwner || !isDraftOrPrivate;
+  });
+
+  if (!filteredSkills.length) {
+    return `<div class="empty-state">
+      <div class="empty-state-title">No skills found</div>
+      <div class="empty-state-text">Create a new skill to get started.</div>
+    </div>`;
+  }
+
+  const rows = filteredSkills.map(s => {
+    const isOwner = s.owner === email;
+    const canShare = isOwner && (s.status === 'draft' || s.status === 'private');
+    const canUnshare = isOwner && s.status === 'team_available';
+    const canRun = ['team_available','company_published','private','draft'].includes(s.status);
+
+    let actions = '';
+    if (options.storeView) {
+      actions += `<button class="btn btn-success btn-sm" onclick="installSkill(${s.id})">+ Install</button>`;
+    } else {
+      if (canRun)
+        actions += `<button class="btn btn-ghost btn-sm" onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>`;
+      if (canShare)
+        actions += `<button class="btn btn-outline btn-sm" onclick="publishSkill(${s.id})">Share to Store</button>`;
+      if (canUnshare)
+        actions += `<button class="btn btn-outline btn-sm" onclick="unpublishSkill(${s.id})">Unshare</button>`;
+    }
+
+    const dept = s.department ? `<span class="skill-dept">${s.department.toUpperCase()}</span>` : '';
+
+    return `<div class="skill-row">
+      <div>
+        <div class="skill-name">${s.name}</div>
+        <div class="skill-desc">${(s.description||'').slice(0,70)}${s.description&&s.description.length>70?'...':''}</div>
+      </div>
+      <div>${dept}</div>
+      <div>${statusBadge(s.status)}</div>
+      <div style="font-size:11px;color:var(--muted);">${s.owner}</div>
+      <div class="btn-row">${actions}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="skill-table">
+    <div class="skill-table-header">
+      <div>Skill Name</div>
+      <div>Department</div>
+      <div>Status</div>
+      <div>Owner</div>
+      <div>Actions</div>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+// ── My Skills ─────────────────────────────────────────────────────────────────
+let _skillTab = 'created';
+
+function getSkillIcon(skill) {
+  const t = (skill.skill_type || '').toLowerCase();
+  const n = (skill.name || '').toLowerCase();
+  const _svg = (path, vb='0 0 16 16') =>
+    `<svg width="18" height="18" viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  const icons = {
+    sum:   { svg: _svg('<path d="M3 3h10M3 7h10M3 11h6"/>'), bg: '#eff6ff', color: '#2563eb' },
+    gen:   { svg: _svg('<path d="M11 2l3 3-7 7H4v-3L11 2z"/>'), bg: '#f0fdf4', color: '#16a34a' },
+    rev:   { svg: _svg('<circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l2.5 2.5"/>'), bg: '#fef9c3', color: '#92400e' },
+    meet:  { svg: _svg('<rect x="1" y="3" width="14" height="11" rx="1"/><path d="M1 7h14M5 1v4M11 1v4"/>'), bg: '#f5f3ff', color: '#6d28d9' },
+    email: { svg: _svg('<rect x="1" y="3" width="14" height="10" rx="1"/><path d="M1 4l7 4.5L15 4"/>'), bg: '#fff7ed', color: '#c2410c' },
+    chart: { svg: _svg('<path d="M3 12V8M7 12V4M11 12V7"/>'), bg: '#ecfdf5', color: '#047857' },
+    doc:   { svg: _svg('<path d="M4 1h6l3 3v11H4V1zm6 0v3h3M6 8h4M6 11h3"/>'), bg: '#f0f9ff', color: '#0369a1' },
+    def:   { svg: _svg('<polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/>'), bg: '#f8fafc', color: '#64748b' },
+  };
+  if (t.includes('summ') || n.includes('summ') || n.includes('สรุป')) return icons.sum;
+  if (t.includes('gen')  || n.includes('gen')  || n.includes('สร้าง')) return icons.gen;
+  if (t.includes('review') || n.includes('review') || n.includes('ตรวจ')) return icons.rev;
+  if (n.includes('meet') || n.includes('ประชุม') || n.includes('minutes')) return icons.meet;
+  if (n.includes('email') || n.includes('อีเมล')) return icons.email;
+  if (t.includes('analyz') || n.includes('analyz') || n.includes('วิเคราะห์')) return icons.chart;
+  if (n.includes('report') || n.includes('รายงาน')) return icons.doc;
+  return icons.def;
+}
+
+const STATUS_ACCENT_COLOR = {
+  draft:                  '#94a3b8',
+  private:                '#94a3b8',
+  pending_team_review:    '#f59e0b',
+  pending_company_review: '#f59e0b',
+  team_available:         '#10b981',
+  company_published:      '#2563eb',
+  rejected:               '#ef4444',
+  request_edit:           '#f59e0b',
+};
+
+function renderSkillCards(skills) {
+  if (!skills || !skills.length) {
+    return `<div class="empty-state">
+      <div class="empty-state-title">ยังไม่มี Skill ที่สร้างเอง</div>
+      <div class="empty-state-text" style="margin-bottom:16px;">สร้าง Skill แรกของคุณเพื่อใช้งานใน Chat Assistant</div>
+      <button class="btn btn-primary btn-sm" onclick="showPanel('create')">+ สร้าง Skill ใหม่</button>
+    </div>`;
+  }
+  const email = getUserEmail();
+  const cards = skills.map(s => {
+    const isOwner = s.owner === email;
+    const canShare = isOwner && (s.status === 'draft' || s.status === 'private');
+    const canUnshare = isOwner && s.status === 'team_available';
+    const canRun = ['team_available','company_published','private','draft'].includes(s.status);
+    const { svg, bg, color } = getSkillIcon(s);
+    const accent = STATUS_ACCENT_COLOR[s.status] || '#94a3b8';
+    const dept = s.department ? `<span class="skill-dept" style="font-size:10px;padding:2px 7px;">${s.department.toUpperCase()}</span>` : '';
+    const desc = (s.description || '').slice(0, 80) + ((s.description || '').length > 80 ? '…' : '');
+    const dateStr = s.created_at
+      ? new Date(s.created_at).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'})
+      : '';
+    let actions = '';
+    if (canRun) actions += `<button class="btn btn-primary btn-sm" onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>`;
+    if (canShare) actions += `<button class="btn btn-outline btn-sm" onclick="publishSkill(${s.id})">Share to Store</button>`;
+    if (canUnshare) actions += `<button class="btn btn-outline btn-sm" onclick="unpublishSkill(${s.id})">Unshare</button>`;
+    return `<div class="skill-card">
+      <div class="skill-card-accent" style="background:${accent};"></div>
+      <div class="skill-card-body">
+        <div class="skill-card-top">
+          <div class="skill-card-icon" style="background:${bg};color:${color};">${svg}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="skill-card-title">${s.name}</div>
+            ${desc ? `<div class="skill-card-desc">${desc}</div>` : ''}
+          </div>
+          <div style="flex-shrink:0;margin-left:6px;">${statusBadge(s.status)}</div>
+        </div>
+        <div class="skill-card-tags">${dept}</div>
+      </div>
+      <div class="skill-card-footer">
+        ${actions}
+        <button class="btn btn-sm" style="background:none;border:1px solid #fca5a5;color:#ef4444;margin-left:auto;" onclick="deleteSkill(${s.id},'${s.name.replace(/'/g,"\\'")}')">ลบ</button>
+        ${dateStr ? `<span class="skill-date-tag">${dateStr}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="skill-cards-grid">${cards}</div>`;
+}
+
+function renderInstalledCards(skills) {
+  if (!skills || !skills.length) {
+    return `<div class="empty-state">
+      <div class="empty-state-title">ยังไม่ได้ติดตั้ง Skill ใดเลย</div>
+      <div class="empty-state-text" style="margin-bottom:16px;">ไปที่ Skill Store แล้วกด <strong>+ Install</strong> เพื่อเพิ่ม Skill<br>จากนั้นสามารถ Run ได้จากหน้านี้หรือผ่าน Chat Assistant</div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button class="btn btn-primary btn-sm" onclick="showPanel('store')">Browse Store</button>
+        <button class="btn btn-ghost btn-sm" onclick="showPanel('create')">+ Create New</button>
+      </div>
+    </div>`;
+  }
+  const cards = skills.map(s => {
+    const { svg, bg, color } = getSkillIcon(s);
+    const dept = s.department ? `<span class="skill-dept" style="font-size:10px;padding:2px 7px;">${s.department.toUpperCase()}</span>` : '';
+    const desc = (s.description || '').slice(0, 80) + ((s.description || '').length > 80 ? '…' : '');
+    const dateStr = s.installed_at
+      ? new Date(s.installed_at).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'})
+      : '';
+    return `<div class="skill-card">
+      <div class="skill-card-accent" style="background:#10b981;"></div>
+      <div class="skill-card-body">
+        <div class="skill-card-top">
+          <div class="skill-card-icon" style="background:${bg};color:${color};">${svg}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="skill-card-title">${s.name}</div>
+            ${desc ? `<div class="skill-card-desc">${desc}</div>` : ''}
+          </div>
+          <div style="flex-shrink:0;margin-left:6px;"><span class="badge badge-team">Installed</span></div>
+        </div>
+        <div class="skill-card-tags">${dept}</div>
+      </div>
+      <div class="skill-card-footer">
+        <button class="btn btn-primary btn-sm" onclick="openRunModal(${s.skill_id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
+        <button class="btn btn-ghost btn-sm" onclick="openSkillDetail(${s.skill_id})">Details</button>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;" onclick="uninstallSkill(${s.installation_id})">ถอน</button>
+        ${dateStr ? `<span class="skill-date-tag">${dateStr}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="skill-cards-grid">${cards}</div>`;
+}
+
+function switchSkillTab(tab) {
+  _skillTab = tab;
+  $('tabPaneCreated').style.display  = tab === 'created'   ? 'block' : 'none';
+  $('tabPaneInstalled').style.display = tab === 'installed' ? 'block' : 'none';
+  $('tabCreated').className   = 'ms-tab-btn' + (tab === 'created'   ? ' active' : '');
+  $('tabInstalled').className = 'ms-tab-btn' + (tab === 'installed' ? ' active' : '');
+}
+
+async function loadMySkills() {
+  const email = getUserEmail();
+
+  // ── สกิลที่สร้างเอง ────────────────────────────────────────────────────────
+  try {
+    const r = await fetch(`${API}/api/skills/list?limit=100&owner=${encodeURIComponent(email)}`);
+    const d = await r.json();
+    const mine = (d.items || []).filter(s => s.status !== 'deprecated');
+    const cc = $('tabCreatedCount'); if (cc) cc.textContent = mine.length;
+    $('myCreatedTable').innerHTML = renderSkillCards(mine);
+  } catch {
+    $('myCreatedTable').innerHTML = '<div class="empty-state"><div class="empty-state-title">โหลดไม่ได้</div></div>';
+  }
+
+  // ── สกิลที่ Install ไว้ ────────────────────────────────────────────────────
+  try {
+    const r = await fetch(`${API}/api/users/${encodeURIComponent(email)}/skills`);
+    const d = await r.json();
+    const installed = d.installed_skills || [];
+    const ic = $('tabInstalledCount'); if (ic) ic.textContent = installed.length;
+    $('myInstalledTable').innerHTML = renderInstalledCards(installed);
+  } catch {
+    $('myInstalledTable').innerHTML = '<div class="empty-state"><div class="empty-state-title">โหลดไม่ได้</div></div>';
+  }
+}
+
+function renderInstalledTable(skills) {
+  const rows = skills.map(s => {
+    const dept = s.department ? `<span class="skill-dept">${s.department.toUpperCase()}</span>` : '';
+    const installedDate = s.installed_at
+      ? new Date(s.installed_at).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'})
+      : '';
+    return `<div class="skill-row">
+      <div>
+        <div class="skill-name">${s.name}</div>
+        <div class="skill-desc">${(s.description||'').slice(0,70)}${(s.description||'').length>70?'...':''}</div>
+      </div>
+      <div>${dept}</div>
+      <div><span class="badge badge-team">Installed</span></div>
+      <div style="font-size:11px;color:var(--muted);">${installedDate}</div>
+      <div class="btn-row">
+        <button class="btn btn-primary btn-sm" onclick="openRunModal(${s.skill_id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
+        <button class="btn btn-ghost btn-sm" onclick="openSkillDetail(${s.skill_id})">Details</button>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;" onclick="uninstallSkill(${s.installation_id})">ถอน</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="skill-table">
+    <div class="skill-table-header">
+      <div>Skill Name</div>
+      <div>Department</div>
+      <div>Status</div>
+      <div>ติดตั้งเมื่อ</div>
+      <div>Actions</div>
+    </div>
+    ${rows}
+  </div>`;
+}
+
+async function uninstallSkill(installationId) {
+  if (!confirm('ต้องการถอนการติดตั้ง Skill นี้หรือไม่?')) return;
+  try {
+    const r = await fetch(`${API}/api/installations/${installationId}`, { method: 'DELETE' });
+    if (r.ok) {
+      toast('ถอนการติดตั้งแล้ว', 'success');
+      loadMySkills();
+    } else {
+      const d = await r.json();
+      toast(d.detail || 'ไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อ Backend ไม่ได้', 'error');
+  }
+}
+
+// ── Skill Store ───────────────────────────────────────────────────────────────
+let _installedIds = new Set();
+let _storeCache = []; // cache all skills for client-side search
+
+async function loadStore() {
+  const email = getUserEmail();
+  const qs = (s) => `${API}/api/skills/list?status=${s}&limit=50`;
+
+  try {
+    const [tr, cr, ir] = await Promise.all([
+      fetch(qs('team_available')),
+      fetch(qs('company_published')),
+      fetch(`${API}/api/users/${encodeURIComponent(email)}/skills`),
+    ]);
+    const [td, cd, inst] = await Promise.all([tr.json(), cr.json(), ir.json()]);
+
+    _installedIds = new Set((inst.installed_skills || []).map(s => s.skill_id));
+    _storeCache = [...(td.items||[]), ...(cd.items||[])].filter(s => s.status !== 'deprecated');
+    renderStoreFilter();
+  } catch {
+    $('storeTable').innerHTML = '<div class="empty-state"><div class="empty-state-title">โหลดไม่ได้</div></div>';
+  }
+}
+
+function renderStoreFilter() {
+  const q = ($('searchStore')?.value || '').toLowerCase();
+  const dept = $('filterDept')?.value || '';
+  const filtered = _storeCache.filter(s => {
+    const matchDept = !dept || (s.department || '').toLowerCase() === dept;
+    const matchQ = !q ||
+      s.name.toLowerCase().includes(q) ||
+      (s.description || '').toLowerCase().includes(q) ||
+      (s.tags || []).some(t => t.toLowerCase().includes(q));
+    return matchDept && matchQ;
+  });
+  $('storeTable').innerHTML = filtered.length
+    ? renderStoreTable(filtered)
+    : `<div class="empty-state"><div class="empty-state-title">ไม่พบ Skill ที่ตรงกัน</div></div>`;
+}
+
+function renderStoreTable(skills) {
+  const email = getUserEmail();
+  const rows = skills.map(s => {
+    const dept = s.department ? `<span class="skill-dept">${s.department.toUpperCase()}</span>` : '';
+    const isOwner    = s.owner === email;
+    const isInstalled = _installedIds.has(s.id);
+
+    let installBtn;
+    if (isOwner) {
+      installBtn = `<span style="font-size:11px;color:var(--muted);font-weight:600;">สร้างโดยคุณ</span>`;
+    } else if (isInstalled) {
+      installBtn = `<button class="btn btn-sm" disabled
+        style="background:#f1f5f9;color:var(--muted);border:1px solid var(--border);cursor:default;">ติดตั้งแล้ว</button>`;
+    } else {
+      installBtn = `<button class="btn btn-success btn-sm" onclick="installSkill(${s.id})">+ Install</button>`;
+    }
+    const actionBtn = `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" onclick="openSkillDetail(${s.id})">Details</button>
+      ${installBtn}
+    </div>`;
+
+    return `<div class="skill-row">
+      <div>
+        <div class="skill-name" style="cursor:pointer;" onclick="openSkillDetail(${s.id})">${s.name}</div>
+        <div class="skill-desc">${(s.description||'').slice(0,70)}${(s.description||'').length>70?'...':''}</div>
+      </div>
+      <div>${dept}</div>
+      <div>${statusBadge(s.status)}</div>
+      <div style="font-size:11px;color:var(--muted);">${s.owner.split('@')[0]}</div>
+      <div class="btn-row">${actionBtn}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="skill-table">
+    <div class="skill-table-header">
+      <div>Skill Name</div><div>Department</div><div>Status</div><div>Owner</div><div>Actions</div>
+    </div>${rows}
+  </div>`;
+}
+
+
+// ── Create Skill Mode Toggle ──────────────────────────────────────────────────
+function switchCreateMode(mode) {
+  const isSimple = mode === 'simple';
+  $('createSimplePane').style.display  = isSimple ? 'grid' : 'none';
+  $('createAdvancedPane').style.display = isSimple ? 'none'  : 'block';
+  $('modeSimpleBtn').style.cssText   = (isSimple ? 'background:var(--accent);color:#fff;' : 'background:transparent;color:var(--muted);')
+    + 'padding:7px 20px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;';
+  $('modeAdvancedBtn').style.cssText = (!isSimple ? 'background:var(--accent);color:#fff;' : 'background:transparent;color:var(--muted);')
+    + 'padding:7px 20px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;';
+}
+
+async function simGeneratePrompt() {
+  const name = $('simName').value.trim();
+  const what = $('simWhat').value.trim();
+  if (!name) return toast('กรุณากรอกชื่อ Skill ก่อน', 'error');
+
+  const btn = $('simGenBtn');
+  btn.innerHTML = '<span class="spinner"></span> กำลัง Generate...';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: `Generate a professional Thai/English system prompt for an AI skill with these details:
+- Name: ${name}
+- What it does: ${what || '-'}
+- Input: ${$('simInput').value || '-'}
+- Output: ${$('simOutput').value || '-'}
+- Type: ${$('simType').value}
+- Department: ${$('simDept').value}
+
+Write the system prompt in Thai/English mixed. Be specific about input format, output format, and role. Start with "คุณคือ [Skill Name]..."`,
+        user_email: getUserEmail(),
+      })
+    });
+    const d = await r.json();
+    const prompt = d.reply || '';
+    $('simGeneratedPrompt').value = prompt;
+    $('simPromptWrap').style.display = 'flex';
+    $('simPromptPlaceholder').style.display = 'none';
+    $('simTestWrap').style.display = 'none';
+    $('simTestBtn').style.display = 'inline-flex';
+    toast('Generate Prompt สำเร็จ', 'success');
+  } catch {
+    toast('ไม่สามารถ Generate ได้', 'error');
+  } finally {
+    btn.innerHTML = 'Generate Prompt';
+    btn.disabled = false;
+  }
+}
+
+async function simTestSkill() {
+  const prompt = $('simGeneratedPrompt').value.trim();
+  if (!prompt) return toast('Generate Prompt ก่อนนะครับ', 'error');
+
+  const testInput = window.prompt('ใส่ข้อความทดสอบ (sample input):') || '';
+  if (!testInput) return;
+
+  const btn = $('simTestBtn');
+  btn.innerHTML = '<span class="spinner"></span> กำลัง Test...';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: testInput,
+        user_email: getUserEmail(),
+        conversation_history: [{ role: 'system', content: prompt }],
+      })
+    });
+    const d = await r.json();
+    $('simTestResult').textContent = d.reply || 'No output';
+    $('simTestWrap').style.display = 'flex';
+  } catch {
+    toast('Test ไม่สำเร็จ', 'error');
+  } finally {
+    btn.innerHTML = 'Test Skill';
+    btn.disabled = false;
+  }
+}
+
+async function simCreateSkill() {
+  const name = $('simName').value.trim();
+  if (!name) return toast('กรุณากรอกชื่อ Skill ก่อน', 'error');
+
+  const body = {
+    name,
+    description: $('simWhat').value || '',
+    owner: getUserEmail(),
+    department: $('simDept').value,
+    skill_type: $('simType').value,
+    tags: [($('simDept').value), ($('simType').value)].filter(Boolean),
+    prompt_template: $('simGeneratedPrompt').value || undefined,
+  };
+
+  try {
+    const r = await fetch(`${API}/api/skills/create`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (r.ok) {
+      toast(`Skill "${d.name}" สร้างแล้ว (Draft)`, 'success');
+      ['simName','simWhat','simInput','simOutput','simGeneratedPrompt'].forEach(id => $(id).value = '');
+      $('simPromptWrap').style.display = 'none';
+      $('simTestWrap').style.display = 'none';
+      $('simTestBtn').style.display = 'none';
+      $('simPromptPlaceholder').style.display = 'flex';
+      setTimeout(() => showPanel('skills'), 1400);
+    } else {
+      toast(d.detail || 'สร้างไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อ Backend ไม่ได้', 'error');
+  }
+}
+
+// ── Create Skill ──────────────────────────────────────────────────────────────
+async function createSkill() {
+  const name = $('newName').value.trim();
+  if (!name) return toast('Skill name is required.', 'error');
+
+  const body = {
+    name,
+    description: $('newDesc').value,
+    owner: getUserEmail(),
+    department: $('newDept').value,
+    skill_type: $('newType').value,
+    tags: $('newTags').value.split(',').map(t=>t.trim()).filter(Boolean),
+  };
+  if ($('newPrompt').value) body.prompt_template = $('newPrompt').value;
+
+  try {
+    const r = await fetch(`${API}/api/skills/create`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (r.ok) {
+      toast(`Skill "${d.name}" created successfully.`, 'success');
+      ['newName','newDesc','newTags','newPrompt'].forEach(id => $(id).value = '');
+      setTimeout(() => showPanel('skills'), 1400);
+    } else {
+      toast(d.detail || 'Failed to create skill.', 'error');
+    }
+  } catch {
+    toast('Unable to connect to backend.', 'error');
+  }
+}
+
+async function generatePrompt() {
+  const name = $('newName').value.trim();
+  const desc = $('newDesc').value.trim();
+  if (!name && !desc) return toast('Enter a name or description first.', 'error');
+
+  const btn = document.querySelector('[onclick="generatePrompt()"]');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        message: `Generate a professional system prompt for an AI skill named "${name}". ${desc ? 'Description: ' + desc : ''} The prompt should define the role, input format, output format, and constraints clearly.`,
+        user_email: getUserEmail(),
+      })
+    });
+    const d = await r.json();
+    $('newPrompt').value = d.reply || '';
+    toast('System prompt generated.', 'success');
+  } catch {
+    toast('Failed to generate prompt.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// ── Run Skill ─────────────────────────────────────────────────────────────────
+function openRunModal(skillId, skillName) {
+  $('runSkillId').value = skillId;
+  $('runModalTitle').textContent = skillName;
+  $('runInput').value = '';
+  $('runOutputWrap').style.display = 'none';
+  openModal('runModal');
+}
+
+async function doRunSkill() {
+  const skillId = $('runSkillId').value;
+  const input   = $('runInput').value.trim();
+  if (!input) return toast('Please provide input.', 'error');
+
+  const btn = $('runBtn');
+  btn.innerHTML = '<span class="spinner"></span> Running...';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch(`${API}/api/skills/${skillId}/run`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ input_text: input, user_email: getUserEmail() })
+    });
+    const d = await r.json();
+    $('runResult').textContent = d.output || d.detail || 'No output received.';
+    $('runOutputWrap').style.display = 'block';
+  } catch {
+    toast('Failed to run skill.', 'error');
+  } finally {
+    btn.innerHTML = 'Run';
+    btn.disabled = false;
+  }
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+async function deleteSkill(skillId, skillName) {
+  if (!confirm(`ลบ "${skillName}" ออกจากระบบ? ไม่สามารถกู้คืนได้`)) return;
+  try {
+    const r = await fetch(`${API}/api/skills/${skillId}`, { method: 'DELETE' });
+    if (r.ok) {
+      toast(`ลบ "${skillName}" แล้ว`, 'success');
+      loadMySkills();
+    } else {
+      const d = await r.json();
+      toast(d.detail || 'ลบไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อ Backend ไม่ได้', 'error');
+  }
+}
+
+async function publishSkill(skillId) {
+  if (!confirm('Share Skill นี้ไปที่ Skill Store ให้ทุกคน Install ได้?')) return;
+  try {
+    const r = await fetch(`${API}/api/skills/${skillId}/publish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    });
+    if (r.ok) {
+      toast('เผยแพร่ Skill ไปยัง Skill Store แล้ว', 'success');
+      loadMySkills();
+    } else {
+      const d = await r.json();
+      toast(d.detail || 'ไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อ Backend ไม่ได้', 'error');
+  }
+}
+
+async function unpublishSkill(skillId) {
+  if (!confirm('ยกเลิกการเผยแพร่? Skill จะหายออกจาก Skill Store')) return;
+  try {
+    const r = await fetch(`${API}/api/skills/${skillId}/unpublish`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    });
+    if (r.ok) {
+      toast('ยกเลิกการเผยแพร่แล้ว', 'success');
+      loadMySkills();
+    } else {
+      const d = await r.json();
+      toast(d.detail || 'ไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อ Backend ไม่ได้', 'error');
+  }
+}
+
+// ── Install ───────────────────────────────────────────────────────────────────
+async function installSkill(skillId) {
+  try {
+    const r = await fetch(`${API}/api/installations/install`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ skill_id: skillId, user_email: getUserEmail() })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      toast('Skill installed to your assistant.', 'success');
+      loadStore();
+    } else {
+      toast(d.detail || 'Already installed.', 'error');
+    }
+  } catch {
+    toast('Unable to connect to backend.', 'error');
+  }
+}
+
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function sendChat() {
+  const input = $('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  appendMsg(msg, 'user');
+
+  const sendBtn = $('sendBtn');
+  sendBtn.innerHTML = '<span class="spinner"></span>';
+  sendBtn.disabled = true;
+
+  chatHistory.push({ role:'user', content: msg });
+
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        message: msg,
+        user_email: getUserEmail(),
+        conversation_history: chatHistory.slice(-10),
+        last_skill_id: lastSkillId,
+      })
+    });
+    const d = await r.json();
+    const reply = d.reply || 'No response received.';
+
+    // Store last skill context
+    if (d.last_skill_id) lastSkillId = d.last_skill_id;
+
+    appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
+    chatHistory.push({ role:'assistant', content: reply });
+
+    // Post-meeting panel
+    if (d.is_meeting_report) {
+      showMeetingActions(reply);
+    }
+
+    // Suggested Skills panel
+    if (d.suggested_skills?.length) {
+      $('suggestedSkills').innerHTML = d.suggested_skills.map(s => `
+        <div class="skill-item">
+          <div class="skill-item-name">${s.name}</div>
+          <div class="skill-item-desc">${(s.description||'').slice(0,55)}${(s.description||'').length>55?'...':''}</div>
+          <div style="display:flex;gap:5px;margin-top:7px;">
+            <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;"
+              onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
+            ${s.is_installed
+              ? `<button class="btn btn-sm" disabled style="background:#f1f5f9;color:var(--muted);border:1px solid var(--border);font-size:10px;">ติดตั้งแล้ว</button>`
+              : `<button class="btn btn-success btn-sm" style="font-size:10px;"
+                  onclick="installSkill(${s.id})">+ Install</button>`}
+          </div>
+        </div>`).join('');
+    } else if (!d.suggested_skills?.length) {
+      $('suggestedSkills').innerHTML = '<div style="padding:14px;font-size:12px;color:var(--muted);">พิมพ์เพื่อรับ Skill แนะนำ...</div>';
+    }
+  } catch {
+    appendMsg('Unable to connect to the backend server. Please ensure it is running.', 'bot');
+  } finally {
+    sendBtn.innerHTML = 'Send';
+    sendBtn.disabled = false;
+  }
+}
+
+// ── Post-Meeting Action Center ────────────────────────────────────────────────
+let _lastMeetingData = null;
+let _lastReportText  = '';
+
+function showMeetingActions(reportText) {
+  _lastReportText = reportText;
+  _lastMeetingData = null;
+
+  // Switch panels
+  const mp = $('meetingActionsPanel');
+  const sp = $('suggestedSkillsPanel');
+  mp.style.display = 'flex';
+  sp.style.display = 'none';
+
+  // Show skeleton immediately
+  $('meetingActionsContent').innerHTML = `
+    <div class="meeting-section">
+      <div class="meeting-section-label">กำลังวิเคราะห์...</div>
+      <div style="height:10px;background:#f3f4f6;border-radius:4px;margin-bottom:6px;"></div>
+      <div style="height:10px;background:#f3f4f6;border-radius:4px;width:60%;"></div>
+    </div>`;
+
+  // Async extract
+  fetch(`${API}/api/meeting/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: reportText, user_email: getUserEmail() }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    _lastMeetingData = data;
+    renderMeetingPanel(data);
+  })
+  .catch(() => {
+    _lastMeetingData = {};
+    renderMeetingPanel({});
+  });
+}
+
+function hideMeetingActions() {
+  $('meetingActionsPanel').style.display = 'none';
+  $('suggestedSkillsPanel').style.display = 'flex';
+}
+
+function renderMeetingPanel(d) {
+  const title    = d.title || 'Meeting Report';
+  const date     = d.date  || '';
+  const parts    = Array.isArray(d.participants) ? d.participants : [];
+  const actions  = Array.isArray(d.action_items) ? d.action_items : [];
+  const needsFollowUp = d.follow_up_required;
+  const followUpDate  = d.follow_up_suggested_date || '';
+
+  const partsHtml = parts.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:5px;">
+        ${parts.map(p => `<span class="meeting-participant">${p}</span>`).join('')}
+       </div>`
+    : `<div style="font-size:11px;color:var(--muted);">-</div>`;
+
+  const actionsHtml = actions.length
+    ? actions.map(a => `
+        <div class="action-item-card">
+          <div class="action-item-task">${typeof a === 'object' ? (a.task || a.description || JSON.stringify(a)) : a}</div>
+          ${typeof a === 'object' && a.owner ? `<div class="action-item-meta">ผู้รับผิดชอบ: ${a.owner}</div>` : ''}
+          ${typeof a === 'object' && a.due ? `<div class="action-item-meta">กำหนด: ${a.due}</div>` : ''}
+        </div>`).join('')
+    : `<div style="font-size:11px;color:var(--muted);">ไม่พบ action items</div>`;
+
+  $('meetingActionsContent').innerHTML = `
+    <div class="meeting-section">
+      <div class="meeting-section-label">การประชุม</div>
+      <div class="meeting-info-title">${title}</div>
+      ${date ? `<div class="meeting-info-date">${date}</div>` : ''}
+    </div>
+
+    <div class="meeting-section">
+      <div class="meeting-section-label">ผู้เข้าร่วม ${parts.length ? `(${parts.length})` : ''}</div>
+      ${partsHtml}
+    </div>
+
+    <div class="meeting-section">
+      <div class="meeting-section-label">Action Items ${actions.length ? `(${actions.length})` : ''}</div>
+      ${actionsHtml}
+    </div>
+
+    <div class="meeting-section" style="border-bottom:none;">
+      <div class="meeting-section-label">Actions</div>
+      <button class="meeting-action-btn primary" onclick="openDraftEmail()">Draft Follow-up Email</button>
+      <button class="meeting-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      <button class="meeting-action-btn" onclick="copyMeetingReport()">Copy Report</button>
+    </div>`;
+}
+
+async function openDraftEmail() {
+  // Ensure contacts and directory are loaded
+  if (!_contacts || _contacts.length === 0) await loadContacts();
+  if (!_dirPeople || _dirPeople.length === 0) await loadDirPeople();
+
+  openModal('draftEmailModal');
+
+  // Debug: log what we have
+  console.log('📧 Draft Email Debug:', {
+    participants: _lastMeetingData?.participants,
+    contacts: _contacts,
+    meetingData: _lastMeetingData
+  });
+
+  // Auto-fill "To" from action item owners first, then participants
+  const emailRegex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+  const participants = _lastMeetingData?.participants || [];
+  const actionItems  = _lastMeetingData?.action_items || [];
+
+  // Collect unique names: action item owners take priority
+  const namesToResolve = [];
+  for (const a of actionItems) {
+    if (typeof a === 'object' && a.owner) {
+      const o = a.owner.trim();
+      if (o && !namesToResolve.includes(o)) namesToResolve.push(o);
+    }
+  }
+  for (const p of participants) {
+    const t = p.trim();
+    if (t && !namesToResolve.includes(t)) namesToResolve.push(t);
+  }
+
+  const resolved = [];
+  for (const name of namesToResolve) {
+    const emailMatch = name.match(emailRegex);
+    if (emailMatch) {
+      const email = emailMatch[0];
+      if (!resolved.includes(email)) resolved.push(email);
+      continue;
+    }
+    const resolvedEmail = resolveNameToEmail(name);
+    if (resolvedEmail) {
+      if (!resolved.includes(resolvedEmail)) resolved.push(resolvedEmail);
+    } else if (name) {
+      if (!resolved.includes(name)) resolved.push(name);
+    }
+  }
+
+  $('emailTo').value = resolved.join(', ');
+
+  $('emailSubject').value = '';
+  $('emailBody').value = '';
+  $('emailDraftLoading').style.display = 'block';
+
+  try {
+    const r = await fetch(`${API}/api/meeting/draft-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        meeting_data: _lastMeetingData || {},
+        user_email: getUserEmail(),
+      }),
+    });
+    const d = await r.json();
+    $('emailSubject').value = d.subject || '';
+    $('emailBody').value    = d.body    || '';
+  } catch {
+    $('emailBody').value = _lastReportText;
+  } finally {
+    $('emailDraftLoading').style.display = 'none';
+  }
+}
+
+function openCalendarForm() {
+  openModal('calendarModal');
+  const d = _lastMeetingData || {};
+  $('calTitle').value = d.title ? `Follow-up: ${d.title}` : 'Follow-up Meeting';
+  $('calNotes').value = '';
+
+  // Try to parse follow_up_suggested_date into YYYY-MM-DD for the date input
+  if (d.follow_up_suggested_date) {
+    try {
+      const raw = d.follow_up_suggested_date;
+      // already YYYY-MM-DD?
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        $('calDate').value = raw;
+      } else {
+        const parsed = new Date(raw);
+        if (!isNaN(parsed)) {
+          $('calDate').value = parsed.toISOString().slice(0,10);
+        }
+      }
+    } catch {}
+  } else {
+    // default: 1 week from today
+    const nxt = new Date();
+    nxt.setDate(nxt.getDate() + 7);
+    $('calDate').value = nxt.toISOString().slice(0,10);
+  }
+
+  $('calTime').value     = '09:00';
+  $('calDuration').value = '60';
+
+  if (Array.isArray(d.action_items) && d.action_items.length) {
+    $('calNotes').value = 'Action Items:\n' + d.action_items.map((a,i) =>
+      `${i+1}. ${typeof a === 'object' ? (a.task || a.description || '') : a}`
+    ).join('\n');
+  }
+}
+
+function downloadICS() {
+  const title    = $('calTitle').value.trim() || 'Follow-up Meeting';
+  const dateVal  = $('calDate').value;
+  const timeVal  = $('calTime').value || '09:00';
+  const duration = parseInt($('calDuration').value) || 60;
+  const notes    = $('calNotes').value.trim();
+
+  if (!dateVal) { alert('กรุณาระบุวันที่'); return; }
+
+  const [y, mo, d] = dateVal.split('-').map(Number);
+  const [h, mi]    = timeVal.split(':').map(Number);
+  const pad = n => String(n).padStart(2,'0');
+  const dtStart = `${y}${pad(mo)}${pad(d)}T${pad(h)}${pad(mi)}00`;
+
+  const endDate = new Date(y, mo-1, d, h, mi + duration);
+  const dtEnd = `${endDate.getFullYear()}${pad(endDate.getMonth()+1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`;
+
+  const uid = `hermes-${Date.now()}@ailab`;
+  const descSafe = notes.replace(/\n/g,'\\n').replace(/,/g,'\\,');
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Hermes AI Skill Hub//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `SUMMARY:${title}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `DESCRIPTION:${descSafe}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${title.replace(/\s+/g,'-')}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeModal('calendarModal');
+}
+
+function openInMailApp() {
+  const to      = $('emailTo').value.trim();
+  const subject = encodeURIComponent($('emailSubject').value.trim());
+  const body    = encodeURIComponent($('emailBody').value.trim());
+  window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+}
+
+function copyEmailDraft() {
+  const text = `Subject: ${$('emailSubject').value}\n\n${$('emailBody').value}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function copyMeetingReport() {
+  navigator.clipboard.writeText(_lastReportText).then(() => {
+    // brief visual feedback on the button
+    const btns = $('meetingActionsContent').querySelectorAll('.meeting-action-btn');
+    btns.forEach(b => { if (b.textContent.trim() === 'Copy Report') {
+      const orig = b.textContent;
+      b.textContent = 'Copied!';
+      setTimeout(() => { b.textContent = orig; }, 1500);
+    }});
+  });
+}
+
+// ── Contacts / Address Book ───────────────────────────────────────────────────
+let _contacts = [];
+let _dirPeople = [];  // employees from directory (auto-loaded for name resolution)
+
+async function loadContacts() {
+  const email = getUserEmail();
+  try {
+    const r = await fetch(`${API}/api/contacts/${encodeURIComponent(email)}`);
+    _contacts = await r.json();
+  } catch { _contacts = []; }
+  return _contacts;
+}
+
+async function loadDirPeople() {
+  try {
+    const r = await fetch(`${API}/api/directory/employees?limit=100`);
+    const d = await r.json();
+    _dirPeople = d.employees || [];
+  } catch { _dirPeople = []; }
+  return _dirPeople;
+}
+
+// Resolve a name/alias/nickname to email — checks directory first, then manual contacts
+function resolveNameToEmail(name) {
+  const n = name.trim().toLowerCase();
+  // Check directory by nickname
+  let found = _dirPeople.find(e => e.nickname && e.nickname.toLowerCase() === n);
+  if (found) return found.email;
+  // Check directory by full_name
+  found = _dirPeople.find(e => e.full_name && e.full_name.toLowerCase() === n);
+  if (found) return found.email;
+  // Check manual contacts
+  found = _contacts.find(c => c.alias.toLowerCase() === n);
+  if (found) return found.email;
+  return null;
+}
+
+async function openContactsModal() {
+  openModal('contactsModal');
+  $('newContactAlias').value = '';
+  $('newContactEmail').value = '';
+  await Promise.all([loadContacts(), loadDirPeople()]);
+  renderContactsList();
+}
+
+function renderContactsList() {
+  let html = '';
+
+  // ── Section 1: Employee Directory (auto) ──
+  if (_dirPeople.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;background:#f8fafc;border-bottom:1px solid var(--border);">Employee Directory</div>`;
+    html += _dirPeople.map(e => {
+      const label = e.nickname ? `${e.nickname} (${e.full_name || e.email})` : (e.full_name || e.email);
+      return `<div style="display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);gap:8px;cursor:pointer;transition:background 0.15s;"
+        onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''"
+        onclick="addContactToEmail('${e.email}')">
+        <div style="width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">
+          ${(e.full_name||e.email||'?')[0].toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--ink);">${label}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.email}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Section 2: Manual contacts ──
+  if (_contacts.length) {
+    html += `<div style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;background:#f8fafc;border-bottom:1px solid var(--border);">Custom Contacts</div>`;
+    html += _contacts.map(c => `
+      <div style="display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);gap:8px;cursor:pointer;transition:background 0.15s;"
+           onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''">
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="addContactToEmail('${c.email}')">
+          <div style="font-size:12px;font-weight:600;color:var(--ink);">${c.alias}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.email}</div>
+        </div>
+        <button onclick="deleteContact(${c.id}); event.stopPropagation();" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:14px;padding:2px 5px;border-radius:3px;" title="ลบ">&times;</button>
+      </div>`).join('');
+  }
+
+  if (!html) {
+    html = '<div style="padding:14px;font-size:12px;color:var(--muted);text-align:center;">ยังไม่มี contacts</div>';
+  }
+
+  $('contactsList').innerHTML = html;
+}
+
+function addContactToEmail(email) {
+  const currentTo = $('emailTo').value.trim();
+  const emails = currentTo
+    ? currentTo.split(',').map(e => e.trim()).filter(Boolean)
+    : [];
+
+  // Don't add duplicate
+  if (!emails.includes(email)) {
+    emails.push(email);
+    $('emailTo').value = emails.join(', ');
+  }
+
+  // Close Address Book modal
+  closeModal('contactsModal');
+  toast('เพิ่ม ' + email + ' ลงใน To', 'success');
+}
+
+async function saveContact() {
+  const alias = $('newContactAlias').value.trim();
+  const email = $('newContactEmail').value.trim();
+  if (!alias || !email || !email.includes('@')) {
+    alert('กรุณากรอก alias และ email ให้ครบ'); return;
+  }
+  await fetch(`${API}/api/contacts/${encodeURIComponent(getUserEmail())}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alias, email }),
+  });
+  $('newContactAlias').value = '';
+  $('newContactEmail').value = '';
+  await loadContacts();
+  renderContactsList();
+}
+
+async function deleteContact(id) {
+  await fetch(`${API}/api/contacts/${encodeURIComponent(getUserEmail())}/${id}`, { method: 'DELETE' });
+  await loadContacts();
+  renderContactsList();
+}
+
+// ── Action button handler ─────────────────────────────────────────────────────
+function handleActionBtn(btn) {
+  if (btn.action === 'run') {
+    openRunModal(btn.skill_id, btn.skill_name);
+  } else if (btn.action === 'nav') {
+    showPanel(btn.panel);
+  } else if (btn.action === 'detail') {
+    openSkillDetail(btn.skill_id);
+  } else if (btn.action === 'example') {
+    // Prefill run modal with example prompt
+    openRunModal(btn.skill_id, btn.skill_name);
+    setTimeout(() => {
+      $('runInput').value = 'ตัวอย่าง: ใส่ข้อมูลที่ต้องการประมวลผลที่นี่';
+      $('runInput').focus();
+      $('runInput').select();
+    }, 200);
+  }
+}
+
+function mdToHtml(text) {
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:.92em">$1</code>')
+    .replace(/^(#{1,6})\s+(.+)$/gm, (_, h, t) => {
+      const sizes = ['1.25em','1.1em','1em','0.95em','0.9em','0.85em'];
+      const mt    = h.length <= 2 ? '14px' : '10px';
+      return `<strong style="font-size:${sizes[h.length-1]};display:block;margin-top:${mt};margin-bottom:3px;">${t}</strong>`;
+    })
+    .replace(/^[\-\*] (.+)$/gm,'&nbsp;&nbsp;• $1')
+    .replace(/\n/g,'<br>');
+}
+
+function appendMsg(text, role, actionButtons = [], poweredBy = null) {
+  const div = document.createElement('div');
+  div.className = `msg msg-${role}`;
+
+  const btnHtml = (role === 'bot' && actionButtons.length)
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid #f3f4f6;">
+        ${actionButtons.map(b =>
+          `<button style="display:inline-flex;align-items:center;padding:4px 12px;border-radius:5px;font-size:11px;font-weight:500;letter-spacing:.1px;cursor:pointer;border:1px solid #e5e7eb;background:#fff;color:#374151;font-family:inherit;transition:background .1s;"
+            onmouseover="this.style.background='#f9fafb'"
+            onmouseout="this.style.background='#fff'"
+            onclick='handleActionBtn(${JSON.stringify(b)})'>${b.label}</button>`
+        ).join('')}
+       </div>`
+    : '';
+
+  const skillBadge = (role === 'bot' && poweredBy)
+    ? `<div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;padding:4px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;font-size:10px;font-weight:600;color:#0369a1;letter-spacing:.3px;width:fit-content;">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/></svg>
+        ${poweredBy.name}
+       </div>`
+    : '';
+
+  div.innerHTML = `
+    <div class="msg-sender">${role === 'user' ? 'YOU' : 'HERMES'}</div>
+    <div class="msg-bubble">
+      ${skillBadge}
+      ${role === 'bot' ? mdToHtml(text) : text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+      ${btnHtml}
+    </div>`;
+  const msgs = $('chatMessages');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Skill Detail Modal ────────────────────────────────────────────────────────
+async function openSkillDetail(skillId) {
+  $('detailModalTitle').textContent = 'Skill Detail';
+  $('skillDetailBody').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">กำลังโหลด...</div>';
+  openModal('skillDetailModal');
+
+  try {
+    const r = await fetch(`${API}/api/skills/${skillId}`);
+    if (!r.ok) throw new Error();
+    const s = await r.json();
+    const email = getUserEmail();
+    const isOwner = s.owner === email;
+    const isInstalled = _installedIds.has(s.id);
+
+    $('detailModalTitle').textContent = s.name;
+    $('skillDetailBody').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-bottom:16px;">
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Department</div>
+          <div style="font-size:13px;margin-top:3px;">${(s.department||'-').toUpperCase()}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Type</div>
+          <div style="font-size:13px;margin-top:3px;">${s.skill_type||'-'}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Status</div>
+          <div style="margin-top:3px;">${statusBadge(s.status)}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Version</div>
+          <div style="font-size:13px;margin-top:3px;">${s.version||'1.0.0'}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Owner</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">${s.owner}</div></div>
+        <div><div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">Used</div>
+          <div style="font-size:13px;margin-top:3px;">${s.usage_count||0} ครั้ง</div></div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px;">Description</div>
+        <div style="font-size:13px;line-height:1.6;">${s.description||'-'}</div>
+      </div>
+      ${s.tags?.length ? `<div style="margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px;">Tags</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">${s.tags.map(t=>`<span style="background:#f1f5f9;color:var(--ink-2);padding:2px 8px;border-radius:4px;font-size:11px;">${t}</span>`).join('')}</div>
+      </div>` : ''}
+      <div style="background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;font-size:12px;color:var(--ink-2);">
+        <strong>วิธีใช้:</strong> กด <strong>Run Skill</strong> แล้ววางข้อความหรือข้อมูลที่ต้องการประมวลผลลงไป แล้วกด Run
+      </div>`;
+
+    $('skillDetailFooter').innerHTML = `
+      <button class="btn btn-primary" onclick="closeModal('skillDetailModal');openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run Skill</button>
+      ${!isOwner && !isInstalled
+        ? `<button class="btn btn-success" onclick="installSkill(${s.id});closeModal('skillDetailModal')">+ Install</button>`
+        : ''}
+      ${isOwner ? `<button class="btn btn-outline" onclick="closeModal('skillDetailModal');showPanel('create')">Edit</button>` : ''}
+      <button class="btn btn-ghost" onclick="closeModal('skillDetailModal')">ปิด</button>`;
+  } catch {
+    $('skillDetailBody').innerHTML = '<div class="empty-state"><div class="empty-state-title">โหลดไม่ได้</div></div>';
+  }
+}
+
+// ── User Profile ──────────────────────────────────────────────────────────────
+async function loadUserProfile() {
+  const email = getUserEmail();
+  if (!email || !email.includes('@')) return;
+
+  try {
+    // ลอง register ก่อน (ถ้ามีอยู่แล้วจะ return existing)
+    await fetch(`${API}/api/users/register`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email })
+    });
+
+    const r = await fetch(`${API}/api/users/profile/${encodeURIComponent(email)}`);
+    if (!r.ok) return;
+    const p = await r.json();
+
+    // ชื่อที่แสดง: full_name > telegram first+last > email prefix
+    const displayName = p.full_name
+      || (p.telegram_first_name ? `${p.telegram_first_name} ${p.telegram_last_name || ''}`.trim() : null)
+      || email.split('@')[0];
+
+    // Avatar initial
+    const initial = displayName.charAt(0).toUpperCase();
+
+    $('userDisplayName').textContent = displayName;
+    // แสดง job_title ถ้ามี ไม่งั้นใช้ role + department
+    const roleText = p.job_title || roleLabel(p.role);
+    $('userRole').textContent = roleText + (p.department ? ` · ${p.department}` : '');
+    $('userAvatar').textContent = initial;
+
+    // Sync profile data → directory automatically on every login
+    const dirPatch = { presence_status: 'active' };
+    if (p.full_name)   dirPatch.full_name   = p.full_name;
+    if (p.department)  dirPatch.department  = p.department;
+    if (p.job_title)   dirPatch.job_title   = p.job_title;
+    fetch(`${API}/api/directory/employees/${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(dirPatch)
+    }).catch(() => {});
+
+    // Telegram dot
+    const dot = $('tgDot');
+    if (p.is_telegram_linked) {
+      dot.classList.remove('unlinked');
+      dot.title = `Telegram: @${p.telegram_username || 'linked'}`;
+    } else {
+      dot.classList.add('unlinked');
+      dot.title = 'Telegram ยังไม่ได้เชื่อม — พิมพ์ /link ใน Telegram bot';
+    }
+  } catch { /* backend not running */ }
+}
+
+function roleLabel(role) {
+  return { admin: 'Admin', team_lead: 'Team Lead', member: 'Member' }[role] || 'Member';
+}
+
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  $('modeLogin').style.display    = mode === 'login'    ? 'block' : 'none';
+  $('modeRegister').style.display = mode === 'register' ? 'block' : 'none';
+}
+
+function togglePwd(inputId, btn) {
+  const el = $(inputId);
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.textContent = show ? 'ซ่อน' : 'แสดง';
+}
+
+function sessionStart(userData) {
+  localStorage.setItem('hermes_email', userData.email);
+  $('userEmail').value = userData.email;
+  $('loginScreen').style.display = 'none';
+  loadUserProfile();
+  loadContacts();
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email    = $('loginEmail').value.trim().toLowerCase();
+  const password = $('loginPassword').value;
+  const errorEl  = $('loginError');
+  const btn      = $('loginBtn');
+
+  errorEl.textContent = '';
+  if (!email) return (errorEl.textContent = 'กรุณากรอก email');
+  if (!password) return (errorEl.textContent = 'กรุณากรอกรหัสผ่าน');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> กำลังเข้าสู่ระบบ...';
+
+  try {
+    const r = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email, password })
+    });
+    const d = await r.json();
+
+    if (r.ok) {
+      sessionStart(d);
+    } else if (d.detail === 'NEED_PASSWORD_SETUP') {
+      errorEl.textContent = 'บัญชีนี้ยังไม่ได้ตั้งรหัสผ่าน กรุณาลงทะเบียนก่อน';
+      $('regEmail').value = email;
+      setTimeout(() => switchMode('register'), 1200);
+    } else {
+      errorEl.textContent = d.detail || 'เข้าสู่ระบบไม่สำเร็จ';
+    }
+  } catch {
+    errorEl.textContent = 'ไม่สามารถเชื่อมต่อระบบได้';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'เข้าสู่ระบบ';
+  }
+}
+
+// ── Register ──────────────────────────────────────────────────────────────────
+async function doRegister() {
+  const email     = $('regEmail').value.trim().toLowerCase();
+  const full_name = $('regFullName').value.trim();
+  const department = $('regDepartment').value.trim();
+  const job_title  = $('regJobTitle').value.trim();
+  const password  = $('regPassword').value;
+  const confirm   = $('regPasswordConfirm').value;
+  const errorEl   = $('registerError');
+  const btn       = $('registerBtn');
+
+  errorEl.textContent = '';
+  if (!email)     return (errorEl.textContent = 'กรุณากรอก email');
+  if (!full_name) return (errorEl.textContent = 'กรุณากรอกชื่อ-นามสกุล');
+  if (!password)  return (errorEl.textContent = 'กรุณากรอกรหัสผ่าน');
+  if (password.length < 8) return (errorEl.textContent = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
+  if (password !== confirm) return (errorEl.textContent = 'รหัสผ่านไม่ตรงกัน');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> กำลังสร้างบัญชี...';
+
+  try {
+    const r = await fetch(`${API}/api/auth/register`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email, password, confirm_password: confirm, full_name, department, job_title })
+    });
+    const d = await r.json();
+
+    if (r.ok) {
+      toast('สร้างบัญชีสำเร็จ ข้อมูลของคุณปรากฏใน Company Directory แล้ว', 'success');
+      sessionStart(d);
+    } else {
+      errorEl.textContent = d.detail || 'ลงทะเบียนไม่สำเร็จ';
+    }
+  } catch {
+    errorEl.textContent = 'ไม่สามารถเชื่อมต่อระบบได้';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'สร้างบัญชี';
+  }
+}
+
+// ── Company Directory ─────────────────────────────────────────────────────────
+
+let _dirPage = 1;
+let _dirEmpCache = [];
+let _dirDebounceTimer = null;
+
+function dirDebounce() {
+  clearTimeout(_dirDebounceTimer);
+  _dirDebounceTimer = setTimeout(() => loadDirectoryEmployees(1), 350);
+}
+
+async function loadDirectory() {
+  await Promise.all([
+    loadDirectoryStats(),
+    loadDirectoryEmployees(1),
+    loadDirectoryDepartments(),
+  ]);
+}
+
+async function loadDirectoryStats() {
+  try {
+    const r = await fetch(`${API}/api/directory/stats`);
+    const d = await r.json();
+    $('statEmployees').textContent = d.total_employees ?? '—';
+    $('statDepts').textContent     = d.departments ?? '—';
+  } catch { /* ignore */ }
+}
+
+async function loadDirectoryDepartments() {
+  try {
+    const r = await fetch(`${API}/api/directory/departments`);
+    const d = await r.json();
+    const sel = $('dirFilterDept');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Department: All</option>' +
+      (d.departments || []).map(dep => `<option value="${dep}"${dep===cur?' selected':''}>${dep}</option>`).join('');
+  } catch { /* ignore */ }
+}
+
+async function loadDirectoryEmployees(page = 1) {
+  _dirPage = page;
+  const search = $('dirSearch').value.trim();
+  const dept   = $('dirFilterDept').value;
+  const status = $('dirFilterStatus').value;
+  const limit  = parseInt($('dirPageLimit')?.value || '8');
+
+  const params = new URLSearchParams({ page, limit });
+  if (search) params.set('search', search);
+  if (dept)   params.set('department', dept);
+  if (status) params.set('presence_status', status);
+
+  const body = $('dirTableBody');
+  const sub  = $('dirTableSub');
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">Loading...</div>';
+
+  try {
+    const r = await fetch(`${API}/api/directory/employees?${params}`);
+    const d = await r.json();
+    const emps = d.employees || [];
+    const total = d.total || 0;
+    const totalPages = Math.ceil(total / limit) || 1;
+
+    sub.textContent = `Showing ${(page-1)*limit+1}–${Math.min(page*limit, total)} of ${total} employees`;
+
+    if (!emps.length) {
+      body.innerHTML = '<div style="padding:32px;text-align:center;color:var(--muted);font-size:13px;">No employees found.</div>';
+      $('dirPagination').style.display = 'none';
+      return;
+    }
+
+    body.innerHTML = `
+      <table class="dir-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" style="margin:0;" /></th>
+            <th>Name</th>
+            <th>Nickname</th>
+            <th>Email</th>
+            <th>Department</th>
+            <th>Team</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${emps.map((emp, idx) => `
+            <tr>
+              <td><input type="checkbox" style="margin:0;" /></td>
+              <td>
+                <div class="dir-emp-name">
+                  <div class="dir-avatar">${(emp.full_name||emp.email||'?')[0].toUpperCase()}</div>
+                  <div>
+                    <div class="dir-name-text">${emp.full_name || '—'}</div>
+                  </div>
+                </div>
+              </td>
+              <td style="font-size:12px;">${emp.nickname || '—'}</td>
+              <td style="font-size:12px;color:var(--muted);">${emp.email}</td>
+              <td style="font-size:12px;">${emp.department || '—'}</td>
+              <td style="font-size:12px;">${emp.team_name || '—'}</td>
+              <td>
+                <button class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:11px;"
+                  onclick="dirSendEmail('${emp.email}')">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555zM0 4.697v7.104l5.803-3.558L0 4.697zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757zm3.436-.586L16 11.801V4.697l-5.803 3.546z"/></svg>
+                </button>
+                <button class="btn btn-ghost btn-sm" style="padding:4px 6px;font-size:11px;" title="Edit" onclick="openEditEmployee(${idx})">✏️</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+
+    _dirEmpCache = emps;
+
+    // Pagination
+    const pag = $('dirPagination');
+    pag.style.display = 'flex';
+    $('dirPagLabel').textContent = `Showing ${(page-1)*limit+1}–${Math.min(page*limit, total)} of ${total} employees`;
+    renderDirPages(page, totalPages);
+
+  } catch (e) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--danger);font-size:13px;">Failed to load employees.</div>';
+  }
+}
+
+function renderDirPages(current, total) {
+  const container = $('dirPageBtns');
+  let html = `<button class="dir-page-btn" onclick="loadDirectoryEmployees(${current-1})" ${current<=1?'disabled':''}>‹</button>`;
+  const start = Math.max(1, current - 2);
+  const end   = Math.min(total, start + 4);
+  for (let p = start; p <= end; p++) {
+    html += `<button class="dir-page-btn ${p===current?'active':''}" onclick="loadDirectoryEmployees(${p})">${p}</button>`;
+  }
+  if (end < total) html += `<span style="padding:0 4px;align-self:center;font-size:12px;color:var(--muted);">…</span><button class="dir-page-btn" onclick="loadDirectoryEmployees(${total})">${total}</button>`;
+  html += `<button class="dir-page-btn" onclick="loadDirectoryEmployees(${current+1})" ${current>=total?'disabled':''}>›</button>`;
+  container.innerHTML = html;
+}
+
+function presenceBadge(status) {
+  const map = { active:'Active', away:'Away', busy:'Busy', offline:'Offline' };
+  const label = map[status] || status || 'Active';
+  return `<span class="presence-badge presence-${status||'active'}">${label}</span>`;
+}
+
+function clearDirFilters() {
+  $('dirSearch').value = '';
+  $('dirFilterDept').value = '';
+  $('dirFilterStatus').value = '';
+  loadDirectoryEmployees(1);
+}
+
+function dirSendEmail(email) {
+  window.location.href = `mailto:${email}`;
+}
+
+async function openAddEmployeeModal() {
+  const email = prompt('Email ของพนักงานใหม่:');
+  if (!email) return;
+  const full_name = prompt('ชื่อ-นามสกุล:') || '';
+  const department = prompt('แผนก (เช่น Engineering, HR):') || '';
+  const job_title = prompt('ตำแหน่งงาน (เช่น Senior Engineer):') || '';
+
+  try {
+    const r = await fetch(`${API}/api/directory/employees`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, full_name, department, job_title }),
+    });
+    if (r.ok) {
+      toast('เพิ่มพนักงานสำเร็จ', 'success');
+      loadDirectory();
+    } else {
+      const e = await r.json();
+      toast(e.detail || 'เพิ่มไม่สำเร็จ', 'error');
+    }
+  } catch {
+    toast('เชื่อมต่อระบบไม่ได้', 'error');
+  }
+}
+
+function exportDirCSV() {
+  const rows = document.querySelectorAll('.dir-table tbody tr');
+  if (!rows.length) return;
+  const headers = ['Name','Nickname','Email','Department','Team'];
+  const lines = [headers.join(',')];
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    const name = cells[1]?.querySelector('.dir-name-text')?.textContent || '';
+    const nickname = cells[2]?.textContent || '';
+    const email = cells[3]?.textContent || '';
+    const dept = cells[4]?.textContent || '';
+    const team = cells[5]?.textContent || '';
+    lines.push([name, nickname, email, dept, team].map(v => `"${v}"`).join(','));
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'company_directory.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+function doLogout() {
+  if (!confirm('ต้องการออกจากระบบหรือไม่?')) return;
+  const _logoutEmail = getUserEmail();
+  if (_logoutEmail) {
+    fetch(`${API}/api/directory/employees/${encodeURIComponent(_logoutEmail)}`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ presence_status: 'offline' })
+    }).catch(() => {});
+  }
+  localStorage.removeItem('hermes_email');
+  lastSkillId = null;
+  chatHistory = [];
+  $('userEmail').value = '';
+  $('userDisplayName').textContent = 'ผู้ใช้งาน';
+  $('userRole').textContent = 'member';
+  $('userAvatar').textContent = 'U';
+  $('tgDot').className = 'tg-dot unlinked';
+  $('loginEmail').value = '';
+  $('loginPassword').value = '';
+  $('loginError').textContent = '';
+  $('loginBtn').disabled = false;
+  $('loginBtn').textContent = 'เข้าสู่ระบบ';
+  switchMode('login');
+  $('loginScreen').style.display = 'flex';
+}
+
+// ── Email To Autocomplete ─────────────────────────────────────────────────────
+function showEmailSuggestions(val) {
+  const box = $('emailToSuggest');
+  // Get current last token (after last comma)
+  const parts = val.split(',');
+  const query = parts[parts.length - 1].trim().toLowerCase();
+  if (!query || query.length < 1) { box.style.display = 'none'; return; }
+
+  // Build candidates from directory + manual contacts
+  const candidates = [];
+  for (const e of _dirPeople) {
+    if (e.nickname && e.nickname.toLowerCase().includes(query)) {
+      candidates.push({ label: `${e.nickname} — ${e.full_name || ''}`, email: e.email });
+    } else if ((e.full_name||'').toLowerCase().includes(query)) {
+      candidates.push({ label: e.full_name, email: e.email });
+    } else if (e.email.toLowerCase().includes(query)) {
+      candidates.push({ label: e.email, email: e.email });
+    }
+  }
+  for (const c of _contacts) {
+    if (c.alias.toLowerCase().includes(query) || c.email.toLowerCase().includes(query)) {
+      if (!candidates.find(x => x.email === c.email)) {
+        candidates.push({ label: c.alias, email: c.email });
+      }
+    }
+  }
+
+  if (!candidates.length) { box.style.display = 'none'; return; }
+
+  box.innerHTML = candidates.slice(0, 6).map(c =>
+    `<div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:12px;"
+      onmousedown="pickEmailSuggest('${c.email}')"
+      onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
+      <span style="font-weight:600;">${c.label}</span>
+      <span style="color:var(--muted);margin-left:6px;font-size:11px;">${c.email}</span>
+    </div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function hideEmailSuggestions() {
+  const box = $('emailToSuggest');
+  if (box) box.style.display = 'none';
+}
+
+function pickEmailSuggest(email) {
+  const input = $('emailTo');
+  const parts = input.value.split(',').map(s => s.trim()).filter(Boolean);
+  parts[parts.length - 1] = email;
+  input.value = parts.join(', ') + ', ';
+  hideEmailSuggestions();
+  input.focus();
+}
+
+// ── My Profile ────────────────────────────────────────────────────────────────
+async function openMyProfile() {
+  const email = getUserEmail();
+  if (!email || !email.includes('@')) return;
+  try {
+    const r = await fetch(`${API}/api/users/profile/${encodeURIComponent(email)}`);
+    if (!r.ok) return;
+    const p = await r.json();
+    $('pfFullName').value = p.full_name || '';
+    $('pfNickname').value = p.nickname || '';
+    $('pfDept').value = p.department || '';
+    $('pfJobTitle').value = p.job_title || '';
+    $('pfStatus').value = p.presence_status || 'active';
+    $('profileModal').style.display = 'flex';
+  } catch { toast('ไม่สามารถโหลดโปรไฟล์ได้', 'error'); }
+}
+
+async function saveMyProfile() {
+  const email = getUserEmail();
+  if (!email) return;
+  try {
+    const body = {
+      full_name: $('pfFullName').value.trim(),
+      nickname: $('pfNickname').value.trim(),
+      department: $('pfDept').value.trim(),
+      job_title: $('pfJobTitle').value.trim(),
+      presence_status: $('pfStatus').value,
+    };
+    const r = await fetch(`${API}/api/directory/employees/${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      closeModal('profileModal');
+      toast('บันทึกโปรไฟล์สำเร็จ', 'success');
+      loadUserProfile();
+      if ($('panel-directory').classList.contains('active')) loadDirectory();
+    } else { toast('บันทึกไม่สำเร็จ', 'error'); }
+  } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
+}
+
+// ── Edit Employee ──────────────────────────────────────────────────────────────
+async function openEditEmployee(idx) {
+  const emp = _dirEmpCache[idx];
+  if (!emp) return;
+  $('editEmpEmail').value = emp.email;
+  $('editEmpEmailLabel').textContent = emp.email;
+  $('editEmpName').value = emp.full_name || '';
+  $('editEmpNickname').value = emp.nickname || '';
+  $('editEmpDept').value = emp.department || '';
+  // Load teams
+  try {
+    const r = await fetch(`${API}/api/directory/teams`);
+    const d = await r.json();
+    const teams = d.teams || [];
+    const sel = $('editEmpTeam');
+    sel.innerHTML = '<option value="">— ไม่มี Team —</option>' +
+      teams.map(t => `<option value="${t.id}" ${t.id === emp.team_id ? 'selected' : ''}>${t.name}</option>`).join('');
+  } catch {}
+  $('editEmpModal').style.display = 'flex';
+}
+
+async function saveEditEmployee() {
+  const email = $('editEmpEmail').value;
+  const teamVal = $('editEmpTeam').value;
+  const body = {
+    full_name: $('editEmpName').value.trim(),
+    nickname: $('editEmpNickname').value.trim(),
+    department: $('editEmpDept').value.trim(),
+  };
+  if (teamVal) body.team_id = parseInt(teamVal);
+  try {
+    const r = await fetch(`${API}/api/directory/employees/${encodeURIComponent(email)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      closeModal('editEmpModal');
+      toast('แก้ไขพนักงานสำเร็จ', 'success');
+      loadDirectory();
+    } else { toast('แก้ไขไม่สำเร็จ', 'error'); }
+  } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
+}
+
+// ── Create Team ────────────────────────────────────────────────────────────────
+function openCreateTeam() {
+  $('ctmName').value = ''; $('ctmDept').value = '';
+  $('ctmDesc').value = ''; $('ctmLeader').value = getUserEmail();
+  $('createTeamModal').style.display = 'flex';
+}
+
+async function saveCreateTeam() {
+  const name = $('ctmName').value.trim();
+  if (!name) { toast('กรุณาใส่ชื่อ Team', 'error'); return; }
+  try {
+    const r = await fetch(`${API}/api/directory/teams`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        department: $('ctmDept').value.trim(),
+        description: $('ctmDesc').value.trim(),
+        leader_email: $('ctmLeader').value.trim(),
+      }),
+    });
+    if (r.ok) {
+      closeModal('createTeamModal');
+      toast('สร้าง Team สำเร็จ', 'success');
+      loadDirectory();
+    } else {
+      const e = await r.json();
+      toast(e.detail || 'สร้างไม่สำเร็จ', 'error');
+    }
+  } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+const _savedEmail = localStorage.getItem('hermes_email');
+if (_savedEmail) {
+  $('userEmail').value = _savedEmail;
+  $('loginScreen').style.display = 'none';
+  loadUserProfile();
+} else {
+  // แสดง login screen ถ้ายังไม่ได้ login
+  $('loginScreen').style.display = 'flex';
+}
+</script>
+
+<!-- ── My Profile Modal ──────────────────────────────────────────────────── -->
+<div id="profileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.18);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h3 style="font-size:15px;font-weight:600;">My Profile</h3>
+      <button onclick="closeModal('profileModal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ชื่อ-นามสกุล</label>
+        <input id="pfFullName" class="form-input" style="width:100%;" placeholder="ชื่อ-นามสกุล" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ชื่อเล่น</label>
+        <input id="pfNickname" class="form-input" style="width:100%;" placeholder="เช่น น้อย, โต้ง, ป้อม" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">แผนก</label>
+        <input id="pfDept" class="form-input" style="width:100%;" placeholder="เช่น Engineering, HR, Finance" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ตำแหน่ง (Job Title)</label>
+        <input id="pfJobTitle" class="form-input" style="width:100%;" placeholder="เช่น Senior Engineer, Product Owner" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">สถานะปัจจุบัน</label>
+        <select id="pfStatus" class="form-input" style="width:100%;">
+          <option value="active">🟢 Active — พร้อมทำงาน</option>
+          <option value="away">🟡 Away — ไม่อยู่ที่โต๊ะ</option>
+          <option value="busy">🔴 Busy — กำลังยุ่ง / ประชุม</option>
+          <option value="offline">⚫ Offline — ออฟไลน์</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('profileModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveMyProfile()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Edit Employee Modal ────────────────────────────────────────────────── -->
+<div id="editEmpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:420px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.18);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h3 style="font-size:15px;font-weight:600;">Edit Employee</h3>
+      <button onclick="closeModal('editEmpModal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">×</button>
+    </div>
+    <input type="hidden" id="editEmpEmail" />
+    <div style="font-size:12px;color:#6b7280;margin-bottom:12px;" id="editEmpEmailLabel"></div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ชื่อ-นามสกุล</label>
+        <input id="editEmpName" class="form-input" style="width:100%;" placeholder="ชื่อ-นามสกุล" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ชื่อเล่น</label>
+        <input id="editEmpNickname" class="form-input" style="width:100%;" placeholder="เช่น น้อย, โต้ง, ป้อม" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">แผนก</label>
+        <input id="editEmpDept" class="form-input" style="width:100%;" placeholder="เช่น Engineering, HR" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">Team</label>
+        <select id="editEmpTeam" class="form-input" style="width:100%;">
+          <option value="">— ไม่มี Team —</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('editEmpModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditEmployee()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Create Team Modal ──────────────────────────────────────────────────── -->
+<div id="createTeamModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.18);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h3 style="font-size:15px;font-weight:600;">Create Team</h3>
+      <button onclick="closeModal('createTeamModal')" style="background:none;border:none;cursor:pointer;font-size:20px;color:#6b7280;line-height:1;">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">ชื่อ Team *</label>
+        <input id="ctmName" class="form-input" style="width:100%;" placeholder="เช่น Engineering Team, IR Team" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">แผนก</label>
+        <input id="ctmDept" class="form-input" style="width:100%;" placeholder="เช่น Engineering, Finance" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">คำอธิบาย</label>
+        <input id="ctmDesc" class="form-input" style="width:100%;" placeholder="อธิบาย Team นี้" />
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:500;color:#6b7280;display:block;margin-bottom:4px;">Team Lead (email)</label>
+        <input id="ctmLeader" class="form-input" style="width:100%;" placeholder="email ของ team lead" />
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('createTeamModal')">ยกเลิก</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCreateTeam()">สร้าง Team</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

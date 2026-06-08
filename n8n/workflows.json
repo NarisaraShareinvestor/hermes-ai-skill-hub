@@ -1,0 +1,216 @@
+{
+  "workflows": [
+    {
+      "name": "Skill Review Workflow",
+      "description": "ส่งการแจ้งเตือนไป Telegram เมื่อมี Skill ใหม่ต้อง review",
+      "trigger": "Webhook - POST /api/skills/submit-review",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Receive Skill Review Request",
+          "action": "Webhook trigger",
+          "output": "skill_id, skill_name, owner, description"
+        },
+        {
+          "step": 2,
+          "name": "Get Skill Details from Backend",
+          "action": "HTTP POST to /api/skills/{skill_id}",
+          "output": "skill_data"
+        },
+        {
+          "step": 3,
+          "name": "Send Telegram Notification",
+          "action": "Call Telegram Bot API",
+          "with": "skill_name, owner, description, skill_id",
+          "output": "telegram_message_id"
+        },
+        {
+          "step": 4,
+          "name": "Save Message ID to Database",
+          "action": "HTTP PUT to /api/approvals/{approval_id}",
+          "data": "telegram_message_id"
+        },
+        {
+          "step": 5,
+          "name": "Wait for Approval (via Telegram)",
+          "action": "Webhook listener",
+          "listen_to": "Telegram callback_query"
+        },
+        {
+          "step": 6,
+          "name": "Process Approval/Rejection",
+          "action": "Call Backend approval endpoint",
+          "route": "/api/approvals/{approval_id}/action"
+        }
+      ]
+    },
+    {
+      "name": "Document Indexing Workflow",
+      "description": "แปลง PDF/เอกสารให้พร้อม search และ embedding",
+      "trigger": "Webhook - POST /api/documents/upload",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Receive Document Upload",
+          "action": "Webhook trigger",
+          "output": "file_path, document_type, owner"
+        },
+        {
+          "step": 2,
+          "name": "Extract Text from PDF",
+          "action": "Call n8n PDF parser node",
+          "input": "file_path",
+          "output": "text_content"
+        },
+        {
+          "step": 3,
+          "name": "Split into Chunks",
+          "action": "Split text with overlap",
+          "chunk_size": 1024,
+          "overlap": 128
+        },
+        {
+          "step": 4,
+          "name": "Generate Embeddings",
+          "action": "Call Claude API for embeddings",
+          "model": "text-embedding-3-small"
+        },
+        {
+          "step": 5,
+          "name": "Store in Vector DB",
+          "action": "Insert to PostgreSQL with pgvector",
+          "table": "document_chunks"
+        },
+        {
+          "step": 6,
+          "name": "Index Metadata",
+          "action": "HTTP POST to /api/documents/index-complete",
+          "status": "indexed"
+        }
+      ]
+    },
+    {
+      "name": "Daily AI Usage Summary",
+      "description": "สรุปการใช้งาน Skill รายวัน",
+      "trigger": "Cron - ทุกวัน 18:00 น.",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Get Daily Stats",
+          "action": "HTTP GET /api/dashboard/stats"
+        },
+        {
+          "step": 2,
+          "name": "Query Top Skills",
+          "action": "Database query",
+          "sql": "SELECT name, COUNT(*) as usage_count FROM skill_usage_logs WHERE DATE(created_at) = TODAY() GROUP BY name ORDER BY usage_count DESC LIMIT 10"
+        },
+        {
+          "step": 3,
+          "name": "Query Failed Tasks",
+          "action": "Database query",
+          "sql": "SELECT COUNT(*) as failed_count FROM skill_usage_logs WHERE status = 'failed' AND DATE(created_at) = TODAY()"
+        },
+        {
+          "step": 4,
+          "name": "Compile Report",
+          "action": "JavaScript node",
+          "creates": "summary_data object"
+        },
+        {
+          "step": 5,
+          "name": "Send Telegram Report",
+          "action": "Call Telegram Bot sendDailySummary()"
+        },
+        {
+          "step": 6,
+          "name": "Log Report",
+          "action": "Save to reports table"
+        }
+      ]
+    },
+    {
+      "name": "Skill Quality Monitor",
+      "description": "ตรวจหา Skill ที่มี error หรือ feedback เสีย",
+      "trigger": "Cron - ทุก 6 ชั่วโมง",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Check Error Rate",
+          "action": "Database query",
+          "sql": "SELECT skill_id, COUNT(*) as error_count, (COUNT(*)*100.0/SUM(COUNT(*)) OVER (PARTITION BY skill_id)) as error_rate FROM skill_usage_logs WHERE status = 'error' AND created_at > NOW() - INTERVAL '24 hours' GROUP BY skill_id HAVING error_rate > 5"
+        },
+        {
+          "step": 2,
+          "name": "Get Skill Owner",
+          "action": "Get owner email from skills table"
+        },
+        {
+          "step": 3,
+          "name": "Prepare Alert",
+          "action": "Format message with skill name, error count, error rate"
+        },
+        {
+          "step": 4,
+          "name": "Send Alert",
+          "action": "Call Telegram Bot sendAlert()",
+          "alert_type": "warning"
+        },
+        {
+          "step": 5,
+          "name": "Notify Owner",
+          "action": "Send email to skill owner"
+        },
+        {
+          "step": 6,
+          "name": "Block High-Risk Skills",
+          "action": "If error_rate > 20%, update skill status to BLOCKED",
+          "route": "HTTP PUT /api/skills/{skill_id}"
+        }
+      ]
+    }
+  ],
+  "n8n_setup_guide": {
+    "step_1_create_webhook": "สร้าง Webhook node สำหรับรับ request จาก Backend API",
+    "step_2_add_http_nodes": "เพิ่ม HTTP node เพื่อเรียก Backend API endpoint",
+    "step_3_add_telegram_node": "เพิ่ม Telegram node (using bot token และ chat ID)",
+    "step_4_add_database_nodes": "เพิ่ม PostgreSQL node เพื่อบันทึกข้อมูล",
+    "step_5_schedule_workflows": "ตั้ง Cron trigger สำหรับ daily/hourly workflows",
+    "step_6_add_error_handling": "เพิ่ม Error handler node ในแต่ละ workflow",
+    "step_7_test_workflows": "Test แต่ละ workflow ก่อน activate"
+  },
+  "webhook_integrations": {
+    "backend_to_n8n": [
+      {
+        "event": "skill.submitted_for_review",
+        "n8n_webhook": "https://n8n.company.com/webhook/skill-review",
+        "payload": {
+          "skill_id": "integer",
+          "skill_name": "string",
+          "owner": "string",
+          "approval_type": "team|company"
+        }
+      },
+      {
+        "event": "document.uploaded",
+        "n8n_webhook": "https://n8n.company.com/webhook/document-index",
+        "payload": {
+          "document_id": "integer",
+          "file_path": "string",
+          "document_type": "string"
+        }
+      }
+    ],
+    "telegram_to_n8n": [
+      {
+        "event": "callback_query",
+        "n8n_webhook": "https://n8n.company.com/webhook/telegram-approval",
+        "payload": {
+          "callback_data": "approve_1|reject_1|edit_1",
+          "user_id": "integer",
+          "message_id": "integer"
+        }
+      }
+    ]
+  }
+}
