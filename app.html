@@ -277,7 +277,7 @@
   }
   .skill-table-header {
     display: grid;
-    grid-template-columns: 1fr 120px 100px 140px 160px;
+    grid-template-columns: 1fr 110px 140px 130px 180px;
     padding: 9px 16px;
     background: #f9fafb;
     border-bottom: 1px solid var(--border);
@@ -289,7 +289,7 @@
   }
   .skill-row {
     display: grid;
-    grid-template-columns: 1fr 120px 100px 140px 160px;
+    grid-template-columns: 1fr 110px 140px 130px 180px;
     padding: 11px 16px;
     border-bottom: 1px solid var(--border);
     align-items: center;
@@ -316,12 +316,14 @@
   .badge {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     padding: 2px 8px;
-    border-radius: 4px;
+    border-radius: 20px;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: .1px;
+    border: 1px solid transparent;
+    white-space: nowrap;
   }
   .badge::before {
     content: '';
@@ -329,16 +331,16 @@
     height: 5px;
     border-radius: 50%;
     background: currentColor;
-    opacity: .65;
+    opacity: .8;
     flex-shrink: 0;
   }
-  .badge-draft       { background: #f3f4f6; color: #4b5563; }
-  .badge-private     { background: #f3f4f6; color: #4b5563; }
-  .badge-pending     { background: #fef3c7; color: #92400e; }
-  .badge-team        { background: #d1fae5; color: #065f46; }
-  .badge-published   { background: #dbeafe; color: #1e40af; }
-  .badge-rejected    { background: #fee2e2; color: #991b1b; }
-  .badge-edit        { background: #fef9c3; color: #854d0e; }
+  .badge-draft       { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+  .badge-private     { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+  .badge-pending     { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+  .badge-team        { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+  .badge-published   { background: #eff6ff; color: #2563eb; border-color: #bfdbfe; }
+  .badge-rejected    { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
+  .badge-edit        { background: #fefce8; color: #ca8a04; border-color: #fef08a; }
 
   /* ── Action Buttons ── */
   .btn {
@@ -476,10 +478,73 @@
   }
   .chat-input-area {
     border-top: 1px solid var(--border);
-    padding: 12px 16px;
+    padding: 8px 16px 12px;
+    background: #f8fafc;
+  }
+  .chat-file-chip {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 20px;
+    padding: 4px 10px 4px 8px;
+    font-size: 11px;
+    color: #1d4ed8;
+    font-weight: 600;
+    margin-bottom: 6px;
+    width: fit-content;
+    max-width: 100%;
+  }
+  .chat-file-chip.active { display: inline-flex; }
+  .chat-file-chip-remove {
+    background: none; border: none; cursor: pointer;
+    color: #93c5fd; font-size: 14px; line-height: 1; padding: 0 0 0 2px;
+  }
+  .chat-file-chip-remove:hover { color: #1d4ed8; }
+  .chat-input-row {
     display: flex;
     gap: 8px;
-    background: #f8fafc;
+    align-items: flex-end;
+  }
+  .chat-attach-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0 10px;
+    height: 40px;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    transition: border-color .15s, color .15s;
+    flex-shrink: 0;
+  }
+  .chat-attach-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .chat-attach-btn.has-file { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+  .chat-record-btn {
+    flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--border); background: #fff; color: var(--muted);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .chat-record-btn:hover { background: #fff5f5; color: #dc2626; border-color: #fca5a5; }
+  .chat-record-btn.recording {
+    background: #fef2f2; color: #dc2626; border-color: #dc2626;
+    animation: recordPulse 1s ease-in-out infinite;
+  }
+  @keyframes recordPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,.3); } 50% { box-shadow: 0 0 0 5px rgba(220,38,38,0); } }
+  .chat-recording-chip {
+    display: none; align-items: center; gap: 8px;
+    background: #fef2f2; border: 1px solid #fca5a5;
+    border-radius: 20px; padding: 4px 12px 4px 8px;
+    font-size: 12px; color: #dc2626; font-weight: 500;
+  }
+  .chat-recording-chip.active { display: inline-flex; }
+  .chat-rec-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #dc2626;
+    animation: recordPulse 1s ease-in-out infinite;
+    flex-shrink: 0;
   }
   .chat-textarea {
     flex: 1;
@@ -832,6 +897,376 @@
   .meeting-action-btn:hover { background: #f9fafb; border-color: #d1d5db; }
   .meeting-action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .meeting-action-btn.primary:hover { background: var(--accent-hover); }
+
+  /* ── Meeting Detect Card (in Chat) ── */
+  .mi-detect-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 16px;
+    max-width: 500px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .mi-detect-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .mi-detect-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--muted);
+  }
+  .mi-confidence-badge {
+    display: inline-flex; align-items: center; padding: 2px 8px;
+    background: #dcfce7; color: #15803d; border-radius: 20px;
+    font-size: 10px; font-weight: 600; letter-spacing: .2px;
+  }
+  .mi-detect-icon {
+    width: 36px; height: 36px; border-radius: 9px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .mi-detect-skill-name { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  .mi-detect-meta { font-size: 11px; color: var(--muted); }
+
+  /* Mode selector cards */
+  .mi-modes { display: flex; flex-direction: column; gap: 7px; margin: 14px 0; }
+  .mi-mode-card {
+    display: flex; align-items: stretch; gap: 0;
+    border: 1.5px solid #e5e7eb; border-radius: 10px;
+    cursor: pointer; overflow: hidden;
+    transition: border-color .15s, background .15s;
+  }
+  .mi-mode-card:hover { border-color: #c7d2fe; background: #fafafa; }
+  .mi-mode-card.selected { border-color: var(--accent); background: #f0f4ff; }
+  .mi-mode-left {
+    flex: 1; display: flex; align-items: flex-start; gap: 10px;
+    padding: 11px 12px;
+  }
+  .mi-mode-radio {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid #d1d5db; background: #fff;
+    flex-shrink: 0; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s;
+  }
+  .mi-mode-card.selected .mi-mode-radio {
+    border-color: var(--accent); background: var(--accent);
+  }
+  .mi-mode-card.selected .mi-mode-radio::after {
+    content: ''; width: 5px; height: 5px; border-radius: 50%; background: #fff;
+  }
+  .mi-mode-icon-wrap {
+    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mi-mode-title { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+  .mi-mode-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .mi-mode-recommended {
+    display: inline-flex; align-items: center;
+    padding: 1px 6px; border-radius: 3px; margin-left: 6px;
+    font-size: 9px; font-weight: 700; letter-spacing: .3px;
+    background: #fef9c3; color: #854d0e;
+  }
+  .mi-mode-preview {
+    width: 90px; flex-shrink: 0;
+    background: #f8fafc; border-left: 1px solid #f1f5f9;
+    padding: 8px; display: flex; flex-direction: column; gap: 3px;
+  }
+  .mi-preview-line {
+    height: 5px; border-radius: 2px; background: #e2e8f0;
+  }
+  .mi-preview-line.dark { background: #cbd5e1; }
+  .mi-preview-row { display: flex; align-items: center; gap: 4px; }
+  .mi-preview-dot { width: 5px; height: 5px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+
+  .mi-run-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent); color: #fff;
+    padding: 8px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; border: none; font-family: inherit;
+    transition: background .12s;
+  }
+  .mi-run-btn:hover { background: var(--accent-hover); }
+  .mi-run-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .mi-change-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #fff; color: var(--ink-2);
+    padding: 8px 13px; border-radius: 8px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; border: 1px solid var(--border); font-family: inherit;
+    transition: background .12s;
+  }
+  .mi-change-btn:hover { background: #f9fafb; }
+
+  /* ── Meeting Analysis Card (in Chat) ── */
+  .mi-analysis-card {
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    max-width: 420px;
+  }
+  .mi-analysis-success {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 700; color: #15803d;
+    background: #dcfce7; border: 1px solid #86efac;
+    border-radius: 8px; padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .mi-analysis-title { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .mi-analysis-meta { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .mi-analysis-section {
+    border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 8px; overflow: hidden;
+  }
+  .mi-analysis-section summary {
+    padding: 9px 12px; font-size: 12px; font-weight: 600; color: var(--ink);
+    cursor: pointer; background: #f9fafb; user-select: none;
+    list-style: none; display: flex; align-items: center; justify-content: space-between;
+  }
+  .mi-analysis-section summary::-webkit-details-marker { display: none; }
+  .mi-analysis-section summary::after { content: '▼'; font-size: 9px; color: var(--muted); transition: transform .2s; }
+  .mi-analysis-section[open] summary::after { transform: rotate(180deg); }
+  .mi-analysis-section-body { padding: 10px 12px; font-size: 12px; line-height: 1.6; color: var(--ink-2); }
+  .mi-analysis-actions {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding-top: 10px; border-top: 1px solid var(--border); margin-top: 4px;
+  }
+  .mi-analysis-action-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 6px 11px; border-radius: 7px;
+    font-size: 11px; font-weight: 500; font-family: inherit;
+    cursor: pointer; border: 1px solid var(--border);
+    background: #fff; color: var(--ink-2); transition: background .12s;
+  }
+  .mi-analysis-action-btn:hover { background: #f9fafb; }
+  .mi-analysis-action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .mi-analysis-action-btn.primary:hover { background: var(--accent-hover); }
+  .mi-followup-chips {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding-top: 10px; margin-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .mi-followup-chip {
+    display: inline-flex; padding: 4px 10px;
+    border-radius: 20px; font-size: 11px; font-weight: 500;
+    background: #f0f9ff; color: #0369a1;
+    border: 1px solid #bae6fd; cursor: pointer; font-family: inherit;
+    transition: background .12s;
+  }
+  .mi-followup-chip:hover { background: #e0f2fe; }
+
+  /* ── Enhanced Sidebar Meeting Styles ── */
+  .mi-sidebar-info-card {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1px solid #7dd3fc; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 4px;
+  }
+  .mi-sidebar-meeting-title {
+    font-size: 12px; font-weight: 700; color: var(--ink);
+    line-height: 1.3;
+  }
+  .mi-status-complete {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600;
+    background: #dcfce7; color: #15803d; white-space: nowrap;
+  }
+  .mi-sidebar-meta-row {
+    font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4;
+  }
+  .mi-sidebar-analyzer { font-size: 10px; color: #0369a1; margin-top: 5px; }
+  .mi-action-item-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #f3f4f6;
+  }
+  .mi-action-item-row:last-child { border-bottom: none; }
+  .mi-action-check {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1.5px solid #d1d5db; flex-shrink: 0;
+    margin-top: 1px; cursor: pointer; appearance: none;
+    background: #fff; transition: background .12s, border-color .12s;
+  }
+  .mi-action-check:checked { background: var(--accent); border-color: var(--accent); }
+  .mi-action-check:checked::after { content: '✓'; display: block; color: #fff; font-size: 9px; text-align: center; line-height: 12px; }
+  .mi-action-task { font-size: 11px; font-weight: 600; color: var(--ink); line-height: 1.4; }
+  .mi-action-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .mi-status-tag {
+    display: inline-flex; padding: 1px 6px; border-radius: 3px;
+    font-size: 9px; font-weight: 600; letter-spacing: .2px;
+    background: #fef3c7; color: #92400e;
+  }
+  .mi-see-all-link {
+    font-size: 11px; color: var(--accent); cursor: pointer;
+    text-decoration: none; display: block; margin-top: 6px; font-weight: 500;
+  }
+  .mi-see-all-link:hover { text-decoration: underline; }
+  .mi-suggested-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 8px 10px; border-radius: 7px;
+    font-size: 11px; font-weight: 500; font-family: inherit;
+    cursor: pointer; border: 1px solid var(--border);
+    background: #fff; color: var(--ink-2); transition: background .12s;
+    margin-bottom: 5px; text-align: left;
+  }
+  .mi-suggested-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+  .mi-suggested-btn.disabled { opacity: .5; cursor: not-allowed; }
+  .mi-file-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid #f3f4f6; font-size: 11px;
+  }
+  .mi-file-item:last-child { border-bottom: none; }
+  .mi-file-icon {
+    width: 26px; height: 26px; border-radius: 5px;
+    background: #f3f4f6; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+  }
+
+  /* ── Meeting Intelligence Panel ── */
+  .mi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .mi-card-title { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 14px; }
+  .mi-input-tab-bar {
+    display: flex; gap: 4px;
+    background: #f3f4f6;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .mi-input-tab {
+    flex: 1; min-width: 80px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none;
+    font-family: inherit;
+    color: var(--muted);
+    background: transparent;
+    transition: background .12s, color .12s, box-shadow .12s;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .mi-input-tab.active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    font-weight: 600;
+  }
+  .mi-textarea {
+    width: 100%; min-height: 160px;
+    padding: 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px;
+    font-family: inherit; resize: vertical;
+    background: #f9fafb; color: var(--ink);
+    box-sizing: border-box;
+    transition: border-color .12s;
+  }
+  .mi-textarea:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .mi-drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px; padding: 32px 20px;
+    text-align: center; cursor: pointer;
+    font-size: 13px; color: var(--muted);
+    transition: border-color .12s, background .12s;
+  }
+  .mi-drop-zone:hover { border-color: var(--accent); background: #eff6ff; color: var(--accent); }
+  .mi-file-loaded {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: #f0fdf4; border: 1px solid #bbf7d0;
+    border-radius: 8px; font-size: 12px; color: #166534;
+    margin-top: 10px;
+  }
+  .mi-status-msg { font-size: 12px; color: var(--muted); margin-top: 10px; text-align: center; }
+  .mi-record-area { text-align: center; padding: 24px 0; }
+  .mi-record-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 24px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; font-family: inherit;
+    background: var(--accent); color: #fff;
+    transition: background .15s, transform .1s;
+  }
+  .mi-record-btn:hover { background: var(--accent-hover); }
+  .mi-record-btn.recording { background: #ef4444; }
+  .mi-record-timer { font-size: 24px; font-weight: 700; color: var(--ink); margin: 12px 0 4px; letter-spacing: 2px; }
+  .mi-record-hint { font-size: 11px; color: var(--muted); }
+  .mi-analyze-btn {
+    width: 100%; padding: 12px;
+    border-radius: 8px; border: none;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+    background: var(--accent); color: #fff;
+    transition: background .15s, opacity .15s;
+    margin-bottom: 16px;
+  }
+  .mi-analyze-btn:hover { background: var(--accent-hover); }
+  .mi-analyze-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .mi-out-tab-bar {
+    display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .mi-out-tab {
+    padding: 8px 16px;
+    font-size: 12px; font-weight: 500;
+    cursor: pointer; border: none;
+    font-family: inherit; color: var(--muted);
+    background: transparent;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color .12s, border-color .12s;
+  }
+  .mi-out-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .mi-out-tab:hover:not(.active) { color: var(--ink); }
+  .mi-out-content { min-height: 200px; }
+  .mi-out-text {
+    white-space: pre-wrap; font-size: 13px; line-height: 1.65;
+    color: var(--ink); font-family: inherit;
+  }
+  .mi-copy-bar {
+    display: flex; justify-content: flex-end;
+    padding-top: 12px; border-top: 1px solid var(--border);
+    margin-top: 12px; gap: 8px;
+  }
+  .mi-copy-btn {
+    padding: 5px 14px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    font-family: inherit; color: var(--muted);
+    transition: background .12s, border-color .12s;
+  }
+  .mi-copy-btn:hover { background: #f3f4f6; border-color: #d1d5db; color: var(--ink); }
+  .mi-loading-pulse {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--muted); padding: 24px 0;
+    justify-content: center;
+  }
+  .mi-actions-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mi-actions-table th {
+    background: #f3f4f6; padding: 8px 12px;
+    text-align: left; font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  .mi-actions-table td {
+    padding: 8px 12px; border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+  }
+  .mi-actions-table tr:last-child td { border-bottom: none; }
+  .mi-email-field { margin-bottom: 10px; }
+  .mi-email-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .mi-email-value {
+    padding: 8px 12px; background: #f9fafb;
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; color: var(--ink);
+  }
 
   /* ── Skill Cards (My Skills redesign) ── */
   .skill-cards-grid {
@@ -1513,17 +1948,56 @@
             </div>
           </div>
           <div class="chat-input-area">
-            <textarea class="chat-textarea" id="chatInput" placeholder="พิมพ์ข้อความ..." rows="1"
-              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';"
-              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
-            <button class="btn btn-primary" onclick="sendChat()" id="sendBtn">Send</button>
+            <!-- attached file chip -->
+            <!-- file chip -->
+            <div class="chat-file-chip" id="chatFileChip">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px;flex-shrink:0;"><path d="M3 8.5V4a3 3 0 0 1 6 0v6a1.5 1.5 0 0 1-3 0V5" stroke-linecap="round"/></svg>
+              <span id="chatFileChipName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;"></span>
+              <button id="chatMeetingIntelBtn" onclick="openMeetingIntelFromFile()" title="วิเคราะห์ด้วย Meeting Intelligence"
+                style="display:none;padding:2px 8px;font-size:10px;font-weight:600;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;cursor:pointer;white-space:nowrap;line-height:1.6;">
+                Meeting Intelligence
+              </button>
+              <button class="chat-file-chip-remove" onclick="clearChatFile()" title="ลบไฟล์">×</button>
+            </div>
+            <!-- recording chip -->
+            <div class="chat-recording-chip" id="chatRecordingChip">
+              <div class="chat-rec-dot"></div>
+              <span id="chatRecordTimer">00:00</span>
+              <button onclick="stopChatRecording()" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:14px;line-height:1;margin-left:2px;" title="หยุดบันทึก">■</button>
+            </div>
+            <div class="chat-input-row">
+              <!-- hidden file input -->
+              <input type="file" id="chatFileInput" style="display:none;"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp,.mp3,.m4a,.wav,.webm,.ogg,.mp4,audio/*"
+                onchange="onChatFileSelect(this)">
+              <button class="chat-attach-btn" id="chatAttachBtn" title="แนบไฟล์" onclick="$('chatFileInput').click()">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" style="width:18px;height:18px;">
+                  <path d="M4 10.5V5a5 5 0 0 1 10 0v8a3 3 0 0 1-6 0V6" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="chat-record-btn" id="chatRecordBtn" title="บันทึกเสียง" onclick="startChatRecording()">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" style="width:16px;height:16px;">
+                  <rect x="7" y="2" width="6" height="10" rx="3" stroke-linecap="round"/>
+                  <path d="M4 10a6 6 0 0 0 12 0" stroke-linecap="round"/>
+                  <line x1="10" y1="16" x2="10" y2="19" stroke-linecap="round"/>
+                  <line x1="7" y1="19" x2="13" y2="19" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <textarea class="chat-textarea" id="chatInput" placeholder="พิมพ์ข้อความ หรือแนบไฟล์เสียง / เอกสาร..." rows="1"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+              <button class="btn btn-primary" onclick="sendChat()" id="sendBtn">Send</button>
+            </div>
           </div>
         </div>
         <div class="skills-side" id="chatSidebar">
           <!-- Post-Meeting Actions (shown when meeting report detected) -->
           <div id="meetingActionsPanel" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
-            <div class="skills-side-header" style="display:flex;align-items:center;justify-content:space-between;">
-              Post-Meeting Actions
+            <div class="skills-side-header" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;">
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--ink);">Post-Meeting Actions</div>
+                <div style="font-size:10px;color:#0369a1;font-weight:600;margin-top:1px;">Meeting Intelligence Assistant</div>
+              </div>
               <button onclick="hideMeetingActions()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);line-height:1;">&times;</button>
             </div>
             <div id="meetingActionsContent" style="flex:1;overflow-y:auto;"></div>
@@ -1816,6 +2290,197 @@
     </div>
     <!-- /panel-directory -->
 
+    <!-- ── Files Panel ────────────────────────────────────────────────── -->
+    <div id="panel-files" class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <h2 style="font-size:18px;font-weight:700;margin:0;">File Manager</h2>
+          <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">อัปโหลดและวิเคราะห์ไฟล์ด้วย AI</p>
+        </div>
+        <label class="btn btn-primary" style="cursor:pointer;">
+          <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px;margin-right:6px;"><path d="M8 1v10M4 5l4-4 4 4M2 13h12" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+          Upload File
+          <input type="file" id="fileUploadInput" style="display:none;"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.gif,.webp"
+            onchange="handleFileUpload(this)">
+        </label>
+      </div>
+
+      <!-- Drop Zone -->
+      <div id="fileDropZone"
+        style="border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;
+               margin-bottom:24px;background:#fafafa;transition:all .2s;cursor:pointer;"
+        ondragover="event.preventDefault();this.style.borderColor='#2563eb';this.style.background='#eff6ff';"
+        ondragleave="this.style.borderColor='';this.style.background='#fafafa';"
+        ondrop="event.preventDefault();this.style.borderColor='';this.style.background='#fafafa';
+                handleFileUpload(null,event.dataTransfer.files[0]);"
+        onclick="$('fileUploadInput').click()">
+        <svg viewBox="0 0 48 48" fill="none" stroke="#9ca3af" stroke-width="2" style="width:48px;height:48px;margin:0 auto 12px;">
+          <path d="M24 32V16m-8 8l8-8 8 8" stroke-linecap="round"/>
+          <path d="M8 36a8 8 0 0 1 0-16h2a12 12 0 0 1 23.9-1A8 8 0 0 1 40 36H8z"/>
+        </svg>
+        <div style="font-size:14px;font-weight:600;color:#374151;">ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือก</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">PDF, Word, Excel, TXT, CSV, รูปภาพ — สูงสุด 20 MB</div>
+      </div>
+
+      <!-- Upload progress -->
+      <div id="fileUploadProgress" style="display:none;margin-bottom:16px;">
+        <div style="font-size:12px;color:#2563eb;margin-bottom:6px;" id="fileUploadStatus">กำลังอัปโหลด...</div>
+        <div style="background:#e2e8f0;border-radius:4px;height:4px;">
+          <div id="fileUploadBar" style="background:#2563eb;height:4px;border-radius:4px;width:0%;transition:width .3s;"></div>
+        </div>
+      </div>
+
+      <!-- File List -->
+      <div id="fileListContainer">
+        <div style="font-size:12px;color:var(--muted);text-align:center;padding:24px;">กำลังโหลด...</div>
+      </div>
+    </div>
+    <!-- /panel-files -->
+
+    <!-- MEETING INTELLIGENCE ASSISTANT -->
+    <div id="panel-meeting" class="panel">
+      <div style="max-width:860px;margin:0 auto;padding:24px 24px 40px;">
+
+        <!-- Header -->
+        <div style="margin-bottom:20px;">
+          <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:4px;">Meeting Intelligence Assistant</div>
+          <div style="font-size:12px;color:var(--muted);">นำเข้าบันทึกการประชุมแล้วรับสรุป · Action Items · ร่างอีเมล · MOM อัตโนมัติ</div>
+        </div>
+
+        <!-- Input Card -->
+        <div class="mi-card">
+          <div class="mi-card-title">ข้อมูลการประชุม</div>
+
+          <!-- Input tab bar -->
+          <div class="mi-input-tab-bar" id="miInputTabBar">
+            <button class="mi-input-tab active" onclick="miSwitchInput('text')" id="miTab-text">📝 พิมพ์ข้อความ</button>
+            <button class="mi-input-tab" onclick="miSwitchInput('file')" id="miTab-file">📄 อัปโหลดไฟล์</button>
+            <button class="mi-input-tab" onclick="miSwitchInput('audio')" id="miTab-audio">🎵 อัปโหลดเสียง</button>
+            <button class="mi-input-tab" onclick="miSwitchInput('record')" id="miTab-record">🎤 บันทึกเสียง</button>
+          </div>
+
+          <!-- Text input -->
+          <div id="miPane-text">
+            <textarea class="mi-textarea" id="miTextInput" placeholder="วางบันทึกการประชุม หรือ transcript ที่นี่...&#10;&#10;เช่น: ประชุมทีม Product วันที่ 9 มิ.ย. 68 ผู้เข้าร่วม: นริสรา, ธนพล, กิตติ&#10;หัวข้อ: review Q2 roadmap, ตัดสินใจเลื่อน feature X ไป Q3..."></textarea>
+          </div>
+
+          <!-- File upload -->
+          <div id="miPane-file" style="display:none;">
+            <div class="mi-drop-zone" onclick="$('miFileInput').click()">
+              <div style="font-size:24px;margin-bottom:8px;">📄</div>
+              <div style="font-weight:600;">คลิกเพื่อเลือกไฟล์</div>
+              <div style="font-size:11px;margin-top:4px;">รองรับ PDF, Word (.docx), TXT · สูงสุด 20 MB</div>
+            </div>
+            <input type="file" id="miFileInput" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" style="display:none;" onchange="miHandleFile(this)">
+            <div id="miFileStatus"></div>
+          </div>
+
+          <!-- Audio upload -->
+          <div id="miPane-audio" style="display:none;">
+            <div class="mi-drop-zone" onclick="$('miAudioInput').click()">
+              <div style="font-size:24px;margin-bottom:8px;">🎵</div>
+              <div style="font-weight:600;">คลิกเพื่อเลือกไฟล์เสียง</div>
+              <div style="font-size:11px;margin-top:4px;">รองรับ MP3, WAV, M4A, WebM, OGG · สูงสุด 24 MB</div>
+            </div>
+            <input type="file" id="miAudioInput" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg" style="display:none;" onchange="miHandleAudio(this)">
+            <div id="miAudioStatus"></div>
+          </div>
+
+          <!-- Record -->
+          <div id="miPane-record" style="display:none;">
+            <div class="mi-record-area">
+              <div id="miRecordStatus" class="mi-status-msg" style="margin-bottom:16px;">กดปุ่มด้านล่างเพื่อเริ่มบันทึกเสียงการประชุม</div>
+              <button class="mi-record-btn" id="miRecordBtn" onclick="miToggleRecording()">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm-5 7a5 5 0 0 0 4.5 4.975V15h-2v1h5v-1h-2v-2.025A5 5 0 0 0 13 8H11a3 3 0 0 1-6 0H5z"/></svg>
+                เริ่มบันทึก
+              </button>
+              <div class="mi-record-timer" id="miRecordTimer">00:00</div>
+              <div class="mi-record-hint">ระบบจะถอดเสียงเป็นข้อความโดย Whisper AI อัตโนมัติ</div>
+            </div>
+            <div id="miRecordFileStatus"></div>
+          </div>
+        </div>
+
+        <!-- Analyze button -->
+        <button class="mi-analyze-btn" id="miAnalyzeBtn" onclick="miAnalyze()">วิเคราะห์การประชุม</button>
+
+        <!-- Output Card (hidden until first run) -->
+        <div class="mi-card" id="miOutputCard" style="display:none;">
+          <!-- Output tab bar -->
+          <div class="mi-out-tab-bar">
+            <button class="mi-out-tab active" onclick="miSwitchOutput('summary')" id="miOutTab-summary">สรุปการประชุม</button>
+            <button class="mi-out-tab" onclick="miSwitchOutput('actions')" id="miOutTab-actions">Action Items</button>
+            <button class="mi-out-tab" onclick="miSwitchOutput('email')" id="miOutTab-email">ร่างอีเมล</button>
+            <button class="mi-out-tab" onclick="miSwitchOutput('mom')" id="miOutTab-mom">MOM Format</button>
+          </div>
+
+          <!-- Summary output -->
+          <div class="mi-out-content" id="miOutPane-summary">
+            <div id="miOutSummaryContent"><div class="mi-loading-pulse">กรุณาวิเคราะห์การประชุมก่อน</div></div>
+            <div class="mi-copy-bar">
+              <button class="mi-copy-btn" onclick="miCopyOutput('summary')">คัดลอก</button>
+            </div>
+          </div>
+
+          <!-- Action Items output -->
+          <div class="mi-out-content" id="miOutPane-actions" style="display:none;">
+            <div id="miOutActionsContent"><div class="mi-loading-pulse">กรุณาวิเคราะห์การประชุมก่อน</div></div>
+            <div class="mi-copy-bar">
+              <button class="mi-copy-btn" onclick="miCopyOutput('actions')">คัดลอก</button>
+            </div>
+          </div>
+
+          <!-- Email output -->
+          <div class="mi-out-content" id="miOutPane-email" style="display:none;">
+            <div id="miOutEmailContent"><div class="mi-loading-pulse">กรุณาวิเคราะห์การประชุมก่อน</div></div>
+            <div class="mi-copy-bar">
+              <button class="mi-copy-btn" onclick="miCopyOutput('email')">คัดลอก</button>
+            </div>
+          </div>
+
+          <!-- MOM output -->
+          <div class="mi-out-content" id="miOutPane-mom" style="display:none;">
+            <div id="miOutMOMContent"><div class="mi-loading-pulse">กรุณาวิเคราะห์การประชุมก่อน</div></div>
+            <div class="mi-copy-bar">
+              <button class="mi-copy-btn" onclick="miCopyOutput('mom')">คัดลอก</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <!-- /panel-meeting -->
+
+    <!-- Analyze Result Modal -->
+    <div id="analyzeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;align-items:center;justify-content:center;">
+      <div style="background:#fff;border-radius:16px;width:680px;max-width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-size:15px;font-weight:700;" id="analyzeModalTitle">วิเคราะห์ไฟล์</div>
+            <div style="font-size:11px;color:var(--muted);" id="analyzeModalFile"></div>
+          </div>
+          <button onclick="closeModal('analyzeModal')" style="background:none;border:none;cursor:pointer;font-size:22px;color:#9ca3af;">×</button>
+        </div>
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border);">
+          <div style="display:flex;gap:8px;">
+            <input class="form-control" id="analyzeQuestion" placeholder="ถามอะไรก็ได้เกี่ยวกับไฟล์นี้..."
+              style="flex:1;" onkeydown="if(event.key==='Enter')runAnalyze()">
+            <button class="btn btn-primary btn-sm" onclick="runAnalyze()">วิเคราะห์</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="quickQ('สรุปเนื้อหาหลักของไฟล์นี้')">สรุปเนื้อหา</button>
+            <button class="btn btn-ghost btn-sm" onclick="quickQ('จับประเด็นสำคัญและ action items')">Action Items</button>
+            <button class="btn btn-ghost btn-sm" onclick="quickQ('แปลเนื้อหาเป็นภาษาไทย')">แปลเป็นไทย</button>
+            <button class="btn btn-ghost btn-sm" onclick="quickQ('ตรวจสอบความถูกต้องและความครบถ้วน')">ตรวจสอบ</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:20px 24px;" id="analyzeResult">
+          <div style="font-size:13px;color:var(--muted);text-align:center;padding:32px;">กด "วิเคราะห์" เพื่อให้ AI วิเคราะห์ไฟล์</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -1977,7 +2642,7 @@
 <div id="toast"></div>
 
 <script>
-const API = 'http://localhost:8000';
+const API = (!window.location.hostname || window.location.hostname === 'localhost') ? 'http://localhost:8000' : `${window.location.protocol}//${window.location.hostname}/api`;
 let chatHistory = [];
 let lastSkillId = null;
 
@@ -2010,7 +2675,9 @@ function showPanel(name) {
 
   const titles = { chat:'Chat Assistant', skills:'My Skills',
                    store:'Skill Store', create:'Create Skill',
-                   directory:'Company Directory' };
+                   files:'File Manager',
+                   directory:'Company Directory',
+                   meeting:'Meeting Intelligence Assistant' };
   $('panelTitle').textContent = titles[name] || name;
 
   document.querySelectorAll('.nav-item').forEach(n => {
@@ -2020,6 +2687,7 @@ function showPanel(name) {
   if (name === 'skills')    loadMySkills();
   if (name === 'store')     loadStore();
   if (name === 'directory') loadDirectory();
+  if (name === 'files')     loadFiles();
 }
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
@@ -2166,7 +2834,12 @@ function renderSkillCards(skills) {
       ? new Date(s.created_at).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'})
       : '';
     let actions = '';
-    if (canRun) actions += `<button class="btn btn-primary btn-sm" onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>`;
+    if (canRun) {
+      const runBtn = s.skill_type === 'meet'
+        ? `<button class="btn btn-primary btn-sm" onclick="showPanel('meeting')">เปิด</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>`;
+      actions += runBtn;
+    }
     if (canShare) actions += `<button class="btn btn-outline btn-sm" onclick="publishSkill(${s.id})">Share to Store</button>`;
     if (canUnshare) actions += `<button class="btn btn-outline btn-sm" onclick="unpublishSkill(${s.id})">Unshare</button>`;
     return `<div class="skill-card">
@@ -2224,7 +2897,9 @@ function renderInstalledCards(skills) {
         <div class="skill-card-tags">${dept}</div>
       </div>
       <div class="skill-card-footer">
-        <button class="btn btn-primary btn-sm" onclick="openRunModal(${s.skill_id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
+        ${s.skill_type === 'meet'
+          ? `<button class="btn btn-primary btn-sm" onclick="showPanel('meeting')">เปิด</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="openRunModal(${s.skill_id},'${s.name.replace(/'/g,"\\'")}')">Run</button>`}
         <button class="btn btn-ghost btn-sm" onclick="openSkillDetail(${s.skill_id})">Details</button>
         <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;" onclick="uninstallSkill(${s.installation_id})">ถอน</button>
         ${dateStr ? `<span class="skill-date-tag">${dateStr}</span>` : ''}
@@ -2374,7 +3049,11 @@ function renderStoreTable(skills) {
     } else {
       installBtn = `<button class="btn btn-success btn-sm" onclick="installSkill(${s.id})">+ Install</button>`;
     }
+    const openBtn = s.skill_type === 'meet'
+      ? `<button class="btn btn-primary btn-sm" onclick="showPanel('meeting')">เปิด</button>`
+      : '';
     const actionBtn = `<div style="display:flex;gap:4px;flex-wrap:wrap;">
+      ${openBtn}
       <button class="btn btn-ghost btn-sm" onclick="openSkillDetail(${s.id})">Details</button>
       ${installBtn}
     </div>`;
@@ -2685,20 +3364,194 @@ async function installSkill(skillId) {
 }
 
 
+// ── Chat File Attachment ──────────────────────────────────────────────────────
+let _chatFile = null;      // { file: File, id: null }
+let _chatFileId = null;    // backend file ID after upload
+
+function _isChatAudioFile(file) {
+  return file.type.startsWith('audio/') || file.type.startsWith('video/') ||
+    /\.(mp3|wav|m4a|webm|ogg|mp4|aac)$/i.test(file.name);
+}
+
+// ── Chat Browser Recording ────────────────────────────────────────────────────
+let _chatRecorder     = null;
+let _chatRecordChunks = [];
+let _chatRecordTimer  = null;
+let _chatRecordSecs   = 0;
+
+async function startChatRecording() {
+  if (_chatRecorder && _chatRecorder.state === 'recording') return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                   : MediaRecorder.isTypeSupported('audio/webm')              ? 'audio/webm'
+                   : 'audio/mp4';
+    _chatRecorder      = new MediaRecorder(stream, { mimeType });
+    _chatRecordChunks  = [];
+
+    _chatRecorder.ondataavailable = e => { if (e.data.size > 0) _chatRecordChunks.push(e.data); };
+    _chatRecorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      clearInterval(_chatRecordTimer);
+      $('chatRecordBtn').classList.remove('recording');
+      $('chatRecordingChip').classList.remove('active');
+      $('chatRecordTimer').textContent = '00:00';
+
+      const ext  = mimeType.includes('webm') ? 'webm' : 'mp4';
+      const blob = new Blob(_chatRecordChunks, { type: mimeType });
+      const file = new File([blob], `recording_${Date.now()}.${ext}`, { type: mimeType });
+      appendMeetingDetectCard(file, '');
+    };
+
+    _chatRecorder.start(500);
+    _chatRecordSecs = 0;
+    $('chatRecordBtn').classList.add('recording');
+    $('chatRecordingChip').classList.add('active');
+    $('chatRecordTimer').textContent = '00:00';
+
+    _chatRecordTimer = setInterval(() => {
+      _chatRecordSecs++;
+      const m = String(Math.floor(_chatRecordSecs / 60)).padStart(2, '0');
+      const s = String(_chatRecordSecs % 60).padStart(2, '0');
+      $('chatRecordTimer').textContent = `${m}:${s}`;
+    }, 1000);
+
+  } catch (e) {
+    toast('ไม่สามารถเข้าถึงไมโครโฟนได้ — กรุณาอนุญาต Microphone ใน browser', 'error');
+  }
+}
+
+function stopChatRecording() {
+  if (_chatRecorder && _chatRecorder.state === 'recording') {
+    _chatRecorder.stop();
+  }
+}
+
+function onChatFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _chatFile = file;
+  _chatFileId = null;
+  $('chatFileChipName').textContent = file.name;
+  $('chatFileChip').classList.add('active');
+  $('chatAttachBtn').classList.add('has-file');
+  const icon = $('chatFileChip').querySelector('svg');
+  const isAudio = _isChatAudioFile(file);
+  if (isAudio) {
+    icon.innerHTML = '<path d="M8 1a3 3 0 0 1 3 3v4a3 3 0 0 1-6 0V4a3 3 0 0 1 3-3zm0 11a5 5 0 0 0 5-5H11a3 3 0 0 1-6 0H3a5 5 0 0 0 5 5zm0 1v2M6 15h4" stroke-linecap="round" stroke-linejoin="round"/>';
+  } else {
+    icon.innerHTML = '<path d="M3 8.5V4a3 3 0 0 1 6 0v6a1.5 1.5 0 0 1-3 0V5" stroke-linecap="round"/>';
+  }
+  $('chatMeetingIntelBtn').style.display = isAudio ? 'inline-block' : 'none';
+  input.value = '';
+}
+
+function clearChatFile() {
+  _chatFile = null;
+  _chatFileId = null;
+  $('chatFileChip').classList.remove('active');
+  $('chatAttachBtn').classList.remove('has-file');
+  $('chatMeetingIntelBtn').style.display = 'none';
+}
+
+function openMeetingIntelFromFile() {
+  if (!_chatFile) return;
+  const file = _chatFile;
+  const name = file.name;
+  clearChatFile();
+  appendMsg(`Meeting Intelligence: ${name}`, 'user');
+  appendMeetingDetectCard(file, '');
+}
+
+async function uploadChatFile() {
+  if (!_chatFile) return null;
+  const form = new FormData();
+  form.append('file', _chatFile);
+  form.append('user_email', getUserEmail());
+  const r = await fetch(`${API}/api/files/upload`, { method:'POST', body: form });
+  if (!r.ok) throw new Error('Upload failed');
+  const d = await r.json();
+  _chatFileId = d.id;
+  return d.id;
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 async function sendChat() {
   const input = $('chatInput');
   const msg = input.value.trim();
-  if (!msg) return;
+  const hasFile = !!_chatFile;
+  if (!msg && !hasFile) return;
+
+  const displayMsg = msg || `📎 ${_chatFile.name}`;
   input.value = '';
   input.style.height = 'auto';
 
-  appendMsg(msg, 'user');
+  const fileToUpload = _chatFile;
+  clearChatFile();
+
+  appendMsg(displayMsg, 'user');
 
   const sendBtn = $('sendBtn');
   sendBtn.innerHTML = '<span class="spinner"></span>';
   sendBtn.disabled = true;
 
+  // If file attached — upload first, then send through /api/chat for full skill/meeting detection
+  if (fileToUpload) {
+    try {
+      const form = new FormData();
+      form.append('file', fileToUpload);
+      form.append('user_email', getUserEmail());
+      const ur = await fetch(`${API}/api/files/upload`, { method:'POST', body: form });
+      if (!ur.ok) {
+        const errBody = await ur.json().catch(() => ({}));
+        throw new Error(errBody.detail || `HTTP ${ur.status}`);
+      }
+      const ud = await ur.json();
+
+      // Send through /api/chat so Meeting Report Assistant + Post-Meeting Actions work
+      const r = await fetch(`${API}/api/chat`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          message: msg || '',
+          user_email: getUserEmail(),
+          conversation_history: chatHistory.slice(-10),
+          last_skill_id: lastSkillId,
+          file_id: ud.id,
+        })
+      });
+      const d = await r.json();
+      const reply = d.reply || 'ไม่ได้รับคำตอบ';
+
+      if (d.last_skill_id) lastSkillId = d.last_skill_id;
+      appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
+      chatHistory.push({ role:'user', content: `[ไฟล์: ${fileToUpload.name}] ${msg || 'สรุปเนื้อหา'}` });
+      chatHistory.push({ role:'assistant', content: reply });
+
+      if (d.suggested_skills?.length) {
+        $('suggestedSkills').innerHTML = d.suggested_skills.map(s => `
+          <div class="skill-item">
+            <div class="skill-item-name">${s.name}</div>
+            <div class="skill-item-desc">${(s.description||'').slice(0,55)}${(s.description||'').length>55?'...':''}</div>
+            <div style="display:flex;gap:5px;margin-top:7px;">
+              <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;"
+                onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
+              ${s.is_installed
+                ? `<button class="btn btn-sm" disabled style="background:#f1f5f9;color:var(--muted);border:1px solid var(--border);font-size:10px;">ติดตั้งแล้ว</button>`
+                : `<button class="btn btn-success btn-sm" style="font-size:10px;"
+                    onclick="installSkill(${s.id})">+ Install</button>`}
+            </div>
+          </div>`).join('');
+      }
+    } catch(e) {
+      appendMsg(`❌ ไม่สามารถประมวลผลไฟล์ได้: ${e.message}`, 'bot');
+    } finally {
+      sendBtn.innerHTML = 'Send';
+      sendBtn.disabled = false;
+    }
+    return;
+  }
+
+  hideMeetingActions();
   chatHistory.push({ role:'user', content: msg });
 
   try {
@@ -2719,11 +3572,6 @@ async function sendChat() {
 
     appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
     chatHistory.push({ role:'assistant', content: reply });
-
-    // Post-meeting panel
-    if (d.is_meeting_report) {
-      showMeetingActions(reply);
-    }
 
     // Suggested Skills panel
     if (d.suggested_skills?.length) {
@@ -2751,13 +3599,498 @@ async function sendChat() {
   }
 }
 
+// ── Meeting Intelligence Chat Integration ─────────────────────────────────────
+let _pendingMeetingFile = null;   // audio File object waiting to be analyzed
+let _meetingFiles       = [];     // files attached to the current meeting session
+let _miCardCounter      = 0;      // unique IDs for detect/analysis cards
+
+function _getAudioDuration(file) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const secs = Math.round(audio.duration) || 0;
+      const m = String(Math.floor(secs / 60)).padStart(2, '0');
+      const s = String(secs % 60).padStart(2, '0');
+      resolve(`${m}:${s}`);
+    };
+    audio.onerror = () => { URL.revokeObjectURL(url); resolve('--:--'); };
+    setTimeout(() => resolve('--:--'), 3000);
+  });
+}
+
+function _detectConfidence(file, msg) {
+  let score = 62;
+  if (_isChatAudioFile(file)) score += 18;
+  if (/meeting|ประชุม|minutes|สรุป|transcript|mom/i.test(file.name)) score += 10;
+  if (/ประชุม|สรุป|meeting|minutes|transcript|รายงาน/i.test(msg)) score += 7;
+  return Math.min(97, score);
+}
+
+function _appendRawBotMsg(html) {
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot';
+  div.innerHTML = `<div class="msg-sender">HERMES</div><div class="msg-bubble">${html}</div>`;
+  const msgs = $('chatMessages');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+async function appendMeetingDetectCard(file, msg) {
+  const id = ++_miCardCounter;
+  _pendingMeetingFile = file;
+  const dur  = await _getAudioDuration(file);
+  const conf = _detectConfidence(file, msg);
+  const ext  = (file.name.split('.').pop() || 'audio').toUpperCase();
+
+  const modes = [
+    {
+      key: 'quick',
+      title: 'Quick Summary',
+      desc: 'สรุปประชุมแบบเร็ว · Action Items · ผู้รับผิดชอบ',
+      color: '#16a34a', bg: '#f0fdf4',
+      iconPath: '<path d="M10 2L4 9h5l-1 7 8-9h-5l1-7z" stroke-linecap="round" stroke-linejoin="round"/>',
+      preview: `<div class="mi-preview-line dark" style="width:60%;margin-bottom:4px;"></div>
+        <div class="mi-preview-line" style="width:90%;"></div><div class="mi-preview-line" style="width:75%;"></div>
+        <div style="margin-top:5px;font-size:8px;color:#94a3b8;font-weight:600;">Action Items</div>
+        <div class="mi-preview-row"><div class="mi-preview-dot"></div><div class="mi-preview-line" style="flex:1;"></div></div>
+        <div class="mi-preview-row"><div class="mi-preview-dot"></div><div class="mi-preview-line" style="flex:1;width:60%;"></div></div>`,
+      selected: true,
+    },
+    {
+      key: 'transcript',
+      title: 'Full Transcript',
+      desc: 'ถอดเสียงทั้งหมด · แยกผู้พูด · Timestamp',
+      color: '#2563eb', bg: '#eff6ff',
+      iconPath: '<path d="M3 5h10M3 8h10M3 11h6" stroke-linecap="round"/><circle cx="13" cy="11" r="2"/><path d="M13 13v3" stroke-linecap="round"/>',
+      preview: `<div style="font-size:7px;color:#64748b;margin-bottom:3px;">10:01</div>
+        <div class="mi-preview-row"><div class="mi-preview-dot" style="background:#3b82f6;"></div><div class="mi-preview-line" style="flex:1;"></div></div>
+        <div style="font-size:7px;color:#64748b;margin:3px 0 2px;">10:05</div>
+        <div class="mi-preview-row"><div class="mi-preview-dot" style="background:#8b5cf6;"></div><div class="mi-preview-line" style="flex:1;"></div></div>`,
+      selected: false,
+    },
+    {
+      key: 'intelligence',
+      title: 'Meeting Intelligence',
+      desc: 'Decisions · Risks · Owners · Timeline · Next Steps',
+      color: '#7c3aed', bg: '#faf5ff',
+      recommended: true,
+      iconPath: '<circle cx="10" cy="8" r="5"/><path d="M8 6c0-1 1-2 2-2s2 1 2 2c0 1-1 1.5-2 2v1" stroke-linecap="round"/><circle cx="10" cy="12.5" r=".5" fill="currentColor"/>',
+      preview: `<div style="font-size:7px;color:#94a3b8;font-weight:600;margin-bottom:3px;">Decisions</div>
+        <div class="mi-preview-line" style="width:85%;margin-bottom:2px;"></div>
+        <div style="font-size:7px;color:#94a3b8;font-weight:600;margin:4px 0 2px;">Risks</div>
+        <div class="mi-preview-line" style="width:70%;margin-bottom:2px;"></div>
+        <div style="font-size:7px;color:#94a3b8;font-weight:600;margin:4px 0 2px;">Timeline</div>
+        <div class="mi-preview-line" style="width:90%;"></div>`,
+      selected: false,
+    },
+    {
+      key: 'email',
+      title: 'Draft Email',
+      desc: 'สร้าง Follow-up Email พร้อมส่งทันที',
+      color: '#ea580c', bg: '#fff7ed',
+      iconPath: '<rect x="2" y="4" width="16" height="12" rx="2"/><path d="M2 7l8 5 8-5" stroke-linecap="round"/>',
+      preview: `<div style="font-size:7px;color:#94a3b8;margin-bottom:3px;">To: Team</div>
+        <div class="mi-preview-line dark" style="width:80%;margin-bottom:5px;"></div>
+        <div class="mi-preview-line" style="width:90%;margin-bottom:2px;"></div>
+        <div class="mi-preview-line" style="width:70%;margin-bottom:2px;"></div>
+        <div class="mi-preview-line" style="width:85%;"></div>`,
+      selected: false,
+    },
+  ];
+
+  const modesHtml = modes.map(m => `
+    <div class="mi-mode-card${m.selected ? ' selected' : ''}" id="miMode_${id}_${m.key}" onclick="miSelectMode(${id},'${m.key}')">
+      <div class="mi-mode-left">
+        <div class="mi-mode-radio" id="miRadio_${id}_${m.key}"></div>
+        <div class="mi-mode-icon-wrap" style="background:${m.bg};">
+          <svg viewBox="0 0 20 20" fill="none" stroke="${m.color}" stroke-width="1.7" width="16" height="16">${m.iconPath}</svg>
+        </div>
+        <div>
+          <div class="mi-mode-title" style="color:${m.color};">
+            ${m.title}${m.recommended ? '<span class="mi-mode-recommended">แนะนำ</span>' : ''}
+          </div>
+          <div class="mi-mode-desc">${m.desc}</div>
+        </div>
+      </div>
+      <div class="mi-mode-preview">${m.preview}</div>
+    </div>`).join('');
+
+  _appendRawBotMsg(`
+    <div class="mi-detect-card" id="miDetectCard_${id}">
+      <div class="mi-detect-header">
+        <span class="mi-detect-label">Detected Skill</span>
+        <span class="mi-confidence-badge">Confidence: ${conf}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div class="mi-detect-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.8" width="18" height="18">
+            <rect x="7" y="2" width="6" height="9" rx="3"/><path d="M4 10a6 6 0 0 0 12 0" stroke-linecap="round"/><line x1="10" y1="16" x2="10" y2="19" stroke-linecap="round"/><line x1="7" y1="19" x2="13" y2="19" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <div class="mi-detect-skill-name">Meeting Intelligence Assistant</div>
+          <div class="mi-detect-meta">Input: Audio File (${ext}) · Duration: ${dur}</div>
+        </div>
+      </div>
+      <div class="mi-modes">${modesHtml}</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="mi-run-btn" id="miRunBtn_${id}" onclick="runMeetingFromChat(${id},'${msg.replace(/'/g,"\\'")}')">
+          <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11"><polygon points="3,2 13,8 3,14"/></svg>
+          Run Analysis
+        </button>
+        <button class="mi-change-btn" onclick="miCancelDetect(${id})">Change Skill</button>
+      </div>
+    </div>`);
+}
+
+function miSelectMode(cardId, mode) {
+  const modes = ['quick','transcript','intelligence','email'];
+  modes.forEach(m => {
+    const card = document.getElementById(`miMode_${cardId}_${m}`);
+    if (card) card.classList.toggle('selected', m === mode);
+  });
+}
+
+async function runMeetingFromChat(cardId, originalMsg) {
+  const file = _pendingMeetingFile;
+  if (!file) return;
+
+  // Read selected mode
+  const modes = ['quick','transcript','intelligence','email'];
+  const selectedMode = modes.find(m => document.getElementById(`miMode_${cardId}_${m}`)?.classList.contains('selected')) || 'quick';
+
+  const runBtn = $(`miRunBtn_${cardId}`);
+  if (runBtn) { runBtn.disabled = true; runBtn.innerHTML = '<span class="spinner"></span> กำลังวิเคราะห์...'; }
+
+  // Show progress bubble
+  const progressBubble = _appendRawBotMsg(`
+    <div style="display:flex;flex-direction:column;gap:8px;min-width:240px;">
+      <div style="font-size:12px;font-weight:600;color:var(--ink);">กำลังวิเคราะห์การประชุม...</div>
+      <div id="miProgress_${cardId}" style="font-size:11px;color:var(--muted);">1/3 · กำลังถอดเสียง...</div>
+      <div style="height:4px;background:#f3f4f6;border-radius:2px;overflow:hidden;">
+        <div id="miProgressBar_${cardId}" style="height:100%;background:var(--accent);border-radius:2px;width:10%;transition:width .4s;"></div>
+      </div>
+    </div>`);
+
+  const setProgress = (pct, label) => {
+    const bar = $(`miProgressBar_${cardId}`);
+    const txt = $(`miProgress_${cardId}`);
+    if (bar) bar.style.width = pct + '%';
+    if (txt) txt.textContent = label;
+  };
+
+  try {
+    // Step 1: Transcribe audio (all modes)
+    setProgress(15, 'กำลังถอดเสียง...');
+    const tForm = new FormData();
+    tForm.append('file', file);
+    const tRes = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: tForm });
+    if (!tRes.ok) {
+      const err = await tRes.json().catch(() => ({}));
+      throw new Error(err.detail || `Transcription failed (${tRes.status})`);
+    }
+    const tData = await tRes.json();
+    const rawTranscript = tData.transcript || '';
+
+    // Clean transcript with LLM (fix Whisper errors)
+    setProgress(35, 'กำลังแก้ไขคำผิด...');
+    const cleanRes = await fetch(`${API}/api/meeting/clean-transcript`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: rawTranscript, user_email: getUserEmail() })
+    }).then(r => r.json()).catch(() => ({ transcript: rawTranscript }));
+    const transcript = cleanRes.transcript || rawTranscript;
+
+    _meetingFiles = [{ name: file.name, size: file.size, type: file.type }];
+
+    // Step 2: Branch by mode
+    if (selectedMode === 'transcript') {
+      setProgress(100, 'เสร็จสิ้น');
+      progressBubble.remove();
+      appendTranscriptCard(transcript, file.name);
+
+    } else if (selectedMode === 'email') {
+      setProgress(60, 'กำลังร่างอีเมล...');
+      const extractData = await fetch(`${API}/api/meeting/extract`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text: transcript, user_email: getUserEmail() })
+      }).then(r => r.json()).catch(() => ({}));
+      const emailData = await fetch(`${API}/api/meeting/draft-email`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ meeting_text: transcript, participants: extractData.participants || [], action_items: extractData.action_items || [], user_email: getUserEmail() })
+      }).then(r => r.json()).catch(() => ({}));
+      setProgress(100, 'เสร็จสิ้น');
+      _lastMeetingData = { ...extractData, email_subject: emailData.subject || '', email_body: emailData.body || '', transcript };
+      progressBubble.remove();
+      appendEmailDraftCard(emailData);
+
+    } else if (selectedMode === 'intelligence') {
+      setProgress(50, 'กำลังวิเคราะห์เชิงธุรกิจ...');
+      const intelData = await fetch(`${API}/api/meeting/analyze-intelligence`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ text: transcript, user_email: getUserEmail() })
+      }).then(r => r.json());
+      setProgress(100, 'เสร็จสิ้น');
+      _lastMeetingData = { ...intelData, transcript };
+      _lastReportText  = intelData.executive_summary || transcript;
+      progressBubble.remove();
+      appendIntelligenceCard(intelData);
+      showMeetingActions(_lastReportText, true);
+
+    } else {
+      // Quick Summary (default)
+      setProgress(50, 'กำลังวิเคราะห์...');
+      const [sumData, extractData, momData] = await Promise.all([
+        fetch(`${API}/api/meeting/generate-summary`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
+        fetch(`${API}/api/meeting/extract`,          { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
+        fetch(`${API}/api/meeting/generate-mom`,     { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
+      ]);
+      setProgress(85, 'กำลังร่างอีเมล...');
+      const actionItems = Array.isArray(extractData.action_items) ? extractData.action_items : [];
+      const emailData = await fetch(`${API}/api/meeting/draft-email`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ meeting_text: transcript, participants: extractData.participants || [], action_items: actionItems, user_email: getUserEmail() })
+      }).then(r => r.json()).catch(() => ({}));
+      setProgress(100, 'เสร็จสิ้น');
+
+      _lastMeetingData = { ...extractData, summary: sumData.summary || '', mom: momData.mom || '', email_subject: emailData.subject || '', email_body: emailData.body || '', transcript };
+      _lastReportText  = sumData.summary || transcript;
+
+      const _up = (pid, html) => { const c = $(`miOutPane-${pid}`)?.querySelector('.mi-out-text'); if (c) c.innerHTML = html; };
+      _up('summary', mdToHtml(_lastMeetingData.summary));
+      _up('actions', mdToHtml(_miRenderActionItemsMd(actionItems)));
+      _up('email',   mdToHtml(`**Subject:** ${_lastMeetingData.email_subject}\n\n${_lastMeetingData.email_body}`));
+      _up('mom',     mdToHtml(_lastMeetingData.mom));
+
+      progressBubble.remove();
+      appendMeetingAnalysisCard(_lastMeetingData);
+      showMeetingActions(_lastReportText, true);
+    }
+
+  } catch (e) {
+    setProgress(100, '');
+    progressBubble.querySelector('[id^="miProgress_"]').textContent = '';
+    progressBubble.querySelector('.msg-bubble').innerHTML =
+      `<div style="color:#dc2626;font-size:12px;">❌ ${e.message}</div>`;
+  } finally {
+    // Always reset the run button
+    if (runBtn) {
+      runBtn.disabled = true;
+      runBtn.style.background = '#6b7280';
+      runBtn.innerHTML = 'Analysis Complete';
+    }
+  }
+}
+
+function _miRenderActionItemsMd(items) {
+  if (!items.length) return 'ไม่พบ action items';
+  return items.map((a, i) => {
+    const task = typeof a === 'object' ? (a.task || a.description || JSON.stringify(a)) : a;
+    const owner = typeof a === 'object' && a.owner ? ` — ${a.owner}` : '';
+    const due   = typeof a === 'object' && a.due   ? ` (กำหนด: ${a.due})` : '';
+    return `${i + 1}. **${task}**${owner}${due}`;
+  }).join('\n');
+}
+
+function _stripMd(text) {
+  return (text || '').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1').replace(/^#+\s*/,'').trim();
+}
+
+function appendMeetingAnalysisCard(d) {
+  const title   = _stripMd(d.title || 'รายงานการประชุม');
+  const date    = d.date || new Date().toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
+  const parts   = Array.isArray(d.participants) ? d.participants : [];
+  const actions = Array.isArray(d.action_items)  ? d.action_items  : [];
+  const summary = d.summary || '';
+
+  // Clean bullet points from summary
+  const bullets = summary.split('\n')
+    .map(l => l.trim())
+    .filter(l => l && !l.match(/^#+/) && !l.match(/^\*\*[^*]+\*\*\s*[-:]/))
+    .map(l => _stripMd(l.replace(/^[-*•]\s*|\d+\.\s*/,'')))
+    .filter(l => l.length > 4)
+    .slice(0, 5);
+
+  const summaryBody = bullets.length
+    ? `<ul style="margin:0;padding-left:16px;">${bullets.map(b=>`<li style="margin-bottom:3px;">${b.replace(/</g,'&lt;')}</li>`).join('')}</ul>`
+    : `<div style="color:var(--muted);font-size:12px;">-</div>`;
+
+  const actionItemsHtml = actions.length
+    ? `<ol style="margin:0;padding-left:18px;">${actions.map(a => {
+        const task  = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
+        const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);font-size:11px;"> — ${a.owner}</span>` : '';
+        const due   = typeof a==='object' && a.due   ? `<span style="color:var(--muted);font-size:11px;"> · ${a.due}</span>` : '';
+        return `<li style="margin-bottom:5px;font-size:12px;line-height:1.5;">${task.replace(/</g,'&lt;')}${owner}${due}</li>`;
+      }).join('')}</ol>`
+    : '<div style="font-size:12px;color:var(--muted);">ไม่พบ action items</div>';
+
+
+  _appendRawBotMsg(`
+    <div class="mi-analysis-card">
+      <div class="mi-analysis-title">${title.replace(/</g,'&lt;')}</div>
+      <div class="mi-analysis-meta">
+        <span>${date}</span>
+        ${parts.length ? `<span>${parts.length} ผู้เข้าร่วม</span>` : ''}
+        ${actions.length ? `<span>${actions.length} Action Items</span>` : ''}
+      </div>
+      <details class="mi-analysis-section" open>
+        <summary>สรุปประเด็นสำคัญ</summary>
+        <div class="mi-analysis-section-body">${summaryBody}</div>
+      </details>
+      <details class="mi-analysis-section">
+        <summary>Action Items (${actions.length})</summary>
+        <div class="mi-analysis-section-body">${actionItemsHtml}</div>
+      </details>
+      <div class="mi-analysis-actions">
+        <button class="mi-analysis-action-btn primary" onclick="showPanel('meeting')">View Full Report</button>
+        <button class="mi-analysis-action-btn" onclick="openDraftEmail()">Draft Follow-up Email</button>
+        <button class="mi-analysis-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding:3px 8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;font-size:10px;font-weight:600;color:#0369a1;width:fit-content;">
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/></svg>
+      Meeting Intelligence Assistant
+    </div>`);
+}
+
+function appendTranscriptCard(transcript, filename) {
+  const lines = transcript.split('\n').filter(l => l.trim());
+  const html = lines.map(l => `<div style="padding:3px 0;border-bottom:1px solid #f3f4f6;font-size:12px;line-height:1.6;">${l.replace(/</g,'&lt;')}</div>`).join('');
+  const uid = '_miTxt_' + Date.now();
+  window[uid] = transcript;
+  _appendRawBotMsg(`
+    <div class="mi-analysis-card">
+      <div style="font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Full Transcript</div>
+      <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">${(filename||'').replace(/</g,'&lt;')}</div>
+      <div style="max-height:320px;overflow-y:auto;">${html || '<div style="color:var(--muted);">ไม่พบเนื้อหา</div>'}</div>
+      <div class="mi-analysis-actions" style="margin-top:12px;">
+        <button class="mi-analysis-action-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Transcript</button>
+      </div>
+    </div>`);
+}
+
+function appendEmailDraftCard(d) {
+  const subject = d.subject || '';
+  const body    = (d.body || '').replace(/\n/g,'<br>').replace(/</g,'&lt;').replace(/&lt;br>/g,'<br>');
+  const uid = '_miEmail_' + Date.now();
+  window[uid] = subject + '\n\n' + (d.body || '');
+  _appendRawBotMsg(`
+    <div class="mi-analysis-card">
+      <div style="font-size:11px;font-weight:700;color:#ea580c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Draft Follow-up Email</div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;">Subject</div>
+        <div style="font-size:12px;font-weight:600;color:var(--ink);padding:7px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;">${subject.replace(/</g,'&lt;')}</div>
+      </div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">Body</div>
+      <div style="font-size:12px;line-height:1.7;padding:10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;max-height:260px;overflow-y:auto;">${body}</div>
+      <div class="mi-analysis-actions" style="margin-top:12px;">
+        <button class="mi-analysis-action-btn primary" onclick="openDraftEmail()">Open in Email Composer</button>
+        <button class="mi-analysis-action-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Email</button>
+      </div>
+    </div>`);
+}
+
+function appendIntelligenceCard(d) {
+  const title    = _stripMd(d.title || 'รายงานการประชุม');
+  const summary  = d.executive_summary || '';
+  const decisions = Array.isArray(d.decisions) ? d.decisions : [];
+  const risks     = Array.isArray(d.risks) ? d.risks : [];
+  const timeline  = Array.isArray(d.timeline) ? d.timeline : [];
+  const nextSteps = Array.isArray(d.next_steps) ? d.next_steps : [];
+  const actions   = Array.isArray(d.action_items) ? d.action_items : [];
+
+  const listHtml = (items, key) => items.length
+    ? items.map(i => `<li style="margin-bottom:3px;">${(typeof i==='object' ? (i[key]||JSON.stringify(i)) : i).toString().replace(/</g,'&lt;')}</li>`).join('')
+    : '<li style="color:var(--muted);">-</li>';
+
+  const timelineHtml = timeline.length
+    ? timeline.map(t => `<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px;font-size:11px;">
+        <span style="color:var(--muted);white-space:nowrap;min-width:60px;">${(t.date||'').replace(/</g,'&lt;')}</span>
+        <span>${(t.milestone||'').replace(/</g,'&lt;')}</span></div>`).join('')
+    : '<div style="font-size:11px;color:var(--muted);">-</div>';
+
+  _appendRawBotMsg(`
+    <div class="mi-analysis-card">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
+        <div style="width:6px;height:6px;border-radius:50%;background:#7c3aed;"></div>
+        <span style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">Meeting Intelligence</span>
+      </div>
+      <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;">${title.replace(/</g,'&lt;')}</div>
+      ${summary ? `<div style="font-size:12px;line-height:1.6;color:var(--ink-2);padding:10px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;margin-bottom:12px;">${summary.replace(/</g,'&lt;')}</div>` : ''}
+
+      <details class="mi-analysis-section" open>
+        <summary>Decisions (${decisions.length})</summary>
+        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(decisions,'decision')}</ul></div>
+      </details>
+      <details class="mi-analysis-section">
+        <summary>Risks &amp; Issues (${risks.length})</summary>
+        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(risks,'risk')}</ul></div>
+      </details>
+      <details class="mi-analysis-section">
+        <summary>Action Items (${actions.length})</summary>
+        <div class="mi-analysis-section-body">
+          <ol style="margin:0;padding-left:18px;">${actions.map(a => {
+            const task = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
+            const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);"> — ${a.owner}</span>` : '';
+            const due   = typeof a==='object' && a.due   ? `<span style="color:var(--muted);"> · ${a.due}</span>` : '';
+            const pri   = typeof a==='object' && a.priority==='high' ? '<span style="color:#dc2626;font-size:10px;font-weight:600;margin-left:4px;">HIGH</span>' : '';
+            return `<li style="margin-bottom:5px;font-size:12px;">${task.replace(/</g,'&lt;')}${owner}${due}${pri}</li>`;
+          }).join('')}</ol>
+        </div>
+      </details>
+      <details class="mi-analysis-section">
+        <summary>Timeline</summary>
+        <div class="mi-analysis-section-body">${timelineHtml}</div>
+      </details>
+      <details class="mi-analysis-section">
+        <summary>Next Steps (${nextSteps.length})</summary>
+        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(nextSteps,'step')}</ul></div>
+      </details>
+      <div class="mi-analysis-actions">
+        <button class="mi-analysis-action-btn primary" onclick="openDraftEmail()">Draft Follow-up Email</button>
+        <button class="mi-analysis-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding:3px 8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:5px;font-size:10px;font-weight:600;color:#7c3aed;width:fit-content;">
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/></svg>
+      Meeting Intelligence
+    </div>`);
+}
+
+function miCancelDetect(cardId) {
+  const card = $(`miDetectCard_${cardId}`);
+  if (card) card.closest('.msg').remove();
+  _pendingMeetingFile = null;
+  toast('พิมพ์ข้อความพร้อมระบุ Skill ที่ต้องการอีกครั้ง', 'info');
+}
+
+function sendChatSuggestion(text) {
+  const input = $('chatInput');
+  input.value = text;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  sendChat();
+}
+
 // ── Post-Meeting Action Center ────────────────────────────────────────────────
 let _lastMeetingData = null;
 let _lastReportText  = '';
 
-function showMeetingActions(reportText) {
+function showMeetingActions(reportText, skipExtract) {
   _lastReportText = reportText;
-  _lastMeetingData = null;
+  if (!skipExtract) _lastMeetingData = null;
+
+  // If called from audio path (_lastMeetingData already set), render directly
+  if (skipExtract && _lastMeetingData) {
+    const mp = $('meetingActionsPanel');
+    const sp = $('suggestedSkillsPanel');
+    mp.style.display = 'flex';
+    sp.style.display = 'none';
+    renderMeetingPanel(_lastMeetingData);
+    return;
+  }
 
   // Switch panels
   const mp = $('meetingActionsPanel');
@@ -2796,51 +4129,114 @@ function hideMeetingActions() {
 }
 
 function renderMeetingPanel(d) {
-  const title    = d.title || 'Meeting Report';
-  const date     = d.date  || '';
-  const parts    = Array.isArray(d.participants) ? d.participants : [];
-  const actions  = Array.isArray(d.action_items) ? d.action_items : [];
-  const needsFollowUp = d.follow_up_required;
-  const followUpDate  = d.follow_up_suggested_date || '';
+  const title   = d.title || 'Meeting Report';
+  const date    = d.date  || '';
+  const parts   = Array.isArray(d.participants) ? d.participants : [];
+  const actions = Array.isArray(d.action_items) ? d.action_items : [];
+  const summary = d.summary || _lastReportText || '';
 
-  const partsHtml = parts.length
-    ? `<div style="display:flex;flex-wrap:wrap;gap:5px;">
-        ${parts.map(p => `<span class="meeting-participant">${p}</span>`).join('')}
-       </div>`
-    : `<div style="font-size:11px;color:var(--muted);">-</div>`;
-
-  const actionsHtml = actions.length
-    ? actions.map(a => `
-        <div class="action-item-card">
-          <div class="action-item-task">${typeof a === 'object' ? (a.task || a.description || JSON.stringify(a)) : a}</div>
-          ${typeof a === 'object' && a.owner ? `<div class="action-item-meta">ผู้รับผิดชอบ: ${a.owner}</div>` : ''}
-          ${typeof a === 'object' && a.due ? `<div class="action-item-meta">กำหนด: ${a.due}</div>` : ''}
-        </div>`).join('')
-    : `<div style="font-size:11px;color:var(--muted);">ไม่พบ action items</div>`;
-
-  $('meetingActionsContent').innerHTML = `
+  // Meeting info card
+  const cleanTitle = _stripMd(title);
+  const infoCard = `
     <div class="meeting-section">
-      <div class="meeting-section-label">การประชุม</div>
-      <div class="meeting-info-title">${title}</div>
-      ${date ? `<div class="meeting-info-date">${date}</div>` : ''}
-    </div>
-
-    <div class="meeting-section">
-      <div class="meeting-section-label">ผู้เข้าร่วม ${parts.length ? `(${parts.length})` : ''}</div>
-      ${partsHtml}
-    </div>
-
-    <div class="meeting-section">
-      <div class="meeting-section-label">Action Items ${actions.length ? `(${actions.length})` : ''}</div>
-      ${actionsHtml}
-    </div>
-
-    <div class="meeting-section" style="border-bottom:none;">
-      <div class="meeting-section-label">Actions</div>
-      <button class="meeting-action-btn primary" onclick="openDraftEmail()">Draft Follow-up Email</button>
-      <button class="meeting-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
-      <button class="meeting-action-btn" onclick="copyMeetingReport()">Copy Report</button>
+      <div class="mi-sidebar-info-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px;">
+          <div class="mi-sidebar-meeting-title">${cleanTitle.replace(/</g,'&lt;')}</div>
+          <span class="mi-status-complete">Complete</span>
+        </div>
+        ${date ? `<div class="mi-sidebar-meta-row">${date}</div>` : ''}
+        ${parts.length ? `<div class="mi-sidebar-meta-row">${parts.length} ผู้เข้าร่วม</div>` : ''}
+        <div class="mi-sidebar-analyzer">Meeting Intelligence Assistant</div>
+      </div>
     </div>`;
+
+  // สรุปย่อ — strip markdown
+  const shortSummary = summary
+    ? summary.split('\n')
+        .map(l => _stripMd(l.replace(/^[-*•]\s*|\d+\.\s*/,'')))
+        .filter(l => l.length > 4 && !l.match(/^#+/))
+        .slice(0, 3)
+        .map(l => `<div style="font-size:11px;color:var(--ink-2);line-height:1.5;margin-bottom:3px;">${l.replace(/</g,'&lt;').slice(0,100)}</div>`).join('')
+    : '<div style="font-size:11px;color:var(--muted);">-</div>';
+
+  const summarySection = `
+    <div class="meeting-section">
+      <div class="meeting-section-label">สรุปย่อ</div>
+      ${shortSummary}
+    </div>`;
+
+  // Action Items with checkboxes
+  const maxShown = 4;
+  const shownActions = actions.slice(0, maxShown);
+  const actionItemsHtml = shownActions.length
+    ? shownActions.map((a, i) => {
+        const task  = typeof a === 'object' ? (a.task || a.description || JSON.stringify(a)) : a;
+        const owner = typeof a === 'object' && a.owner ? a.owner : '';
+        const due   = typeof a === 'object' && a.due   ? a.due   : '';
+        return `
+          <div class="mi-action-item-row">
+            <input type="checkbox" class="mi-action-check" id="miCheck_${i}" onchange="this.closest('.mi-action-item-row').style.opacity=this.checked?.5:1">
+            <div style="flex:1;min-width:0;">
+              <div class="mi-action-task">${task.replace(/</g,'&lt;').replace(/\*\*/g,'')}</div>
+              <div class="mi-action-meta">
+                ${owner ? owner : ''}
+                ${due ? `${owner ? ' · ' : ''}${due}` : ''}
+                ${!owner && !due ? '' : ''}
+              </div>
+            </div>
+            <span class="mi-status-tag">รอดำเนินการ</span>
+          </div>`;
+      }).join('')
+    : '<div style="font-size:11px;color:var(--muted);">ไม่พบ action items</div>';
+
+  const seeAllLink = actions.length > maxShown
+    ? `<a class="mi-see-all-link" onclick="showPanel('meeting')">ดูทั้งหมด ${actions.length} รายการ →</a>` : '';
+
+  const actionsSection = `
+    <div class="meeting-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+        <div class="meeting-section-label" style="margin-bottom:0;">Action Items</div>
+        ${actions.length ? `<span style="font-size:10px;color:var(--muted);">${actions.length} รายการ</span>` : ''}
+      </div>
+      ${actionItemsHtml}
+      ${seeAllLink}
+    </div>`;
+
+  // Suggested Actions
+  const suggestedSection = `
+    <div class="meeting-section">
+      <div class="meeting-section-label">Suggested Actions</div>
+      <button class="mi-suggested-btn" onclick="openDraftEmail()">Draft Follow-up Email</button>
+      <button class="mi-suggested-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+    </div>`;
+
+  // Meeting Files
+  const filesSection = _meetingFiles.length ? `
+    <div class="meeting-section" style="border-bottom:none;">
+      <div class="meeting-section-label">Meeting Files</div>
+      ${_meetingFiles.map(f => {
+        const isAudio = _isChatAudioFile({name:f.name, type:f.type});
+        const iconSvg = isAudio
+          ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><rect x="5" y="1" width="5" height="8" rx="2.5"/><path d="M3 8a5 5 0 0 0 10 0" stroke-linecap="round"/><line x1="8" y1="13" x2="8" y2="15" stroke-linecap="round"/></svg>`
+          : `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path d="M4 1h6l4 4v10H4V1z"/><polyline points="10,1 10,5 14,5"/></svg>`;
+        const kb = f.size ? `${(f.size/1024).toFixed(0)} KB` : '';
+        return `<div class="mi-file-item">
+          <div class="mi-file-icon">${iconSvg}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name.replace(/</g,'&lt;')}</div>
+            ${kb ? `<div style="font-size:10px;color:var(--muted);">${kb}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  $('meetingActionsContent').innerHTML = infoCard + summarySection + actionsSection + suggestedSection + filesSection;
+}
+
+function miCopySidebarMOM() {
+  const mom = _lastMeetingData?.mom || _lastReportText || '';
+  if (!mom) { toast('ไม่พบ MOM', 'error'); return; }
+  navigator.clipboard.writeText(mom).then(() => toast('คัดลอก MOM แล้ว', 'success')).catch(() => toast('ไม่สามารถคัดลอกได้', 'error'));
 }
 
 async function openDraftEmail() {
@@ -3666,6 +5062,156 @@ function doLogout() {
   $('loginScreen').style.display = 'flex';
 }
 
+// ── File Manager ─────────────────────────────────────────────────────────────
+let _currentAnalyzeFileId = null;
+
+async function loadFiles() {
+  const email = getUserEmail();
+  try {
+    const r = await fetch(`${API}/api/files?user_email=${encodeURIComponent(email)}`);
+    const files = await r.json();
+    renderFileList(files);
+  } catch {
+    $('fileListContainer').innerHTML = '<div style="color:#ef4444;padding:16px;font-size:13px;">โหลดไฟล์ไม่ได้</div>';
+  }
+}
+
+function renderFileList(files) {
+  if (!files.length) {
+    $('fileListContainer').innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--muted);">
+        <svg viewBox="0 0 48 48" fill="none" stroke="#d1d5db" stroke-width="2" style="width:48px;height:48px;margin:0 auto 12px;display:block;">
+          <path d="M8 6h22l10 10v26H8V6zm22 0v10h10" stroke-linecap="round"/>
+        </svg>
+        <div style="font-size:13px;">ยังไม่มีไฟล์ — ลองอัปโหลดไฟล์แรกสิ!</div>
+      </div>`;
+    return;
+  }
+
+  const ICON = {
+    pdf: '📄', word: '📝', excel: '📊', image: '🖼️', text: '📃', default: '📁'
+  };
+  function fileIcon(mime) {
+    if (!mime) return ICON.default;
+    if (mime.includes('pdf')) return ICON.pdf;
+    if (mime.includes('word') || mime.includes('msword')) return ICON.word;
+    if (mime.includes('excel') || mime.includes('sheet')) return ICON.excel;
+    if (mime.startsWith('image/')) return ICON.image;
+    if (mime.startsWith('text/')) return ICON.text;
+    return ICON.default;
+  }
+  function fmtSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(1) + ' MB';
+  }
+  function fmtDate(iso) {
+    return new Date(iso).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'});
+  }
+
+  $('fileListContainer').innerHTML = `
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff;">
+      <div style="display:grid;grid-template-columns:1fr 80px 110px 160px;padding:8px 16px;
+                  background:#f9fafb;border-bottom:1px solid var(--border);
+                  font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.6px;text-transform:uppercase;">
+        <div>ชื่อไฟล์</div><div>ขนาด</div><div>วันที่</div><div style="text-align:right;">Actions</div>
+      </div>
+      ${files.map(f => `
+        <div style="display:grid;grid-template-columns:1fr 80px 110px 160px;padding:12px 16px;
+                    border-bottom:1px solid #f1f5f9;align-items:center;transition:background .1s;"
+             onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">${fileIcon(f.mime)}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--ink);">${f.name}</div>
+              ${f.summary ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${f.summary.slice(0,60)}…</div>` : ''}
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);">${fmtSize(f.size)}</div>
+          <div style="font-size:12px;color:var(--muted);">${fmtDate(f.created_at)}</div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;">
+            <button class="btn btn-primary btn-sm" onclick="openAnalyze(${f.id},'${f.name.replace(/'/g,"\\'")}')">
+              🤖 วิเคราะห์
+            </button>
+            <button class="btn btn-ghost btn-sm" style="color:#ef4444;"
+              onclick="deleteFile(${f.id})">🗑</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function handleFileUpload(input, droppedFile) {
+  const file = droppedFile || (input && input.files[0]);
+  if (!file) return;
+
+  const prog = $('fileUploadProgress');
+  const bar  = $('fileUploadBar');
+  const status = $('fileUploadStatus');
+  prog.style.display = 'block';
+  status.textContent = `กำลังอัปโหลด ${file.name}...`;
+  bar.style.width = '30%';
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('user_email', getUserEmail());
+
+  try {
+    bar.style.width = '60%';
+    const r = await fetch(`${API}/api/files/upload`, { method: 'POST', body: form });
+    bar.style.width = '100%';
+    if (!r.ok) {
+      const err = await r.json();
+      throw new Error(err.detail || 'Upload failed');
+    }
+    status.textContent = `✅ อัปโหลด ${file.name} สำเร็จ`;
+    await loadFiles();
+  } catch(e) {
+    status.textContent = `❌ ${e.message}`;
+    status.style.color = '#ef4444';
+  }
+  setTimeout(() => { prog.style.display='none'; bar.style.width='0%'; status.style.color=''; }, 3000);
+  if (input) input.value = '';
+}
+
+async function deleteFile(fileId) {
+  if (!confirm('ลบไฟล์นี้?')) return;
+  const email = getUserEmail();
+  await fetch(`${API}/api/files/${fileId}?user_email=${encodeURIComponent(email)}`, {method:'DELETE'});
+  loadFiles();
+}
+
+function openAnalyze(fileId, fileName) {
+  _currentAnalyzeFileId = fileId;
+  $('analyzeModalTitle').textContent = 'วิเคราะห์ไฟล์';
+  $('analyzeModalFile').textContent = fileName;
+  $('analyzeQuestion').value = '';
+  $('analyzeResult').innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:32px;">กด "วิเคราะห์" หรือเลือก Quick Action</div>';
+  $('analyzeModal').style.display = 'flex';
+}
+
+function quickQ(q) {
+  $('analyzeQuestion').value = q;
+  runAnalyze();
+}
+
+async function runAnalyze() {
+  if (!_currentAnalyzeFileId) return;
+  const question = $('analyzeQuestion').value.trim() || 'สรุปเนื้อหาหลักของไฟล์นี้';
+  $('analyzeResult').innerHTML = '<div style="font-size:13px;color:#2563eb;text-align:center;padding:32px;">🤖 กำลังวิเคราะห์...</div>';
+  try {
+    const r = await fetch(`${API}/api/files/${_currentAnalyzeFileId}/analyze`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_email: getUserEmail(), question})
+    });
+    const d = await r.json();
+    $('analyzeResult').innerHTML = `
+      <div style="font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--ink);">${d.result}</div>`;
+  } catch {
+    $('analyzeResult').innerHTML = '<div style="color:#ef4444;font-size:13px;">วิเคราะห์ไม่สำเร็จ</div>';
+  }
+}
+
 // ── Email To Autocomplete ─────────────────────────────────────────────────────
 function showEmailSuggestions(val) {
   const box = $('emailToSuggest');
@@ -3836,6 +5382,301 @@ async function saveCreateTeam() {
       toast(e.detail || 'สร้างไม่สำเร็จ', 'error');
     }
   } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
+}
+
+// ── Meeting Intelligence Assistant ───────────────────────────────────────────
+
+let _miCurrentText   = '';
+let _miCurrentInput  = 'text';
+let _miCurrentOutput = 'summary';
+let _miRecorder      = null;
+let _miRecordChunks  = [];
+let _miRecordTimer   = null;
+let _miRecordSecs    = 0;
+let _miLastExtracted = null;
+
+function miSwitchInput(tab) {
+  ['text','file','audio','record'].forEach(t => {
+    $('miTab-' + t).classList.toggle('active', t === tab);
+    $('miPane-' + t).style.display = t === tab ? '' : 'none';
+  });
+  _miCurrentInput = tab;
+  if (tab === 'text') { /* keep current text */ }
+}
+
+function miSwitchOutput(tab) {
+  ['summary','actions','email','mom'].forEach(t => {
+    $('miOutTab-' + t).classList.toggle('active', t === tab);
+    $('miOutPane-' + t).style.display = t === tab ? '' : 'none';
+  });
+  _miCurrentOutput = tab;
+}
+
+async function miHandleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  $('miFileStatus').innerHTML = `<div class="mi-status-msg">กำลังอ่านไฟล์ ${file.name}...</div>`;
+
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch(`${API}/api/meeting/extract-file`, { method: 'POST', body: form });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+    const d = await r.json();
+    _miCurrentText = d.text || '';
+    $('miTextInput').value = _miCurrentText;
+    $('miFileStatus').innerHTML = `<div class="mi-file-loaded">✅ โหลดสำเร็จ: ${d.filename} (${_miCurrentText.length.toLocaleString()} ตัวอักษร) — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว</div>`;
+    miSwitchInput('text');
+  } catch (e) {
+    $('miFileStatus').innerHTML = `<div style="font-size:12px;color:#ef4444;margin-top:8px;">❌ ${e.message}</div>`;
+  }
+  input.value = '';
+}
+
+async function miHandleAudio(input) {
+  const file = input.files[0];
+  if (!file) return;
+  $('miAudioStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียง ${file.name} ด้วย Whisper AI...</div>`;
+
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+    const d = await r.json();
+    _miCurrentText = d.transcript || '';
+    $('miTextInput').value = _miCurrentText;
+    $('miAudioStatus').innerHTML = `<div class="mi-file-loaded">✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร) — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว</div>`;
+    miSwitchInput('text');
+  } catch (e) {
+    $('miAudioStatus').innerHTML = `<div style="font-size:12px;color:#ef4444;margin-top:8px;">❌ ${e.message}</div>`;
+  }
+  input.value = '';
+}
+
+async function miToggleRecording() {
+  if (_miRecorder && _miRecorder.state === 'recording') {
+    _miRecorder.stop();
+    return;
+  }
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    $('miRecordStatus').textContent = '❌ ไม่สามารถเข้าถึงไมโครโฟน: ' + e.message;
+    return;
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+    : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+
+  _miRecordChunks = [];
+  _miRecorder = new MediaRecorder(stream, { mimeType });
+
+  _miRecorder.ondataavailable = e => { if (e.data.size > 0) _miRecordChunks.push(e.data); };
+
+  _miRecorder.onstop = () => {
+    stream.getTracks().forEach(t => t.stop());
+    clearInterval(_miRecordTimer);
+    $('miRecordBtn').textContent = '🎤 เริ่มบันทึก';
+    $('miRecordBtn').classList.remove('recording');
+    $('miRecordStatus').textContent = 'กำลังส่งไฟล์เสียงเพื่อถอดเสียง...';
+    const blob = new Blob(_miRecordChunks, { type: mimeType.split(';')[0] });
+    _miTranscribeRecording(blob, mimeType.split(';')[0]);
+  };
+
+  _miRecorder.start(1000);
+  _miRecordSecs = 0;
+  _miRecordTimer = setInterval(() => {
+    _miRecordSecs++;
+    const m = String(Math.floor(_miRecordSecs / 60)).padStart(2, '0');
+    const s = String(_miRecordSecs % 60).padStart(2, '0');
+    $('miRecordTimer').textContent = `${m}:${s}`;
+  }, 1000);
+
+  $('miRecordBtn').innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="3" width="10" height="10" rx="1"/></svg> หยุดบันทึก`;
+  $('miRecordBtn').classList.add('recording');
+  $('miRecordStatus').textContent = 'กำลังบันทึก... กดปุ่มอีกครั้งเพื่อหยุด';
+}
+
+async function _miTranscribeRecording(blob, mimeType) {
+  const ext = mimeType === 'audio/mp4' ? '.mp4' : mimeType === 'audio/ogg' ? '.ogg' : '.webm';
+  const file = new File([blob], `recording${ext}`, { type: mimeType });
+  const form = new FormData();
+  form.append('file', file);
+
+  $('miRecordFileStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียงด้วย Whisper AI...</div>`;
+  try {
+    const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
+    const d = await r.json();
+    _miCurrentText = d.transcript || '';
+    $('miTextInput').value = _miCurrentText;
+    $('miRecordFileStatus').innerHTML = `<div class="mi-file-loaded">✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร) — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว</div>`;
+    $('miRecordStatus').textContent = 'เสร็จสิ้น — สามารถบันทึกใหม่หรือวิเคราะห์ได้เลย';
+    miSwitchInput('text');
+  } catch (e) {
+    $('miRecordFileStatus').innerHTML = `<div style="font-size:12px;color:#ef4444;margin-top:8px;">❌ ${e.message}</div>`;
+    $('miRecordStatus').textContent = 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+  }
+}
+
+const _miLoadingHTML = `<div class="mi-loading-pulse"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> กำลังวิเคราะห์...</div>`;
+
+async function miAnalyze() {
+  const text = $('miTextInput').value.trim();
+  if (!text) { alert('กรุณาใส่ข้อมูลการประชุมก่อน'); return; }
+
+  _miCurrentText = text;
+  const email = getUserEmail();
+  const btn = $('miAnalyzeBtn');
+  btn.disabled = true;
+  btn.textContent = 'กำลังวิเคราะห์...';
+
+  // Show output card with loading state
+  $('miOutputCard').style.display = '';
+  miSwitchOutput('summary');
+  $('miOutSummaryContent').innerHTML = _miLoadingHTML;
+  $('miOutActionsContent').innerHTML = _miLoadingHTML;
+  $('miOutEmailContent').innerHTML   = _miLoadingHTML;
+  $('miOutMOMContent').innerHTML     = _miLoadingHTML;
+
+  const body = JSON.stringify({ text, user_email: email });
+  const hdrs = { 'Content-Type': 'application/json' };
+
+  // Run summary, extract, MOM in parallel; email waits for extract
+  const [summaryRes, extractRes, momRes] = await Promise.allSettled([
+    fetch(`${API}/api/meeting/generate-summary`, { method:'POST', headers:hdrs, body }).then(r => r.json()),
+    fetch(`${API}/api/meeting/extract`,          { method:'POST', headers:hdrs, body }).then(r => r.json()),
+    fetch(`${API}/api/meeting/generate-mom`,     { method:'POST', headers:hdrs, body }).then(r => r.json()),
+  ]);
+
+  // Summary tab
+  if (summaryRes.status === 'fulfilled' && summaryRes.value.summary) {
+    $('miOutSummaryContent').innerHTML = `<div class="mi-out-text">${summaryRes.value.summary.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  } else {
+    $('miOutSummaryContent').innerHTML = `<div style="font-size:12px;color:#ef4444;">เกิดข้อผิดพลาดในการสร้างสรุป</div>`;
+  }
+
+  // Action Items tab
+  if (extractRes.status === 'fulfilled' && !extractRes.value.error) {
+    _miLastExtracted = extractRes.value;
+    $('miOutActionsContent').innerHTML = _miRenderActionItems(_miLastExtracted);
+  } else {
+    $('miOutActionsContent').innerHTML = `<div style="font-size:12px;color:#ef4444;">เกิดข้อผิดพลาดในการดึง Action Items</div>`;
+    _miLastExtracted = {};
+  }
+
+  // MOM tab
+  if (momRes.status === 'fulfilled' && momRes.value.mom) {
+    $('miOutMOMContent').innerHTML = `<div class="mi-out-text">${momRes.value.mom.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+  } else {
+    $('miOutMOMContent').innerHTML = `<div style="font-size:12px;color:#ef4444;">เกิดข้อผิดพลาดในการสร้าง MOM</div>`;
+  }
+
+  // Email draft — uses extracted data
+  try {
+    const emailR = await fetch(`${API}/api/meeting/draft-email`, {
+      method: 'POST', headers: hdrs,
+      body: JSON.stringify({ meeting_data: _miLastExtracted || {}, user_email: email }),
+    });
+    const emailD = await emailR.json();
+    $('miOutEmailContent').innerHTML = _miRenderEmail(emailD.subject || '', emailD.body || '');
+  } catch {
+    $('miOutEmailContent').innerHTML = `<div style="font-size:12px;color:#ef4444;">เกิดข้อผิดพลาดในการร่างอีเมล</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'วิเคราะห์การประชุมอีกครั้ง';
+  // Scroll output into view
+  $('miOutputCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function _miRenderActionItems(d) {
+  const title   = d.title || '';
+  const date    = d.date  || '';
+  const parts   = Array.isArray(d.participants) ? d.participants : [];
+  const actions = Array.isArray(d.action_items) ? d.action_items : [];
+
+  let html = '';
+  if (title || date) {
+    html += `<div style="margin-bottom:14px;">`;
+    if (title) html += `<div style="font-size:14px;font-weight:600;color:var(--ink);">${title}</div>`;
+    if (date)  html += `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${date}</div>`;
+    html += `</div>`;
+  }
+  if (parts.length) {
+    html += `<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">ผู้เข้าร่วม</div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">` + parts.map(p => `<span class="meeting-participant">${p}</span>`).join('') + `</div></div>`;
+  }
+  if (actions.length) {
+    html += `<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Action Items (${actions.length})</div>`;
+    html += `<table class="mi-actions-table"><thead><tr><th>#</th><th>งาน</th><th>ผู้รับผิดชอบ</th><th>กำหนด</th></tr></thead><tbody>`;
+    actions.forEach((a, i) => {
+      const task     = typeof a === 'object' ? (a.task || a.description || '') : String(a);
+      const owner    = typeof a === 'object' ? (a.owner || '-') : '-';
+      const deadline = typeof a === 'object' ? (a.deadline || '-') : '-';
+      html += `<tr><td style="color:var(--muted);">${i+1}</td><td>${task}</td><td>${owner}</td><td>${deadline}</td></tr>`;
+    });
+    html += `</tbody></table>`;
+  } else {
+    html += `<div style="font-size:12px;color:var(--muted);">ไม่พบ Action Items</div>`;
+  }
+  if (d.follow_up_required && d.follow_up_suggested_date) {
+    html += `<div style="margin-top:12px;font-size:12px;color:var(--accent);">📅 แนะนำนัดประชุม follow-up: ${d.follow_up_suggested_date}</div>`;
+  }
+  return html || `<div style="font-size:12px;color:var(--muted);">ไม่พบข้อมูล</div>`;
+}
+
+function _miRenderEmail(subject, body) {
+  const esc = s => s.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `
+    <div class="mi-email-field"><div class="mi-email-label">Subject</div><div class="mi-email-value">${esc(subject)}</div></div>
+    <div class="mi-email-field"><div class="mi-email-label">เนื้อหา</div>
+      <div class="mi-email-value" style="white-space:pre-wrap;min-height:120px;font-size:12px;line-height:1.6;">${esc(body)}</div>
+    </div>`;
+}
+
+function miCopyOutput(tab) {
+  let text = '';
+  if (tab === 'summary') {
+    const el = $('miOutSummaryContent').querySelector('.mi-out-text');
+    text = el ? el.textContent : '';
+  } else if (tab === 'actions') {
+    if (_miLastExtracted) {
+      const title   = _miLastExtracted.title || '';
+      const date    = _miLastExtracted.date  || '';
+      const parts   = Array.isArray(_miLastExtracted.participants) ? _miLastExtracted.participants : [];
+      const actions = Array.isArray(_miLastExtracted.action_items) ? _miLastExtracted.action_items : [];
+      const lines = [];
+      if (title) lines.push(`การประชุม: ${title}`);
+      if (date)  lines.push(`วันที่: ${date}`);
+      if (parts.length) lines.push(`ผู้เข้าร่วม: ${parts.join(', ')}`);
+      lines.push('');
+      lines.push('Action Items:');
+      actions.forEach((a, i) => {
+        const task = typeof a === 'object' ? (a.task || '') : String(a);
+        const owner = typeof a === 'object' ? (a.owner || '') : '';
+        const dl = typeof a === 'object' ? (a.deadline || '') : '';
+        lines.push(`${i+1}. ${task}${owner ? ' — ' + owner : ''}${dl ? ' (' + dl + ')' : ''}`);
+      });
+      text = lines.join('\n');
+    }
+  } else if (tab === 'email') {
+    const subj = $('miOutEmailContent').querySelector('.mi-email-value');
+    const body = $('miOutEmailContent').querySelectorAll('.mi-email-value');
+    if (body.length >= 2) text = `${body[0].textContent.trim()}\n\n${body[1].textContent.trim()}`;
+    else if (body.length === 1) text = body[0].textContent.trim();
+  } else if (tab === 'mom') {
+    const el = $('miOutMOMContent').querySelector('.mi-out-text');
+    text = el ? el.textContent : '';
+  }
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector(`#miOutPane-${tab} .mi-copy-btn`);
+    if (btn) { btn.textContent = '✅ คัดลอกแล้ว'; setTimeout(() => btn.textContent = 'คัดลอก', 2000); }
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

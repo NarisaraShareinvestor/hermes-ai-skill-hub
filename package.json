@@ -1,0 +1,13 @@
+{
+  "name": "hermes-ai-skill-hub",
+  "version": "1.0.0",
+  "description": "Hermes AI Skill Hub - Meeting Intelligence Assistant",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
