@@ -362,18 +362,304 @@ Hermes Agent สามารถทำหน้าที่เป็น AI Skill 
 
 ---
 
-## เป้าหมายของ MVP
+## 🎯 Featured Skill in Development: Meeting Intelligence Assistant
+
+### ภาพรวม (Overview)
+
+**Meeting Intelligence Assistant** คือ Hero Skill ที่จะเปลี่ยนประชุมเพียงชั่วข้ามโค้ง ให้กลายเป็น **ความจำองค์กรที่ยาวนาน** ที่สามารถค้นหาได้
+
+จุดเด่นของ Skill นี้: **"เมื่อ 3 เดือนที่แล้วเราตัดสินใจอะไรเกี่ยวกับเรื่องนี้"** — องค์กรยอมจ่ายเงินสำหรับความสามารถนี้ แต่ไม่ใช่แค่การสรุปประชุม
+
+---
+
+### Phase 1: ความสามารถพื้นฐาน (2-3 สัปดาห์)
+
+**Input:**
+- 📝 ข้อความประชุม
+- 🎤 ไฟล์เสียง (mp3, wav, m4a, mp4)
+- 📁 ไฟล์เอกสาร (txt, docx, pdf)
+- 🔴 บันทึกจาก Browser
+
+**Output:**
+- 📄 สรุมประชุม (Meeting Summary)
+- ✅ รายการงาน (Action Items Table)
+- 📧 ร่างอีเมล (Email Draft)
+- 📋 รายงานการประชุม ราชการ (Minutes of Meeting - MOM)
+
+**เก็บถาวร:**
+- ทุกการประชุมถูกบันทึกลงฐานข้อมูล
+- Full-text search พบประชุมเก่าได้ในทันที
+
+---
+
+### Phase 2: ส่วนดัดแปลงข้อมูล (Intelligence Layer) (3-4 สัปดาห์)
+
+**เพิ่มเติม:**
+
+#### 🔊 Speaker Identification (ระบุว่าใครพูดอะไร)
+```
+[John] เราต้องอัปเดตราคา
+[Sarah] ฉันจะจัดการเรื่องนี้
+[John] ครำหมาย: วันศุกร์
+```
+
+#### 🚨 Risk Detection (จับปัญหาที่แฝงอยู่)
+```
+Risk Found:
+- งบประมาณยังไม่ได้อนุมัติ
+- ข้อมูลราคาเก่า
+- Deadline ของลูกค้าไม่ชัด
+```
+
+#### 🎭 Sentiment Analysis (อารมณ์ของประชุม)
+```
+ประเด็น Pricing: ⚠️ Negative (มีความกังวล)
+ประเด็น Partnership: ✅ Positive (เห็นพ้องต้องกัน)
+```
+
+#### 💡 Decision Tracker (สิ่งตัดสินใจหลัก)
+```
+Decision #1: เน้นไปที่ Automotive Parts
+Decision #2: ส่ง Proposal วันศุกร์
+Decision #3: ตรวจสอบราคาวันจันทร์
+```
+
+#### 🔍 Semantic Search (ค้นหาแบบเข้าใจ)
+```
+"เมื่อเราคุยเรื่อง Pricing?"
+→ Hermes ค้นหาจาก 30 ประชุมที่เกี่ยว
+→ ตอบได้ทันที พร้อมบริบท
+```
+
+---
+
+### Phase 3: การบูรณาการระดับองค์กร (4-5 สัปดาห์)
+
+#### 📅 Outlook / Calendar Integration
+```
+ประชุมใน Outlook
+    ↓
+Hermes โคลนสร้าง Meeting Record
+    ↓
+หลังประชุม: Attach Transcript + Insights
+```
+
+#### 📌 Action Item Tracking
+```
+Meeting → สร้าง Task อัตโนมัติ
+       ↓
+Deadline ใกล้เข้า → Telegram Reminder
+       ↓
+ประชุมครั้งต่อ → Check Progress
+```
+
+#### 🏢 Knowledge Base (ความจำองค์กร)
+```
+Team Search: "เมื่อไหร่เราตัดสินใจลดราคา?"
+    ↓
+Hermes ค้นหาจากทุกประชุม (เดือน, ปี)
+    ↓
+ตอบ: "3 เมษายน 2026 ประชุม Sales
+Decision: ลดราคา 10% สำหรับ Bulk Order"
+```
+
+#### 🔄 N8n Automation
+```
+New Meeting Detected
+    ↓
+Auto-Extract เอกสาร
+    ↓
+Detect Risk → Notify Team Lead
+    ↓
+Action Item Created → Assign
+    ↓
+Action Complete → Update Status
+```
+
+---
+
+### ✨ Auto-Skill Generation (Phase 2 Bonus Feature)
+
+ระบบจะตรวจจับรูปแบบการทำงาน แล้ว **สร้าง Skill ให้โดยอัตโนมัติ**
+
+**ตัวอย่าง:**
+
+```
+User ใช้ Chat ซ้ำๆ:
+"สรุปประชุม เป็น MOM ราชการ" (15 ครั้ง)
+
+Hermes Detects:
+"User ทำคำสั่งประเภทนี้ซ้ำแล้ว"
+    ↓
+✨ Suggest: "Create Meeting Minutes Skill?"
+
+Auto-Fill Form:
+- Name: "Meeting Minutes MOM Generator"
+- Type: Generator
+- Prompt: (Auto-Generated)
+- Status: Ready to Share
+
+User clicks "📤 Share to Skill Store"
+    ↓
+✅ Published (no approval needed!)
+```
+
+**ไม่ต้อง Approve:**
+- ผู้ใช้สร้าง Skill → Share → Published
+- ทีมอื่นค้นพบจาก Skill Store → Install
+
+---
+
+### 🗄️ Data Model
+
+```
+meetings
+├── id, team_id, owner_email
+├── title, meeting_date
+├── transcript_text, summary_text
+├── speakers, decisions, risks
+├── sentiment_score, embedding
+
+action_items
+├── meeting_id, task, assigned_to
+├── deadline, status
+
+decisions
+├── meeting_id, decision_text
+├── type, confidence_score
+
+meeting_search_index
+├── embedding (semantic search)
+└── tsvector (full-text search)
+
+user_request_patterns (NEW)
+├── user_email, pattern_type
+├── frequency, suggested_skill
+```
+
+---
+
+### 💰 ราคาคุณค่า (Value Proposition)
+
+**สำหรับองค์กร:**
+- 💼 หาสิ่งตัดสินใจเก่า → ทำนายได้ดีขึ้น
+- ⏰ ประชุมต่อไป เตรียมตัวโดยอ้างอิงเดิม → ปะทะน้อยลง
+- 📊 Knowledge Base → ผู้บริหารเห็นเนื้องก → ควบคุมดี
+- 🔄 Action Tracking → ทำให้สำเร็จได้ทันเวลา
+
+**สำหรับทีม:**
+- 🎯 รู้ว่าใครต้องทำอะไร เมื่อไหร่
+- 🚨 Risk มาก่อน แก้ก่อน
+- 💬 "เมื่อไหร่ได้ทำเสร็จ?" → ดูประวัติ → รู้ได้
+
+---
+
+## 🚀 Implementation Roadmap
+
+### MVP: Meeting Intelligence Assistant (Phase 1)
+
+เวอร์ชันแรกจะเน้น Meeting Intelligence Skill ด้วยความสามารถพื้นฐาน:
+
+1. ✅ Upload meeting notes/audio/files
+2. ✅ Auto-extract: Summary, Actions, Decisions
+3. ✅ Generate: Email draft, MOM format
+4. ✅ Persist: Store meetings in database
+5. ✅ Search: Find meetings by full-text search
+6. ✅ Auto-share: Direct to Skill Store (no approval workflow)
+7. ✅ Auto-skill: Detect patterns → Suggest skill creation
+
+**Timeline:** 2-3 weeks
+
+---
+
+### Phase 2: Intelligence Enrichment
+
+เพิ่มการวิเคราะห์ขั้นสูง:
+
+1. 🎤 Audio transcription (Whisper)
+2. 👥 Speaker identification
+3. 🎭 Sentiment analysis
+4. 🚨 Risk detection
+5. 💡 Decision tracking
+6. 🔍 Semantic search (embeddings)
+
+**Timeline:** 3-4 weeks (after Phase 1)
+
+---
+
+### Phase 3: Enterprise Integration
+
+บูรณาการกับระบบองค์กร:
+
+1. 📅 Outlook calendar sync
+2. 📌 Action tracking + reminders
+3. 🏢 Knowledge base UI
+4. 🔄 N8n automation
+5. 📊 Analytics dashboard
+
+**Timeline:** 4-5 weeks (after Phase 2)
+
+---
+
+## เป้าหมายของระบบ Core Skill Hub
 
 เวอร์ชันแรกของระบบควรทำให้ผู้ใช้สามารถทำสิ่งเหล่านี้ได้:
 
 1. สร้าง Skill ใหม่ได้
 2. ใช้ Skill ที่สร้างไว้ได้
-3. แชร์ Skill ให้ทีมของตัวเองได้
-4. ให้ Team Lead อนุมัติหรือปฏิเสธ Skill ได้
-5. ให้สมาชิกในทีมเลือกติดตั้ง Skill ไปยัง Personal AI Assistant ของตัวเองได้
+3. **Share to Skill Store ทันที** (ไม่ต้อง Approve)
+4. ให้สมาชิกในทีมเลือกติดตั้ง Skill ได้
+5. ระบบตรวจจับรูปแบบและแนะนำ Skill ใหม่
 6. ส่ง Skill ที่ดีเข้าสู่ Company Review ได้
 7. อนุมัติหรือปฏิเสธ Skill ผ่าน Telegram ได้
 8. เผยแพร่ Skill ที่ผ่านการอนุมัติไปยัง Company Skill Store ได้
+
+---
+
+## 📁 โครงสร้างไฟล์สำหรับ Meeting Intelligence
+
+Meeting Intelligence Assistant จะใช้ไฟล์ต่อไปนี้:
+
+```
+backend/
+├── models.py                    # ✏️ Extend: Meeting, ActionItem, Decision
+├── schemas.py                   # ✏️ Extend: Request/Response schemas
+├── main.py                      # ✏️ Import meeting routers
+├── llm.py                       # ✨ NEW: LLM routing (Haiku/Sonnet/Embeddings)
+├── meeting_service.py           # ✨ NEW: Core meeting logic
+├── transcription.py             # ✨ NEW: Whisper integration
+├── analyzers.py                 # ✨ NEW: Sentiment, risk, decision analysis
+├── calendar.py                  # ✨ NEW: Outlook/Calendar integration (Phase 3)
+└── routers/
+    ├── meetings.py              # ✨ NEW: Meeting endpoints
+    ├── search.py                # ✨ NEW: Search endpoints
+    └── actions.py               # ✨ NEW: Action item endpoints
+
+n8n/workflows/
+├── meeting_enrichment.json      # ✨ NEW: Auto-enrich workflow
+├── action_item_reminder.json    # ✨ NEW: Deadline reminders
+└── calendar_sync.json           # ✨ NEW: Calendar integration (Phase 3)
+
+data/
+└── skills.json                  # ✏️ Add: Meeting Intelligence skill definition
+```
+
+---
+
+## 🔄 Workflow Comparison
+
+### ❌ Old Approval Workflow (Removed)
+
+```
+Draft → Share → Pending Review → Approve → Publish
+```
+
+### ✅ New Direct Workflow (Implemented)
+
+```
+Auto-Detect Pattern → Create Skill → Share → Published
+                                    (no approval!)
+```
 
 ---
 
@@ -479,13 +765,38 @@ Skill ควรมีระดับการเข้าถึง เช่น
 
 ## Tech Stack
 
-* Frontend: HTML ในช่วงแรก และอาจพัฒนาเป็น React ในอนาคต
-* Backend: FastAPI
-* Database: PostgreSQL
-* Automation: n8n
-* Notification: Telegram
-* AI Engine: Hermes Agent หรือ LLM API
-* Deployment: Hostinger VPS + Docker
+* **Frontend:** HTML ในช่วงแรก และอาจพัฒนาเป็น React ในอนาคต
+* **Backend:** FastAPI
+* **Database:** PostgreSQL (+ pgvector for embeddings, Phase 2+)
+* **Automation:** n8n
+* **Notification:** Telegram
+* **AI Engine:** 
+  - Claude Haiku (extraction, cheap JSON parsing)
+  - Claude Sonnet (analysis, sentiment, risks)
+  - OpenAI text-embedding-3-small (semantic search)
+* **Audio:** OpenAI Whisper API (transcription, Phase 2)
+* **Search:** Postgres tsvector (Phase 1) + pgvector (Phase 2)
+* **Deployment:** Hostinger VPS + Docker
+
+---
+
+### LLM Routing Strategy
+
+Meeting Intelligence Assistant ใช้ **Smart LLM Routing** เพื่อประสิทธิภาพ:
+
+```
+Task Type          | Model            | Why
+─────────────────────────────────────────────────
+Extraction JSON    | Claude Haiku     | Cheap + fast
+Sentiment/Risk     | Claude Sonnet    | Balanced cost/quality
+Decision Analysis  | Claude Sonnet    | Better reasoning
+Embeddings         | OpenAI embed-3   | Cheap + proven
+```
+
+**ประโยชน์:**
+- ⚡ เร็ว — Haiku สำหรับงานง่าย
+- 💰 ถูก — ~$0.50/meeting
+- 🎯 ถูกต้อง — Sonnet สำหรับการวิเคราะห์
 
 ---
 
