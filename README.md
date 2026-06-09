@@ -30,122 +30,78 @@ Personal AI → Team Skill Library → Company Skill Store
 
 ## หลักการสำคัญของการแชร์ Skill
 
-ระบบนี้ควรแยกคำว่า **Share, Approve, Install และ Publish** ออกจากกันอย่างชัดเจน
+ระบบนี้ใช้ **Simple Direct Workflow** — ไม่มี Approval Process
 
-### 1. Share
+### 1. Create (สร้าง)
 
-หมายถึงการส่ง Skill จากระดับส่วนตัวเข้าไปยังทีม เพื่อให้ทีมพิจารณา
-
-ตัวอย่าง:
+User สร้าง Skill ใหม่
 
 ```text
 User สร้าง Skill ส่วนตัว
         ↓
-กด Share to Team
-        ↓
-Skill เข้าสถานะ Pending Team Review
-```
-
-การ Share ไม่ได้แปลว่าทุกคนในทีมจะได้ใช้ทันที
-แต่เป็นการส่ง Skill เข้าไปให้ทีมตรวจสอบก่อน
-
----
-
-### 2. Approve
-
-หมายถึงการอนุมัติให้ Skill นั้นเข้าไปอยู่ใน Team Skill Library
-
-ผู้ที่กด Approve ควรเป็น:
-
-* Team Lead
-* AI Admin
-* Project Owner
-* คนที่มีสิทธิ์ดูแล Skill ของทีมนั้น
-
-ตัวอย่าง:
-
-```text
-Skill ถูก Share เข้า Team
-        ↓
-Team Lead ตรวจสอบ
-        ↓
-กด Approve to Team
-        ↓
-Skill เข้า Team Skill Library
+Status: Private (เฉพาะเจ้าของใช้)
 ```
 
 ---
 
-### 3. Install
+### 2. Share (แชร์ไปยัง Skill Store)
 
-หมายถึงสมาชิกในทีมเลือกนำ Skill ที่อยู่ใน Team Skill Library ไปใช้กับ Personal AI Assistant ของตัวเอง
-
-ตัวอย่าง:
+User กด **Share to Skill Store** → Published ทันที ❌ ไม่ต้อง Approve
 
 ```text
-Skill อยู่ใน Team Skill Library
+User กด "Share to Skill Store"
         ↓
-สมาชิกในทีมเห็น Skill
+Skill เข้า Company Skill Store
         ↓
-กด Add to My Assistant
-        ↓
-Skill ถูกติดตั้งใน Personal AI Assistant ของคนนั้น
+ทีมอื่นค้นหา → Install ได้เลย
 ```
 
-สมาชิกในทีมไม่จำเป็นต้องรับ Skill ทุกตัว
+**ไม่มี Pending Review, ไม่รอ Approval**
+
+---
+
+### 3. Install (ติดตั้ง)
+
+สมาชิกในทีมเลือกติดตั้ง Skill จาก Skill Store
+
+```text
+Skill อยู่ใน Company Skill Store
+        ↓
+สมาชิกเห็น Skill
+        ↓
+กด "Add to My Assistant"
+        ↓
+Skill ถูกติดตั้งใน Personal AI Assistant
+```
+
 ใครอยากใช้ก็กดติดตั้ง ใครไม่อยากใช้ก็ไม่ต้องทำอะไร
 
 ---
 
-### 4. Publish
-
-หมายถึงการเผยแพร่ Skill จากระดับทีมไปยังระดับบริษัท
-
-ตัวอย่าง:
-
-```text
-Team Skill ใช้งานได้ดี
-        ↓
-กด Submit to Company Review
-        ↓
-AI Admin หรือผู้ดูแลระบบตรวจสอบ
-        ↓
-กด Publish
-        ↓
-Skill เข้า Company Skill Store
-```
-
-เมื่อ Skill ถูก Publish แล้ว ทีมอื่นสามารถนำไปใช้ต่อได้
-
----
-
-## Flow การทำงานของ Skill Sharing
+## Flow การทำงานของ Skill Sharing (Simple)
 
 Flow หลักของระบบควรเป็นแบบนี้:
 
 ```text
 Draft Skill
         ↓
-Private Skill
+Private Skill (เฉพาะเจ้าของ)
         ↓
-Share to Team
+Share to Skill Store
         ↓
-Pending Team Review
+✅ Published (ทันที!)
         ↓
-Approve to Team
-        ↓
-Team Skill Library
-        ↓
-Member installs to Personal Assistant
-        ↓
-Submit to Company Review
-        ↓
-Company Published
+Teammates Find & Install
 ```
+
+**ผลที่ได้:**
+- ⚡ เร็วขึ้น (ไม่รอ Approval)
+- 🎯 User Control (ไม่ต้องให้ใครอื่นตัดสินใจ)
+- 📈 High Velocity (Share ได้บ่อยขึ้น)
 
 ---
 
-## ตัวอย่างการใช้งานจริง
+## ตัวอย่างการใช้งานจริง (Simple Flow)
 
 สมมติผู้ใช้สร้าง Skill ชื่อ:
 
@@ -155,18 +111,15 @@ Annual Report Summarizer
 
 Flow จะเป็นดังนี้:
 
-1. ผู้ใช้สร้าง Skill ส่วนตัวชื่อ `Annual Report Summarizer`
-2. ทดลองใช้กับ Annual Report จริง
-3. เห็นว่า Skill ใช้งานดี จึงกด `Share to IR Team`
-4. Skill เข้าสถานะ `Pending Team Review`
-5. n8n ส่งข้อความแจ้งเตือนไปยัง Telegram Channel
-6. Team Lead ตรวจสอบรายละเอียดของ Skill
-7. Team Lead กด `Approve to Team`
-8. Skill เข้าไปอยู่ใน `IR Team Skill Library`
-9. สมาชิกในทีม IR เห็น Skill นี้
-10. สมาชิกที่ต้องการใช้งานกด `Add to My Assistant`
-11. ถ้า Skill นี้มีประโยชน์กับทีมอื่น สามารถกด `Submit to Company Review`
-12. ถ้าผ่านการตรวจสอบ จะถูก Publish ไปยัง `Company Skill Store`
+1. ✅ ผู้ใช้สร้าง Skill ส่วนตัวชื่อ `Annual Report Summarizer`
+2. ✅ ทดลองใช้กับ Annual Report จริง
+3. ✅ เห็นว่า Skill ใช้งานดี จึงกด **`Share to Skill Store`**
+4. ✅ **Skill ปรากฏใน Company Skill Store ทันที!** (ไม่รอ Approve)
+5. ✅ สมาชิกอื่นค้นหา Skill นี้
+6. ✅ สมาชิกที่ต้องการใช้งานกด **`Add to My Assistant`**
+7. 🎉 **Skill พร้อมใช้งาน!**
+
+**เหลือเพียง 3 ขั้นตอน** (ก่อน: 12 ขั้นตอน)
 
 ---
 
@@ -184,17 +137,13 @@ Flow จะเป็นดังนี้:
 
 ---
 
-### Team Skill Library
+### Team Skill Library / Company Skill Store
 
-พื้นที่เก็บ Skill ที่ผ่านการอนุมัติให้ใช้ภายในทีมแล้ว
+พื้นที่รวมใช้ (ไม่แยก Team/Company แล้ว)
 
-สมาชิกในทีมสามารถดู ทดลองใช้ และเลือกติดตั้ง Skill เหล่านี้ไปยัง Personal AI Assistant ของตัวเองได้
+Skill ใดก็ได้ที่ User Share → ปรากฏในหน้า Skill Store ทันที
+สมาชิกในองค์กรสามารถค้นหา, ดู, และติดตั้ง Skill ไปยัง Personal AI Assistant ของตัวเองได้
 
----
-
-### Company Skill Store
-
-พื้นที่กลางของบริษัทสำหรับเก็บ Skill ที่ผ่านการตรวจสอบแล้ว และสามารถให้หลายทีมใช้งานร่วมกันได้
 
 ---
 
@@ -210,24 +159,33 @@ Flow จะเป็นดังนี้:
 
 ---
 
-### Telegram Approval Channel
+### Telegram Notifications
 
-ช่องทาง Telegram สำหรับแจ้งเตือนเมื่อมี Skill ใหม่ถูกส่งเข้ามา Review
+ช่องทาง Telegram สำหรับแจ้งเตือนและติดตามกิจกรรม Skill
 
-ตัวอย่างปุ่มใน Telegram:
+ตัวอย่างข้อความใน Telegram:
 
 ```text
-Approve to Team
-Reject
-Request Edit
+📢 New Skill Shared!
+Name: Annual Report Summarizer
+Owner: john@example.com
+Status: ✅ Published
+
+👉 Open Skill Store
+👎 Report Issue
 ```
 
-หรือในกรณีส่งเข้าระดับบริษัท:
+หรือสำหรับการติดตามงาน:
 
 ```text
-Publish to Company
-Reject
-Request Edit
+⏰ Action Item Reminder
+Task: Review Pricing
+Owner: Sarah
+Due: Tomorrow
+Status: Open
+
+✅ Mark Complete
+📝 Update Status
 ```
 
 ---
@@ -236,12 +194,12 @@ Request Edit
 
 ระบบ Automation สำหรับจัดการ Workflow เช่น:
 
-* แจ้งเตือนเมื่อมี Skill ใหม่ถูก Share
-* ส่งข้อความไปยัง Telegram
-* รับผลการ Approve หรือ Reject
-* เปลี่ยนสถานะของ Skill
-* แจ้งเตือนเจ้าของ Skill
-* ส่ง Skill ที่ผ่านการอนุมัติไปยัง Team Library หรือ Company Skill Store
+* 📢 แจ้งเตือนเมื่อมี Skill ใหม่ถูก Share → Telegram
+* 🎤 Auto-trigger Meeting Enrichment (Phase 2)
+* ⏰ Action Item Deadline Reminders
+* 📊 Daily Analytics Summary
+* 🔄 Calendar Sync (Phase 3)
+* 📝 Auto-generate Skill Suggestions (Pattern Detection)
 
 ---
 
@@ -669,47 +627,29 @@ Skill แต่ละตัวควรมีสถานะ เช่น
 
 ### Draft
 
-กำลังสร้างหรือแก้ไข ยังไม่พร้อมใช้งานจริง
+กำลังสร้างหรือแก้ไข ยังไม่พร้อมแชร์
 
 ### Private
 
-ใช้ได้เฉพาะเจ้าของ Skill
+ใช้ได้เฉพาะเจ้าของ Skill (ยังไม่ได้แชร์)
 
-### Pending Team Review
+### Published
 
-ถูกแชร์เข้า Team แล้ว แต่รอ Team Lead หรือ AI Admin ตรวจสอบ
-
-### Team Available
-
-ผ่านการอนุมัติแล้ว และพร้อมใช้งานใน Team Skill Library
+ถูก Share ไปยัง Skill Store แล้ว ✅
+- ทุกคนในบริษัทเห็นได้
+- สามารถติดตั้งใช้งานได้เลย
 
 ### Installed
 
-สมาชิกเลือกติดตั้ง Skill นี้ไปยัง Personal AI Assistant ของตัวเองแล้ว
-
-### Pending Company Review
-
-ถูกส่งจากระดับทีมเข้าสู่การตรวจสอบระดับบริษัท
-
-### Company Published
-
-ผ่านการอนุมัติแล้ว และถูกเผยแพร่ใน Company Skill Store
-
-### Rejected
-
-ไม่ผ่านการอนุมัติ
-
-### Request Edit
-
-ต้องแก้ไขก่อนถึงจะอนุมัติได้
+สมาชิกเลือกติดตั้ง Skill นี้ไปยัง Personal AI Assistant ของตัวเอง
 
 ### Deprecated
 
-Skill เก่าที่ไม่แนะนำให้ใช้แล้ว
+Skill เก่าที่ไม่แนะนำให้ใช้แล้ว (แต่ยังใช้ได้)
 
 ### Blocked
 
-Skill ที่ถูกปิดใช้งานเพราะมีความเสี่ยงหรือไม่ผ่านเงื่อนไข
+Skill ที่ถูกปิดใช้งานเพราะมีความเสี่ยง (ต้อง Admin ยกเลิก)
 
 ---
 
@@ -719,19 +659,15 @@ Skill ควรมีระดับการเข้าถึง เช่น
 
 ### Private
 
-ใช้ได้เฉพาะเจ้าของ Skill
+ใช้ได้เฉพาะเจ้าของ Skill (Status: Draft หรือ Private)
 
-### Team
+### Company (Public)
 
-ใช้ได้เฉพาะภายในทีม
+ทุกคนในบริษัทเห็นได้ (Status: Published)
+- ค้นหาได้จาก Skill Store
+- สามารถติดตั้งใช้งานได้เลย
 
-### Shared
-
-แชร์ให้ทีมอื่นขอใช้งานได้
-
-### Company
-
-ทุกทีมในบริษัทสามารถใช้งานได้
+**หมายเหตุ:** เมื่อคุณกด "Share to Skill Store" Skill จะกลายเป็น Public ทันที
 
 ---
 
@@ -741,25 +677,24 @@ Skill ควรมีระดับการเข้าถึง เช่น
 
 * Use Skill
 * Edit Skill
-* Share to Team
-* Submit to Company Review
+* **📤 Share to Skill Store** (Publish ทันที!)
 * Delete Draft
+* Deprecate Skill (เลิกใช้)
 
-### สำหรับ Team Lead หรือ AI Admin
+### สำหรับผู้ดูแลระบบ (Admin)
 
-* Approve to Team
-* Reject
-* Request Edit
-* Publish to Company
-* Block Skill
+* Block Skill (ถ้ามีปัญหา)
+* Deprecate Skill
+* Remove from Store (ถ้าต้องการ)
 
-### สำหรับสมาชิกในทีม
+### สำหรับสมาชิกในองค์กร
 
 * Try Skill
-* Add to My Assistant
+* **➕ Add to My Assistant**
 * Remove from My Assistant
 * Set as Favorite
 * View Details
+* Report Issue
 
 ---
 
