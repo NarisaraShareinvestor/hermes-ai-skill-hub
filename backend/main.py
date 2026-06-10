@@ -1174,11 +1174,64 @@ async def meeting_extract_file(
     return {"text": text, "filename": file.filename or saved_name}
 
 
+def _split_audio_file(audio_path, chunk_size_mb=20):
+    """Split audio file into chunks for Whisper processing."""
+    file_size = audio_path.stat().st_size
+    chunk_bytes = chunk_size_mb * 1024 * 1024
+    chunks = []
+
+    with open(str(audio_path), "rb") as f:
+        while True:
+            chunk = f.read(chunk_bytes)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    return chunks, len(chunks)
+
+
+async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
+    """Transcribe large audio files by splitting into chunks."""
+    file_size = audio_path.stat().st_size
+    max_single_file = MAX_AUDIO_MB * 1024 * 1024
+
+    if file_size <= max_single_file:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        with open(str(audio_path), "rb") as af:
+            result = client.audio.transcriptions.create(model="whisper-1", file=af)
+        return result.text, 1
+
+    chunks, num_chunks = _split_audio_file(audio_path)
+    transcripts = []
+
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+
+    for i, chunk in enumerate(chunks):
+        if on_progress:
+            on_progress(i + 1, num_chunks, f"Processing chunk {i+1}/{num_chunks}")
+
+        chunk_path = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}.tmp"
+        try:
+            chunk_path.write_bytes(chunk)
+            with open(str(chunk_path), "rb") as cf:
+                result = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=cf,
+                    language="th"
+                )
+            transcripts.append(result.text)
+        finally:
+            chunk_path.unlink(missing_ok=True)
+
+    return " ".join(transcripts), num_chunks
+
+
 @app.post("/api/meeting/transcribe")
 async def meeting_transcribe(
     file: UploadFile = File(...),
 ):
-    """Transcribe audio/video file to text via OpenAI Whisper."""
+    """Transcribe audio/video file to text via OpenAI Whisper (supports files > 25 MB)."""
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         raise HTTPException(400, "OPENAI_API_KEY ยังไม่ได้ตั้งค่า")
@@ -1192,8 +1245,9 @@ async def meeting_transcribe(
         raise HTTPException(400, f"รูปแบบ '{mime_base}' ไม่รองรับ (รองรับ: MP3, WAV, M4A, WebM, OGG, MP4)")
 
     content = await file.read()
-    if len(content) > MAX_AUDIO_MB * 1024 * 1024:
-        raise HTTPException(400, f"ไฟล์เสียงใหญ่เกิน {MAX_AUDIO_MB} MB (Whisper จำกัด 25 MB)")
+    MAX_LARGE_AUDIO = 500
+    if len(content) > MAX_LARGE_AUDIO * 1024 * 1024:
+        raise HTTPException(400, f"ไฟล์เสียงใหญ่เกิน {MAX_LARGE_AUDIO} MB")
 
     ext = pathlib.Path(file.filename or "audio.webm").suffix or ".webm"
     saved_name = f"audio_{uuid.uuid4().hex}{ext}"
@@ -1203,13 +1257,60 @@ async def meeting_transcribe(
     _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
     _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        with open(str(audio_path), "rb") as af:
-            result = client.audio.transcriptions.create(model="whisper-1", file=af)
-        return {"transcript": result.text}
+        transcript, num_chunks = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
+        return {"transcript": transcript, "chunks_processed": num_chunks}
     except Exception as e:
         raise HTTPException(500, f"Whisper error: {e}")
+    finally:
+        for k, v in _saved_env.items():
+            if v is not None:
+                os.environ[k] = v
+        try:
+            audio_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+@app.post("/api/meeting/transcribe-large")
+async def meeting_transcribe_large(
+    file: UploadFile = File(...),
+):
+    """Transcribe large audio files with chunking (supports up to 500 MB)."""
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or "your_openai" in api_key:
+        raise HTTPException(400, "OPENAI_API_KEY ยังไม่ได้ตั้งค่า")
+
+    mime = file.content_type or ""
+    if not mime or mime == "application/octet-stream":
+        mime = mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+    mime_base = mime.split(";")[0].strip()
+
+    if mime_base not in AUDIO_MIME_TYPES:
+        raise HTTPException(400, f"รูปแบบ '{mime_base}' ไม่รองรับ")
+
+    content = await file.read()
+    MAX_LARGE_AUDIO = 500
+    if len(content) > MAX_LARGE_AUDIO * 1024 * 1024:
+        raise HTTPException(400, f"ไฟล์เสียงใหญ่เกิน {MAX_LARGE_AUDIO} MB")
+
+    ext = pathlib.Path(file.filename or "audio.webm").suffix or ".webm"
+    saved_name = f"audio_{uuid.uuid4().hex}{ext}"
+    audio_path = UPLOAD_DIR / saved_name
+    audio_path.write_bytes(content)
+
+    _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
+    _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
+    try:
+        transcript, num_chunks = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
+        file_size_mb = len(content) / (1024 * 1024)
+        return {
+            "transcript": transcript,
+            "chunks_processed": num_chunks,
+            "file_size_mb": round(file_size_mb, 2),
+            "filename": file.filename or saved_name
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Transcription error: {str(e)}")
     finally:
         for k, v in _saved_env.items():
             if v is not None:

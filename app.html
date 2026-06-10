@@ -3783,17 +3783,32 @@ async function runMeetingFromChat(cardId, originalMsg) {
   };
 
   try {
-    // Step 1: Transcribe audio (all modes)
+    // Step 1: Transcribe audio (all modes) - supports large files
     setProgress(15, 'กำลังถอดเสียง...');
     const tForm = new FormData();
     tForm.append('file', file);
-    const tRes = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: tForm });
+
+    // Choose endpoint based on file size (25MB threshold)
+    const fileSizeMB = file.size / (1024 * 1024);
+    const isLargeFile = fileSizeMB > 25;
+    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
+
+    if (isLargeFile) {
+      setProgress(20, `กำลังถอดเสียง (${fileSizeMB.toFixed(1)} MB - แบ่งเป็น chunks)...`);
+    }
+
+    const tRes = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: tForm });
     if (!tRes.ok) {
       const err = await tRes.json().catch(() => ({}));
       throw new Error(err.detail || `Transcription failed (${tRes.status})`);
     }
     const tData = await tRes.json();
     const rawTranscript = tData.transcript || '';
+
+    // Log chunking info if applicable
+    if (tData.chunks_processed && tData.chunks_processed > 1) {
+      console.log(`✅ Transcribed ${tData.chunks_processed} audio chunks and merged successfully`);
+    }
 
     // Clean transcript with LLM (fix Whisper errors)
     setProgress(35, 'กำลังแก้ไขคำผิด...');
@@ -5436,17 +5451,32 @@ async function miHandleFile(input) {
 async function miHandleAudio(input) {
   const file = input.files[0];
   if (!file) return;
-  $('miAudioStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียง ${file.name} ด้วย Whisper AI...</div>`;
+
+  const fileSizeMB = file.size / (1024 * 1024);
+  const isLargeFile = fileSizeMB > 25;
+  const statusMsg = isLargeFile
+    ? `⏳ กำลังถอดเสียง ${file.name} (${fileSizeMB.toFixed(1)} MB - แบ่งเป็น chunks)...`
+    : `⏳ กำลังถอดเสียง ${file.name} ด้วย Whisper AI...`;
+
+  $('miAudioStatus').innerHTML = `<div class="mi-status-msg">${statusMsg}</div>`;
 
   const form = new FormData();
   form.append('file', file);
   try {
-    const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
+    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
+    const r = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: form });
     if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
     const d = await r.json();
     _miCurrentText = d.transcript || '';
+
+    let successMsg = `✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร)`;
+    if (d.chunks_processed && d.chunks_processed > 1) {
+      successMsg += ` — ${d.chunks_processed} chunks ✓`;
+    }
+    successMsg += ` — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว`;
+
     $('miTextInput').value = _miCurrentText;
-    $('miAudioStatus').innerHTML = `<div class="mi-file-loaded">✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร) — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว</div>`;
+    $('miAudioStatus').innerHTML = `<div class="mi-file-loaded">${successMsg}</div>`;
     miSwitchInput('text');
   } catch (e) {
     $('miAudioStatus').innerHTML = `<div style="font-size:12px;color:#ef4444;margin-top:8px;">❌ ${e.message}</div>`;
@@ -5506,14 +5536,28 @@ async function _miTranscribeRecording(blob, mimeType) {
   const form = new FormData();
   form.append('file', file);
 
-  $('miRecordFileStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียงด้วย Whisper AI...</div>`;
+  const fileSizeMB = blob.size / (1024 * 1024);
+  const isLargeFile = fileSizeMB > 25;
+  const statusMsg = isLargeFile
+    ? `⏳ กำลังถอดเสียง (${fileSizeMB.toFixed(1)} MB - แบ่งเป็น chunks)...`
+    : `⏳ กำลังถอดเสียงด้วย Whisper AI...`;
+
+  $('miRecordFileStatus').innerHTML = `<div class="mi-status-msg">${statusMsg}</div>`;
   try {
-    const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
+    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
+    const r = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: form });
     if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
     const d = await r.json();
     _miCurrentText = d.transcript || '';
+
+    let successMsg = `✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร)`;
+    if (d.chunks_processed && d.chunks_processed > 1) {
+      successMsg += ` — ${d.chunks_processed} chunks ✓`;
+    }
+    successMsg += ` — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว`;
+
     $('miTextInput').value = _miCurrentText;
-    $('miRecordFileStatus').innerHTML = `<div class="mi-file-loaded">✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร) — ข้อความถูกโอนไปแท็บ "พิมพ์ข้อความ" แล้ว</div>`;
+    $('miRecordFileStatus').innerHTML = `<div class="mi-file-loaded">${successMsg}</div>`;
     $('miRecordStatus').textContent = 'เสร็จสิ้น — สามารถบันทึกใหม่หรือวิเคราะห์ได้เลย';
     miSwitchInput('text');
   } catch (e) {
