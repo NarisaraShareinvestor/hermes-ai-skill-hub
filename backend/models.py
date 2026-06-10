@@ -166,6 +166,20 @@ class AuditLog(Base):
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
+class UserFile(Base):
+    """ไฟล์ที่ผู้ใช้อัปโหลดเข้าระบบ"""
+    __tablename__ = "user_files"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    owner_email  = Column(String(255), index=True, nullable=False)
+    original_name = Column(String(500), nullable=False)
+    saved_name   = Column(String(500), nullable=False)       # ชื่อไฟล์จริงบน disk
+    file_size    = Column(Integer, default=0)                # bytes
+    mime_type    = Column(String(100), nullable=True)
+    summary      = Column(Text, nullable=True)               # AI summary (lazy)
+    created_at   = Column(DateTime, default=func.now())
+
+
 class UserContact(Base):
     """จำ alias → email ของคนในทีม เช่น คุณเอ → chamai@gmail.com"""
     __tablename__ = "user_contacts"

@@ -17,6 +17,12 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 # เก็บ conversation history แยกตาม chat_id
 conversations: dict = {}
 
+# เก็บ meeting context ล่าสุดแยกตาม chat_id (สำหรับ post-meeting actions)
+_meeting_context: dict = {}  # chat_id → {owners: [...], title: str, summary: str}
+
+MEETING_KEYWORDS = ["action items", "ผู้รับผิดชอบ", "สรุปการประชุม", "action item",
+                    "มติที่ประชุม", "follow-up", "กำหนดส่ง"]
+
 
 def tg_get(method: str, params: dict = None):
     url = f"https://api.telegram.org/bot{TOKEN}/{method}"
@@ -45,6 +51,18 @@ def tg_send(chat_id: int, text: str):
     )
 
 
+def tg_send_html(chat_id: int, html: str, reply_markup: dict = None):
+    """ส่ง HTML โดยตรง ไม่ผ่าน md_to_tg_html พร้อม optional inline keyboard"""
+    payload = {"chat_id": chat_id, "text": html, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json=payload,
+        timeout=10,
+    )
+
+
 def tg_send_typing(chat_id: int):
     requests.post(
         f"https://api.telegram.org/bot{TOKEN}/sendChatAction",
@@ -52,6 +70,17 @@ def tg_send_typing(chat_id: int):
         timeout=5,
     )
 
+
+# ── Email draft detection ─────────────────────────────────────────────────────
+EMAIL_DRAFT_RE = re.compile(
+    r'(ร่าง|draft|เขียน|ส่ง|compose)\s*(email|อีเมล|mail)',
+    re.IGNORECASE
+)
+# คำที่นำหน้าชื่อผู้รับ
+TO_PATTERNS = [
+    re.compile(r'(?:หา|ถึง|to|send to|ส่งหา|ส่งให้)\s*([ก-๙a-zA-Z][ก-๙a-zA-Z\s]{0,30}?)(?:\s+เรื่อง|\s+about|\s+re:|\s*$)', re.IGNORECASE),
+]
+SUBJECT_PATTERN = re.compile(r'เรื่อง[:\s]+(.+)', re.IGNORECASE)
 
 EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b')
 
@@ -102,11 +131,13 @@ def do_update_profile(email: str, department: str = None, full_name: str = None)
 
 def detect_profile_update(chat_id: int, text: str, from_user: dict) -> str | None:
     """
-    ตรวจหาข้อมูลโปรไฟล์ในข้อความธรรมดา
-    - ถ้าพบ email → link telegram จริง
-    - ถ้าพบ department → patch profile จริง
-    คืนค่า reply string ถ้าอัปเดต, None ถ้าไม่พบอะไร
+    ตรวจหาข้อมูลโปรไฟล์ในข้อความสั้นๆ เท่านั้น
+    ป้องกันการจับข้อความยาว เช่น meeting reports ผิดพลาด
     """
+    # ข้อความยาวเกิน 200 ตัวอักษร = ไม่ใช่การอัปเดตโปรไฟล์
+    if len(text) > 200:
+        return None
+
     text_lower = text.lower()
     updated_fields = []
     current_email = get_linked_email(chat_id)
@@ -114,7 +145,6 @@ def detect_profile_update(chat_id: int, text: str, from_user: dict) -> str | Non
 
     # ── ตรวจหา Email ─────────────────────────────────────────────────────────
     found_emails = EMAIL_RE.findall(text)
-    # กรอง system emails ออก
     real_emails = [e for e in found_emails if "@telegram.user" not in e and "example.com" not in e]
 
     if real_emails:
@@ -123,15 +153,14 @@ def detect_profile_update(chat_id: int, text: str, from_user: dict) -> str | Non
         if result:
             current_email = email
             is_linked = True
-            updated_fields.append(f"Email: <b>{email}</b>")
+            updated_fields.append(f"Email: {email}")
 
-    # ── ตรวจหา Department ─────────────────────────────────────────────────────
+    # ── ตรวจหา Department (ต้องมี : หรือ = ตามหลัง trigger) ──────────────────
     dept_value = None
     for trigger in DEPT_TRIGGERS:
         if trigger in text_lower:
-            # ตัดคำก่อน/หลัง trigger ออก เอาส่วนที่เหลือเป็น department
             pattern = re.compile(
-                rf'(?:{trigger})[:\s]+([ก-๙a-zA-Z0-9 /&._-]{{1,50}})',
+                rf'(?:{trigger})\s*[:=]\s*([ก-๙a-zA-Z0-9 /&._-]{{1,40}})',
                 re.IGNORECASE
             )
             m = pattern.search(text)
@@ -141,7 +170,7 @@ def detect_profile_update(chat_id: int, text: str, from_user: dict) -> str | Non
 
     if dept_value and is_linked:
         if do_update_profile(current_email, department=dept_value):
-            updated_fields.append(f"แผนก: <b>{dept_value}</b>")
+            updated_fields.append(f"แผนก: {dept_value}")
 
     # ── ตรวจหา ชื่อตัวเอง ────────────────────────────────────────────────────
     name_value = None
@@ -158,12 +187,12 @@ def detect_profile_update(chat_id: int, text: str, from_user: dict) -> str | Non
 
     if name_value and is_linked:
         if do_update_profile(current_email, full_name=name_value):
-            updated_fields.append(f"ชื่อ: <b>{name_value}</b>")
+            updated_fields.append(f"ชื่อ: {name_value}")
 
     if not updated_fields:
         return None
 
-    reply = "บันทึกข้อมูลโปรไฟล์แล้ว\n\n" + "\n".join(updated_fields)
+    reply = "✅ บันทึกข้อมูลโปรไฟล์แล้ว\n\n" + "\n".join(updated_fields)
     if is_linked:
         reply += f"\n\nดูโปรไฟล์เต็มได้ด้วย /profile"
     else:
@@ -180,6 +209,217 @@ def get_linked_email(chat_id: int) -> str:
     except Exception:
         pass
     return f"{chat_id}@telegram.user"
+
+
+def draft_email_from_tg(chat_id: int, text: str) -> tuple | None:
+    """
+    ตรวจว่าเป็นคำสั่งร่าง email หรือไม่
+    คืนค่า (html, reply_markup) หรือ None ถ้าไม่ใช่คำสั่ง email
+    """
+    if not EMAIL_DRAFT_RE.search(text):
+        return None
+
+    # ดึงชื่อผู้รับ
+    recipient_name = ""
+    for pat in TO_PATTERNS:
+        m = pat.search(text)
+        if m:
+            recipient_name = m.group(1).strip()
+            break
+
+    # ดึงเรื่อง
+    subj_m = SUBJECT_PATTERN.search(text)
+    topic = subj_m.group(1).strip() if subj_m else ""
+
+    user_email = get_linked_email(chat_id)
+    history = conversations.get(chat_id, [])
+
+    try:
+        r = requests.post(
+            f"{BACKEND_URL}/api/telegram/draft-email",
+            json={
+                "recipient_name": recipient_name,
+                "topic": topic,
+                "conversation_history": history[-8:],
+                "user_email": user_email,
+            },
+            timeout=30,
+        )
+        d = r.json()
+    except Exception as e:
+        return (f"⚠️ ร่าง email ไม่ได้: {e}", None)
+
+    to_name  = d.get("to_name") or recipient_name or "ผู้รับ"
+    to_email = d.get("to_email") or ""
+    subject  = d.get("subject") or "ติดตามผลการสนทนา"
+    body     = d.get("body") or ""
+
+    if not body:
+        return (f"⚠️ ไม่สามารถร่างอีเมลได้ กรุณาลองใหม่", None)
+
+    def esc(s): return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+    to_line = esc(to_name)
+    if to_email:
+        to_line += f" &lt;{esc(to_email)}&gt;"
+
+    body_safe = esc(body[:2000])
+    suffix = "\n\n<i>…(แสดงบางส่วน)</i>" if len(body) > 2000 else ""
+
+    html = (
+        f"📧 <b>ร่าง Email</b>\n"
+        f"<b>To:</b> {to_line}\n"
+        f"<b>Subject:</b> {esc(subject)}\n"
+        f"─────────────────────\n\n"
+        f"{body_safe}{suffix}"
+    )
+
+    reply_markup = None
+    if to_email:
+        import urllib.parse
+        open_url = "http://localhost:8000/mail-open?to={}&subject={}&body={}".format(
+            urllib.parse.quote(to_email),
+            urllib.parse.quote(subject),
+            urllib.parse.quote(body[:1800]),
+        )
+        reply_markup = {
+            "inline_keyboard": [[
+                {"text": "📬 เปิดใน Mail App", "url": open_url}
+            ]]
+        }
+
+    return (html, reply_markup)
+
+
+def is_meeting_report(text: str) -> bool:
+    """ตรวจว่า response ของ Hermes เป็น meeting report หรือไม่"""
+    lower = text.lower()
+    return sum(1 for kw in MEETING_KEYWORDS if kw.lower() in lower) >= 2
+
+
+def extract_owners_from_reply(reply: str) -> list[str]:
+    """ดึงชื่อผู้รับผิดชอบจาก reply ของ Hermes"""
+    owners = []
+    # จับ "คุณX", "นายX", "นางX" ฯลฯ
+    for m in re.finditer(r'(?:คุณ|นาย|นาง(?:สาว)?)\s*([ก-๙a-zA-Z]+)', reply):
+        name = "คุณ" + m.group(1)
+        if name not in owners:
+            owners.append(name)
+    return owners[:5]
+
+
+def send_meeting_actions(chat_id: int, owners: list[str]):
+    """ส่ง inline keyboard ของ Post-Meeting Actions"""
+    # สร้างปุ่ม "ส่ง email หา [ชื่อ]" สำหรับแต่ละ owner
+    email_buttons = []
+    for name in owners:
+        email_buttons.append(
+            {"text": f"📧 ส่ง Email หา {name}", "callback_data": f"email|{name}"}
+        )
+
+    # จัดเรียงเป็นแถวๆ ละ 1 ปุ่ม
+    keyboard = [[btn] for btn in email_buttons]
+    # เพิ่มปุ่ม "ส่ง Email ทุกคน" ถ้ามีหลายคน
+    if len(owners) > 1:
+        all_names = ",".join(owners)
+        keyboard.append([{"text": "📨 ส่ง Email ทุกคน", "callback_data": f"email_all|{all_names}"}])
+
+    markup = {"inline_keyboard": keyboard}
+    tg_send_html(chat_id,
+        "<b>Post-Meeting Actions</b>\n"
+        "เลือกการดำเนินการต่อ:",
+        markup
+    )
+
+
+def answer_callback(callback_id: str, text: str = ""):
+    """ตอบ callback query เพื่อหยุด loading spinner"""
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/answerCallbackQuery",
+        json={"callback_query_id": callback_id, "text": text},
+        timeout=5,
+    )
+
+
+def handle_callback(update: dict):
+    """จัดการ callback query จาก inline keyboard"""
+    cb = update.get("callback_query", {})
+    if not cb:
+        return
+    cb_id   = cb["id"]
+    chat_id = cb["message"]["chat"]["id"]
+    data    = cb.get("data", "")
+
+    answer_callback(cb_id)
+
+    # email|คุณเอ  หรือ  email_all|คุณเอ,คุณบี
+    if data.startswith("email|") or data.startswith("email_all|"):
+        names_str = data.split("|", 1)[1]
+        names     = [n.strip() for n in names_str.split(",") if n.strip()]
+
+        tg_send_typing(chat_id)
+
+        user_email = get_linked_email(chat_id)
+        history    = conversations.get(chat_id, [])
+        ctx        = _meeting_context.get(chat_id, {})
+        topic      = ctx.get("title", "")
+
+        # ถ้ามีหลายคนให้ draft ทีละคนและส่งรวมกัน
+        results = []
+        for name in names:
+            try:
+                r = requests.post(
+                    f"{BACKEND_URL}/api/telegram/draft-email",
+                    json={
+                        "recipient_name": name,
+                        "topic": topic,
+                        "conversation_history": history[-8:],
+                        "user_email": user_email,
+                    },
+                    timeout=30,
+                )
+                d = r.json()
+                results.append((name, d))
+            except Exception as e:
+                results.append((name, {"error": str(e)}))
+
+        import urllib.parse
+
+        for name, d in results:
+            to_email = d.get("to_email") or ""
+            subject  = d.get("subject") or topic or "ติดตามผลการประชุม"
+            body     = d.get("body") or ""
+
+            if not body:
+                tg_send_html(chat_id, f"⚠️ ร่าง email หา {name} ไม่สำเร็จ")
+                continue
+
+            def esc(s): return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+            to_line = esc(d.get("to_name") or name)
+            if to_email:
+                to_line += f" &lt;{esc(to_email)}&gt;"
+
+            html = (
+                f"📧 <b>ร่าง Email</b>\n"
+                f"<b>To:</b> {to_line}\n"
+                f"<b>Subject:</b> {esc(subject)}\n"
+                f"─────────────────────\n\n"
+                f"{esc(body[:1800])}"
+            )
+
+            markup = None
+            if to_email:
+                open_url = "http://localhost:8000/mail-open?to={}&subject={}&body={}".format(
+                    urllib.parse.quote(to_email),
+                    urllib.parse.quote(subject),
+                    urllib.parse.quote(body[:1800]),
+                )
+                markup = {"inline_keyboard": [[
+                    {"text": "📬 เปิดใน Mail App", "url": open_url}
+                ]]}
+
+            tg_send_html(chat_id, html, markup)
 
 
 def ask_hermes(chat_id: int, user_msg: str, user_name: str) -> str:
@@ -282,6 +522,9 @@ def handle_message(update: dict):
             "/skills — ดูรายชื่อ Skill ที่ใช้งานได้\n"
             "/run [id] [ข้อความ] — เรียกใช้ Skill เช่น /run 1 สรุปเอกสารนี้\n"
             "/clear — ล้างประวัติการสนทนา\n\n"
+            "<b>ร่าง Email</b>\n"
+            "พิมพ์: <b>ร่าง email หา [ชื่อ] เรื่อง [หัวข้อ]</b>\n"
+            "เช่น: ร่าง email หาคุณเอ เรื่องสรุปประชุม\n\n"
             "<b>คำสั่ง Approval</b>\n"
             "/approve_[id] — อนุมัติ Skill\n"
             "/reject_[id] — ปฏิเสธ Skill\n"
@@ -433,6 +676,14 @@ def handle_message(update: dict):
                 tg_send(chat_id, f"⚠️ Error: {e}")
             return
 
+    # ── ร่าง Email ─────────────────────────────────────────────────────────────
+    email_result = draft_email_from_tg(chat_id, text)
+    if email_result is not None:
+        tg_send_typing(chat_id)
+        html_msg, markup = email_result
+        tg_send_html(chat_id, html_msg, markup)
+        return
+
     # ── ตรวจหาข้อมูลโปรไฟล์ในข้อความก่อน ────────────────────────────────────
     profile_reply = detect_profile_update(chat_id, text, message.get("from", {}))
     if profile_reply:
@@ -444,6 +695,17 @@ def handle_message(update: dict):
     reply = ask_hermes(chat_id, text, user_name)
     print(f"[{chat_id}] Hermes: {reply[:100]}...")
     tg_send(chat_id, reply)
+
+    # ── ตรวจว่าเป็น Meeting Report → แสดง Post-Meeting Actions ───────────────
+    if is_meeting_report(reply):
+        owners = extract_owners_from_reply(reply)
+        # บันทึก meeting context สำหรับ callback
+        _meeting_context[chat_id] = {
+            "title": text[:80] if len(text) < 80 else "",
+            "owners": owners,
+        }
+        if owners:
+            send_meeting_actions(chat_id, owners)
 
 
 def main():
@@ -471,7 +733,10 @@ def main():
 
             for update in updates:
                 offset = update["update_id"] + 1
-                handle_message(update)
+                if "callback_query" in update:
+                    handle_callback(update)
+                else:
+                    handle_message(update)
 
         except KeyboardInterrupt:
             print("\n🛑 Bot หยุดทำงาน")

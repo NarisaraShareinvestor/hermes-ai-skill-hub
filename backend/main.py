@@ -5,9 +5,9 @@ _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -18,7 +18,7 @@ import asyncio
 import threading
 
 from database import engine, get_db, Base
-from models import Skill, SkillInstallation, AuditLog, ApprovalQueue, User, UserContact, UserMemory, SkillStatus, SkillVisibility, UserRole, MemoryType, Team, ContactGroup
+from models import Skill, SkillInstallation, AuditLog, ApprovalQueue, User, UserContact, UserMemory, SkillStatus, SkillVisibility, UserRole, MemoryType, Team, ContactGroup, UserFile
 from schemas import (
     SkillCreate, SkillUpdate, SkillResponse, SkillDetailResponse,
     SkillApprovalRequest, SkillApprovalAction, SkillInstallationCreate,
@@ -104,28 +104,64 @@ _MEETING_EXTRACT_PROMPT = (
 
 _MEETING_EMAIL_PROMPT = "เขียนอีเมลสรุปการประชุมภาษาไทย เป็นทางการแต่กระชับ ไม่ต้องมีบรรทัด Subject"
 
+_MEETING_MOM_PROMPT = (
+    "คุณเป็นผู้ช่วยจัดทำรายงานการประชุมรูปแบบราชการ (MOM - Minutes of Meeting) "
+    "จาก transcript หรือบันทึกการประชุม ให้สร้างรายงานการประชุมภาษาไทยในรูปแบบทางการ "
+    "โครงสร้าง (ใช้อย่างเคร่งครัด):\n\n"
+    "รายงานการประชุม [ชื่อการประชุม]\n"
+    "ครั้งที่ [...]/[ปีพ.ศ.]\n"
+    "เมื่อวัน[วัน]ที่ [...] [เดือน] พ.ศ. [...] เวลา [...] น.\n"
+    "ณ [สถานที่]\n\n"
+    "ผู้มาประชุม\n"
+    "1. [ชื่อ-นามสกุล]  [ตำแหน่ง]  ประธาน\n"
+    "2. [ชื่อ-นามสกุล]  [ตำแหน่ง]  กรรมการ\n"
+    "(เพิ่มรายชื่อตามข้อมูล)\n\n"
+    "ผู้ไม่มาประชุม/ลา\n"
+    "- [รายชื่อ] หรือ - ไม่มี\n\n"
+    "เลขานุการ\n"
+    "[ชื่อ-นามสกุล]  [ตำแหน่ง]\n\n"
+    "────────────────────────────────────────\n\n"
+    "เริ่มประชุมเวลา [...] น.\n\n"
+    "ระเบียบวาระที่ 1  เรื่องที่ประธานแจ้งให้ที่ประชุมทราบ\n"
+    "[สรุปเนื้อหา]\n"
+    "มติที่ประชุม  [มติหรือรับทราบ]\n\n"
+    "ระเบียบวาระที่ 2  [หัวข้อ]\n"
+    "[สรุปเนื้อหา]\n"
+    "มติที่ประชุม  [มติ]\n\n"
+    "(เพิ่มระเบียบวาระตามข้อมูลที่มี)\n\n"
+    "────────────────────────────────────────\n\n"
+    "ปิดประชุมเวลา [...] น.\n\n"
+    "(ลงชื่อ)  _________________________  ผู้จดรายงานการประชุม\n"
+    "( [ชื่อ] )\n"
+    "ตำแหน่ง  ...............................\n\n"
+    "หมายเหตุ: ข้อมูลที่ไม่ระบุใน transcript ให้ใช้ [...] แทน ห้ามแต่งเติม"
+)
+
+
+_MEETING_SKILL_NAME = "Meeting Intelligence Assistant"
 
 def _seed_meeting_skill(db: Session) -> "Skill":
     existing = db.query(Skill).filter(Skill.skill_type == "meet").first()
     if existing:
         return existing
     skill = Skill(
-        name="Meeting Report Assistant",
-        description="สร้างรายงานการประชุมมีโครงสร้าง สกัดข้อมูลสำคัญ และร่างอีเมล follow-up อัตโนมัติ",
+        name=_MEETING_SKILL_NAME,
+        description="วิเคราะห์การประชุมครบวงจร — ถอดเสียง, สรุป, Action Items, ร่างอีเมล, MOM format อัตโนมัติ",
         owner=_MEETING_SKILL_OWNER,
-        department="ir",
+        department="general",
         skill_type="meet",
-        status=SkillStatus.TEAM_AVAILABLE,
-        visibility=SkillVisibility.TEAM,
-        tags=["meeting", "minutes", "report", "extraction", "email", "follow-up"],
+        status=SkillStatus.COMPANY_PUBLISHED,
+        visibility=SkillVisibility.COMPANY,
+        tags=["meeting", "minutes", "transcript", "action-items", "mom", "email", "whisper"],
         prompt_template=_MEETING_GENERATE_PROMPT,
         workflow_data={
             "email_draft_prompt": _MEETING_EMAIL_PROMPT,
             "extract_prompt": _MEETING_EXTRACT_PROMPT,
+            "mom_prompt": _MEETING_MOM_PROMPT,
         },
-        version="2.0.0",
+        version="3.0.0",
         uses_claude=True,
-        claude_model="claude-3-haiku-20240307",
+        claude_model="gpt-4o-mini",
     )
     db.add(skill)
     db.commit()
@@ -174,25 +210,27 @@ def _startup_seed():
     try:
         meet_skill = _seed_meeting_skill(db)
 
-        # Migrate existing meeting skill to merged version
-        if meet_skill.name != "Meeting Report Assistant":
-            meet_skill.name        = "Meeting Report Assistant"
-            meet_skill.description = "สร้างรายงานการประชุมมีโครงสร้าง สกัดข้อมูลสำคัญ และร่างอีเมล follow-up อัตโนมัติ"
-            meet_skill.tags        = ["meeting", "minutes", "report", "extraction", "email", "follow-up"]
-            meet_skill.version     = "2.0.0"
-            wf = dict(meet_skill.workflow_data or {})
-            wf["extract_prompt"] = _MEETING_EXTRACT_PROMPT
-            if "email_draft_prompt" not in wf:
-                wf["email_draft_prompt"] = _MEETING_EMAIL_PROMPT
-            meet_skill.workflow_data = wf
-
-        # Always keep prompt_template in sync with the current constant
+        # Migrate meeting skill to Meeting Intelligence Assistant
+        if meet_skill.name != _MEETING_SKILL_NAME:
+            meet_skill.name        = _MEETING_SKILL_NAME
+            meet_skill.description = "วิเคราะห์การประชุมครบวงจร — ถอดเสียง, สรุป, Action Items, ร่างอีเมล, MOM format อัตโนมัติ"
+            meet_skill.department  = "general"
+            meet_skill.tags        = ["meeting", "minutes", "transcript", "action-items", "mom", "email", "whisper"]
+            meet_skill.version     = "3.0.0"
+        meet_skill.status     = SkillStatus.COMPANY_PUBLISHED
+        meet_skill.visibility = SkillVisibility.COMPANY
+        wf = dict(meet_skill.workflow_data or {})
+        wf["extract_prompt"]    = _MEETING_EXTRACT_PROMPT
+        wf["email_draft_prompt"] = _MEETING_EMAIL_PROMPT
+        wf["mom_prompt"]        = _MEETING_MOM_PROMPT
+        meet_skill.workflow_data = wf
         meet_skill.prompt_template = _MEETING_GENERATE_PROMPT
 
-        # Deprecate "Meeting Minutes Generator" (merged into Meeting Report Assistant)
-        old = db.query(Skill).filter(Skill.name == "Meeting Minutes Generator").first()
-        if old and old.status != SkillStatus.DEPRECATED:
-            old.status = SkillStatus.DEPRECATED
+        # Deprecate old meeting skill names
+        for old_name in ("Meeting Minutes Generator", "Meeting Report Assistant"):
+            old = db.query(Skill).filter(Skill.name == old_name).first()
+            if old and old.id != meet_skill.id and old.status != SkillStatus.DEPRECATED:
+                old.status = SkillStatus.DEPRECATED
 
         # Patch other skills with prompt templates if missing
         for name, prompt in _SKILL_PROMPTS.items():
@@ -290,10 +328,201 @@ def _claude_chat(messages: list, system: str = "") -> str:
                 os.environ[k] = v
 
 
+# ── Mail Open (redirect to mailto: for Telegram buttons) ─────────────────────
+@app.get("/mail-open", response_class=HTMLResponse)
+def mail_open(to: str = "", subject: str = "", body: str = ""):
+    """
+    Intermediate page that auto-redirects to mailto: link.
+    Used by Telegram inline keyboard buttons (which can't use mailto: directly).
+    """
+    import urllib.parse
+    mailto = "mailto:{}?subject={}&body={}".format(
+        urllib.parse.quote(to),
+        urllib.parse.quote(subject),
+        urllib.parse.quote(body),
+    )
+    safe_to = to.replace("<", "&lt;").replace(">", "&gt;")
+    safe_subj = subject.replace("<", "&lt;").replace(">", "&gt;")
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url={mailto}">
+  <title>เปิด Mail App...</title>
+  <style>
+    body {{ font-family: -apple-system, sans-serif; display:flex; align-items:center;
+            justify-content:center; min-height:100vh; margin:0; background:#f8fafc; }}
+    .card {{ text-align:center; padding:40px; background:#fff; border-radius:16px;
+             box-shadow:0 4px 24px rgba(0,0,0,.08); max-width:420px; width:90%; }}
+    h2 {{ color:#1e40af; margin-bottom:8px; }}
+    p {{ color:#64748b; font-size:14px; }}
+    a.btn {{ display:inline-block; margin-top:20px; padding:12px 28px;
+             background:#2563eb; color:#fff; border-radius:8px; text-decoration:none;
+             font-weight:600; font-size:15px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>📧 เปิด Mail App</h2>
+    <p><b>ถึง:</b> {safe_to}</p>
+    <p><b>เรื่อง:</b> {safe_subj}</p>
+    <p style="margin-top:16px;color:#94a3b8;font-size:13px;">กำลังเปิด Mail App อัตโนมัติ…</p>
+    <a class="btn" href="{mailto}">เปิด Mail App</a>
+  </div>
+  <script>setTimeout(()=>window.location.href="{mailto}", 300);</script>
+</body>
+</html>""")
+
+
+# ── File Upload ───────────────────────────────────────────────────────────────
+import uuid, pathlib, mimetypes
+
+UPLOAD_DIR = pathlib.Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+ALLOWED_TYPES = {
+    "application/pdf", "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain", "text/csv",
+    "image/png", "image/jpeg", "image/gif", "image/webp",
+}
+MAX_FILE_MB = 20
+
+AUDIO_MIME_TYPES = {
+    "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a",
+    "audio/wav", "audio/x-wav", "audio/wave",
+    "audio/webm", "audio/ogg",
+    "video/mp4", "video/webm",  # some recorders emit video/* for audio-only content
+}
+MAX_AUDIO_MB = 25  # Whisper's hard limit
+
+
+def _extract_text(path: pathlib.Path, mime: str) -> str:
+    """Extract readable text from uploaded file."""
+    try:
+        if mime == "application/pdf":
+            import pypdf
+            reader = pypdf.PdfReader(str(path))
+            return "\n".join(p.extract_text() or "" for p in reader.pages)[:8000]
+        if mime in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/msword"):
+            import docx as _docx
+            doc = _docx.Document(str(path))
+            return "\n".join(p.text for p in doc.paragraphs)[:8000]
+        if mime in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "application/vnd.ms-excel"):
+            import openpyxl
+            wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+            lines = []
+            for ws in wb.worksheets:
+                for row in ws.iter_rows(values_only=True):
+                    lines.append("\t".join(str(c) if c is not None else "" for c in row))
+            return "\n".join(lines)[:8000]
+        if mime.startswith("text/"):
+            return path.read_text(errors="ignore")[:8000]
+    except Exception as e:
+        return f"(ไม่สามารถอ่านไฟล์ได้: {e})"
+    return ""
+
+
+@app.post("/api/files/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    user_email: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    # Resolve MIME — browser sometimes sends octet-stream, so fallback to extension guess
+    mime = file.content_type or ""
+    if not mime or mime == "application/octet-stream":
+        mime = mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+    if mime not in ALLOWED_TYPES:
+        raise HTTPException(400, f"ไฟล์ประเภท {mime} ไม่รองรับ (รองรับ: PDF, Word, Excel, TXT, CSV, รูปภาพ)")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_MB * 1024 * 1024:
+        raise HTTPException(400, f"ไฟล์ใหญ่เกิน {MAX_FILE_MB} MB")
+
+    ext        = pathlib.Path(file.filename or "file").suffix
+    saved_name = f"{uuid.uuid4().hex}{ext}"
+    dest       = UPLOAD_DIR / saved_name
+    dest.write_bytes(content)
+
+    record = UserFile(
+        owner_email=user_email,
+        original_name=file.filename or saved_name,
+        saved_name=saved_name,
+        file_size=len(content),
+        mime_type=mime,
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {"id": record.id, "name": record.original_name,
+            "size": record.file_size, "mime": mime}
+
+
+@app.get("/api/files")
+def list_files(user_email: str, db: Session = Depends(get_db)):
+    files = db.query(UserFile).filter(UserFile.owner_email == user_email)\
+               .order_by(UserFile.created_at.desc()).all()
+    return [{"id": f.id, "name": f.original_name, "size": f.file_size,
+             "mime": f.mime_type, "summary": f.summary,
+             "created_at": f.created_at.isoformat()} for f in files]
+
+
+@app.delete("/api/files/{file_id}")
+def delete_file(file_id: int, user_email: str, db: Session = Depends(get_db)):
+    f = db.query(UserFile).filter(UserFile.id == file_id, UserFile.owner_email == user_email).first()
+    if not f:
+        raise HTTPException(404, "ไม่พบไฟล์")
+    try:
+        (UPLOAD_DIR / f.saved_name).unlink(missing_ok=True)
+    except Exception:
+        pass
+    db.delete(f)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/files/{file_id}/analyze")
+def analyze_file(file_id: int, body: dict, db: Session = Depends(get_db)):
+    user_email = body.get("user_email", "")
+    question   = body.get("question", "สรุปเนื้อหาหลักของไฟล์นี้ให้ฉันทราบ")
+    f = db.query(UserFile).filter(UserFile.id == file_id).first()
+    if not f:
+        raise HTTPException(404, "ไม่พบไฟล์")
+
+    path = UPLOAD_DIR / f.saved_name
+    text = _extract_text(path, f.mime_type or "")
+
+    if not text.strip():
+        if (f.mime_type or "").startswith("image/"):
+            result = "ไฟล์นี้เป็นรูปภาพ — กรุณาบอกว่าต้องการให้วิเคราะห์อะไร"
+        else:
+            result = "ไม่สามารถอ่านเนื้อหาไฟล์นี้ได้"
+    else:
+        system = "คุณเป็น AI ช่วยวิเคราะห์เอกสาร ตอบภาษาไทย กระชับ ตรงประเด็น"
+        prompt = f"ไฟล์: {f.original_name}\n\nเนื้อหา:\n{text}\n\nคำถาม: {question}"
+        result = _claude_chat([{"role": "user", "content": prompt}], system)
+
+    # cache summary ถ้าเป็น default question
+    if "สรุปเนื้อหา" in question and not f.summary:
+        f.summary = result[:500]
+        db.commit()
+
+    return {"result": result, "filename": f.original_name}
+
+
 # ── Root / Health ──────────────────────────────────────────────────────────────
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return {"message": "Hermes AI Skill Hub", "version": "1.0.0", "docs": "/docs"}
+    try:
+        with open(os.path.join(os.path.dirname(__file__), '..', 'app.html'), 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        return {"message": "Hermes AI Skill Hub", "version": "1.0.0", "docs": "/docs"}
 
 
 @app.get("/health")
@@ -309,6 +538,7 @@ class ChatRequest(BaseModel):
     department: str = "general"
     conversation_history: List[dict] = []
     last_skill_id: Optional[int] = None  # skill ที่กำลังพูดถึงใน session
+    file_id: Optional[int] = None        # ไฟล์ที่แนบมากับข้อความ
 
 
 class ChatResponse(BaseModel):
@@ -504,8 +734,28 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 9. ถ้าผู้ใช้พูดถึงชื่อคนที่มีใน Address Book → ตอบด้วย email จาก Address Book ทันที ไม่ต้องถามซ้ำ
 10. ถ้าผู้ใช้บอก "[ชื่อ] คือ [email]" หรือ "email [ชื่อ] คือ [email]" → ยืนยันว่าจำแล้ว และระบบได้บันทึกไว้แล้ว"""
 
+    # ── Inject file content if file_id is provided ───────────────────────────
+    file_context = ""
+    _file_is_meeting = False
+    _forced_meeting_skill = None
+    if req.file_id:
+        _f = db.query(UserFile).filter(UserFile.id == req.file_id).first()
+        if _f:
+            _fpath = UPLOAD_DIR / _f.saved_name
+            _ftext = _extract_text(_fpath, _f.mime_type or "")
+            file_context = f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}"
+            # Detect if file is a meeting report → force-use Meeting Report Assistant
+            if _is_meeting_report(_ftext):
+                _file_is_meeting = True
+                _forced_meeting_skill = db.query(Skill).filter(
+                    Skill.skill_type == "meet",
+                    Skill.status.notin_([SkillStatus.DEPRECATED, SkillStatus.BLOCKED])
+                ).first()
+
+    effective_message = (req.message or "สรุปเนื้อหาหลักของไฟล์นี้") + file_context
+
     messages = req.conversation_history[-6:] if req.conversation_history else []
-    messages.append({"role": "user", "content": req.message})
+    messages.append({"role": "user", "content": effective_message})
 
     # ── Auto-save contacts จาก chat message ("ชื่อ คือ email") ──────────────
     import re
@@ -562,25 +812,38 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         if len(note) > 2:
             UserMemoryManager.save_custom_memory(db, req.user_email, note)
 
-    msg_lower = req.message.lower()
+    msg_lower = effective_message.lower()
     powered_by_skill_info = None
     new_last_skill_id = req.last_skill_id
 
     is_question = (
-        len(req.message) < _AUTO_RUN_MIN_LENGTH
-        or any(req.message.lower().startswith(p) for p in _QUESTION_PREFIXES)
-        or any(p in req.message.lower()[:60] for p in _QUESTION_PREFIXES)
+        len(effective_message) < _AUTO_RUN_MIN_LENGTH
+        or any(effective_message.lower().startswith(p) for p in _QUESTION_PREFIXES)
+        or any(p in effective_message.lower()[:60] for p in _QUESTION_PREFIXES)
     )
+    # ไฟล์ประชุมไม่ใช่ question — force skill matching
+    if req.file_id:
+        is_question = False
 
-    if not is_question:
+    if _file_is_meeting and _forced_meeting_skill:
+        # File is a meeting report → always use Meeting Report Assistant
+        reply = _claude_chat(
+            [{"role": "user", "content": effective_message}],
+            _skill_system_prompt(_forced_meeting_skill),
+        )
+        _forced_meeting_skill.usage_count = (_forced_meeting_skill.usage_count or 0) + 1
+        _forced_meeting_skill.last_used_at = datetime.now()
+        new_last_skill_id = _forced_meeting_skill.id
+        powered_by_skill_info = {"id": _forced_meeting_skill.id, "name": _forced_meeting_skill.name}
+    elif not is_question:
         scored = sorted(
-            [(s, _score_skill_for_autorun(req.message, s)) for s in user_skills],
+            [(s, _score_skill_for_autorun(effective_message, s)) for s in user_skills],
             key=lambda x: x[1], reverse=True
         )
         if scored and scored[0][1] >= _AUTO_RUN_THRESHOLD:
             best = scored[0][0]
             reply = _claude_chat(
-                [{"role": "user", "content": req.message}],
+                [{"role": "user", "content": effective_message}],
                 _skill_system_prompt(best),
             )
             best.usage_count = (best.usage_count or 0) + 1
@@ -775,6 +1038,255 @@ def meeting_draft_email(body: dict, db: Session = Depends(get_db)):
     body_text = _claude_chat([{"role": "user", "content": prompt}], system)
     return {"subject": f"รายงานการประชุม: {title}", "body": body_text,
             "_skill_id": skill.id}
+
+
+# ── Meeting Intelligence: new endpoints ───────────────────────────────────────
+
+@app.post("/api/meeting/generate-summary")
+def meeting_generate_summary(body: dict, db: Session = Depends(get_db)):
+    """Generate a structured meeting report/summary from raw text."""
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"error": "no text"}
+
+    skill = _seed_meeting_skill(db)
+    skill.usage_count = (skill.usage_count or 0) + 1
+    skill.last_used_at = datetime.now()
+    db.commit()
+
+    summary = _claude_chat(
+        [{"role": "user", "content": text[:4000]}],
+        skill.prompt_template or _MEETING_GENERATE_PROMPT,
+    )
+    return {"summary": summary, "_skill_id": skill.id}
+
+
+@app.post("/api/meeting/generate-mom")
+def meeting_generate_mom(body: dict, db: Session = Depends(get_db)):
+    """Generate formal Thai MOM (Minutes of Meeting) format."""
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"error": "no text"}
+
+    skill = _seed_meeting_skill(db)
+    skill.usage_count = (skill.usage_count or 0) + 1
+    skill.last_used_at = datetime.now()
+    db.commit()
+
+    mom_text = _claude_chat(
+        [{"role": "user", "content": f"สร้าง MOM จาก transcript/บันทึกการประชุมนี้:\n\n{text[:4000]}"}],
+        _MEETING_MOM_PROMPT,
+    )
+    return {"mom": mom_text, "_skill_id": skill.id}
+
+
+_MEETING_INTEL_PROMPT = """\
+คุณคือที่ปรึกษาธุรกิจอาวุโสที่วิเคราะห์การประชุมเชิงลึก
+วิเคราะห์ transcript และตอบเป็น JSON เท่านั้น ไม่มีข้อความอื่น:
+{
+  "title": "ชื่อการประชุม",
+  "date": "วันที่",
+  "participants": ["รายชื่อผู้เข้าร่วม"],
+  "executive_summary": "สรุปผู้บริหาร 2-3 ประโยค",
+  "decisions": ["มติที่ตกลงกัน"],
+  "risks": ["ความเสี่ยงหรือปัญหาที่พบ"],
+  "owners": [{"name": "ชื่อ", "responsibilities": ["งานที่รับผิดชอบ"]}],
+  "timeline": [{"date": "วันที่/กำหนด", "milestone": "งาน"}],
+  "action_items": [{"task": "งาน", "owner": "ผู้รับผิดชอบ", "due": "กำหนด", "priority": "high/medium/low"}],
+  "next_steps": ["ขั้นตอนต่อไป"],
+  "follow_up_recommendations": ["แนะนำให้ติดตาม"]
+}
+"""
+
+
+@app.post("/api/meeting/clean-transcript")
+def meeting_clean_transcript(body: dict, db: Session = Depends(get_db)):
+    """Use LLM to fix Whisper transcription errors (spelling, proper nouns, Thai words)."""
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"transcript": text}
+    cleaned = _claude_chat(
+        [{"role": "user", "content": text[:6000]}],
+        "แก้ไขคำผิดใน transcript ภาษาไทยนี้: แก้ชื่อสถานที่ ชื่อคน และคำสะกดผิดที่เกิดจากการฟังเสียง อย่าเปลี่ยนเนื้อหาหรือความหมาย ตอบแค่ transcript ที่แก้แล้วเท่านั้น ไม่ต้องอธิบายหรือเพิ่มเติมใดๆ",
+    )
+    return {"transcript": cleaned}
+
+
+@app.post("/api/meeting/analyze-intelligence")
+def meeting_analyze_intelligence(body: dict, db: Session = Depends(get_db)):
+    """Deep business intelligence analysis — decisions, risks, owners, timeline, next steps."""
+    text = (body.get("text") or "").strip()
+    if not text:
+        return {"error": "no text"}
+
+    skill = _seed_meeting_skill(db)
+    skill.usage_count = (skill.usage_count or 0) + 1
+    skill.last_used_at = datetime.now()
+    db.commit()
+
+    raw = _claude_chat(
+        [{"role": "user", "content": f"Transcript:\n\n{text[:6000]}"}],
+        _MEETING_INTEL_PROMPT,
+    )
+    try:
+        import json as _json, re as _re
+        m = _re.search(r'\{[\s\S]+\}', raw)
+        data = _json.loads(m.group()) if m else {}
+    except Exception:
+        data = {"executive_summary": raw}
+    return {**data, "_skill_id": skill.id}
+
+
+@app.post("/api/meeting/extract-file")
+async def meeting_extract_file(
+    file: UploadFile = File(...),
+):
+    """Extract raw text from a document file for meeting input."""
+    mime = file.content_type or ""
+    if not mime or mime == "application/octet-stream":
+        mime = mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+
+    doc_types = {
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+    }
+    if mime not in doc_types:
+        raise HTTPException(400, f"รองรับ PDF, Word (.docx), TXT เท่านั้น")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_MB * 1024 * 1024:
+        raise HTTPException(400, f"ไฟล์ใหญ่เกิน {MAX_FILE_MB} MB")
+
+    ext = pathlib.Path(file.filename or "file").suffix
+    saved_name = f"mtg_{uuid.uuid4().hex}{ext}"
+    dest = UPLOAD_DIR / saved_name
+    dest.write_bytes(content)
+    try:
+        text = _extract_text(dest, mime)
+    finally:
+        try:
+            dest.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    return {"text": text, "filename": file.filename or saved_name}
+
+
+@app.post("/api/meeting/transcribe")
+async def meeting_transcribe(
+    file: UploadFile = File(...),
+):
+    """Transcribe audio/video file to text via OpenAI Whisper."""
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or "your_openai" in api_key:
+        raise HTTPException(400, "OPENAI_API_KEY ยังไม่ได้ตั้งค่า")
+
+    mime = file.content_type or ""
+    if not mime or mime == "application/octet-stream":
+        mime = mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
+    mime_base = mime.split(";")[0].strip()
+
+    if mime_base not in AUDIO_MIME_TYPES:
+        raise HTTPException(400, f"รูปแบบ '{mime_base}' ไม่รองรับ (รองรับ: MP3, WAV, M4A, WebM, OGG, MP4)")
+
+    content = await file.read()
+    if len(content) > MAX_AUDIO_MB * 1024 * 1024:
+        raise HTTPException(400, f"ไฟล์เสียงใหญ่เกิน {MAX_AUDIO_MB} MB (Whisper จำกัด 25 MB)")
+
+    ext = pathlib.Path(file.filename or "audio.webm").suffix or ".webm"
+    saved_name = f"audio_{uuid.uuid4().hex}{ext}"
+    audio_path = UPLOAD_DIR / saved_name
+    audio_path.write_bytes(content)
+
+    _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
+    _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        with open(str(audio_path), "rb") as af:
+            result = client.audio.transcriptions.create(model="whisper-1", file=af)
+        return {"transcript": result.text}
+    except Exception as e:
+        raise HTTPException(500, f"Whisper error: {e}")
+    finally:
+        for k, v in _saved_env.items():
+            if v is not None:
+                os.environ[k] = v
+        try:
+            audio_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+@app.post("/api/telegram/draft-email")
+def telegram_draft_email(body: dict, db: Session = Depends(get_db)):
+    """Draft an email from Telegram — looks up recipient by nickname/name in directory."""
+    recipient_name   = (body.get("recipient_name") or "").strip()
+    topic            = (body.get("topic") or "").strip()
+    context_messages = body.get("conversation_history") or []
+    sender_email     = body.get("user_email") or ""
+    sender_display   = sender_email.split("@")[0] or "ทีม"
+
+    # Look up recipient in directory
+    to_email = None
+    to_name  = recipient_name
+    if recipient_name:
+        users = db.query(User).filter(User.is_active == True).all()
+        lowq  = recipient_name.lower()
+        for u in users:
+            if u.nickname and u.nickname.lower() == lowq:
+                to_email = u.email
+                to_name  = u.full_name or u.nickname
+                break
+        if not to_email:
+            for u in users:
+                if u.full_name and lowq in u.full_name.lower():
+                    to_email = u.email
+                    to_name  = u.full_name
+                    break
+
+    # Build context from recent conversation (last 8 messages)
+    ctx = ""
+    if context_messages:
+        ctx = "\n".join(f"{'User' if m.get('role')=='user' else 'Hermes'}: {m.get('content','')}"
+                        for m in context_messages[-8:])
+
+    greeting = f"เรียน {to_name}," if to_name else "เรียน ผู้เกี่ยวข้องทุกท่าน,"
+
+    system = (
+        "คุณเป็น AI ช่วยร่างอีเมลภาษาไทยแบบมืออาชีพ "
+        "ใช้รูปแบบนี้เสมอ:\n"
+        f"{greeting}\n\n"
+        "[ย่อหน้าสรุปบริบท/การประชุม/เรื่องที่ต้องการสื่อสาร]\n\n"
+        "Action Items:\n"
+        "1. [ผู้รับผิดชอบ]จะ[งาน]\n"
+        "2. ...\n\n"
+        "(ถ้าไม่มี action items ให้ละส่วนนี้)\n\n"
+        "[ประโยคปิด เช่น ขอให้ทุกท่านดำเนินการตามที่กำหนด...]\n\n"
+        "ขอบคุณค่ะ\n\n"
+        "[ชื่อผู้ส่ง]\n\n"
+        "ห้ามใส่บรรทัด Subject: หรือ To: ในเนื้อหา ตอบเป็นเนื้อหาอีเมลอย่างเดียว"
+    )
+
+    prompt = (
+        f"ร่างอีเมลภาษาไทยโดยใช้ข้อมูลจากบริบทด้านล่าง\n"
+        f"ผู้รับ: {to_name or 'ผู้เกี่ยวข้อง'}\n"
+        f"เรื่อง: {topic or 'ตามบริบทการสนทนา'}\n"
+        f"ผู้ส่ง: {sender_display}\n\n"
+        f"บริบทการสนทนา:\n{ctx or '(ไม่มีบริบท)'}\n\n"
+        f"ร่างอีเมลตามรูปแบบที่กำหนด ลงชื่อด้วย '{sender_display}'"
+    )
+
+    email_body = _claude_chat([{"role": "user", "content": prompt}], system)
+
+    return {
+        "to_email": to_email,
+        "to_name":  to_name,
+        "subject":  topic or "ติดตามผลการสนทนา",
+        "body":     email_body,
+    }
 
 
 # ── Run a Skill ────────────────────────────────────────────────────────────────
@@ -2055,39 +2567,9 @@ def get_active_memory(user_email: str, memory_type: str, db: Session = Depends(g
 
 @app.on_event("startup")
 async def startup_telegram():
-    global _telegram_running
-    if not TELEGRAM_TOKEN:
-        print("⚠️  TELEGRAM_BOT_TOKEN not set, skipping bot")
-        return
-
-    # Use a lock file to prevent multiple processes from polling simultaneously
-    import atexit
-    lock_path = "/tmp/hermes_tg_polling.lock"
-    if os.path.exists(lock_path):
-        try:
-            with open(lock_path) as f:
-                pid = int(f.read().strip())
-            # Check if that pid is still alive
-            os.kill(pid, 0)
-            print(f"⚠️  Telegram polling already running (pid={pid}), skipping")
-            return
-        except (ProcessLookupError, ValueError, OSError):
-            pass  # Process is dead, remove stale lock
-
-    with open(lock_path, "w") as f:
-        f.write(str(os.getpid()))
-
-    def cleanup_lock():
-        try:
-            os.remove(lock_path)
-        except:
-            pass
-    atexit.register(cleanup_lock)
-
-    _telegram_running = True
-    thread = threading.Thread(target=telegram_polling_thread, daemon=True)
-    thread.start()
-    print(f"🤖 Telegram bot polling started (pid={os.getpid()})")
+    # Telegram polling is handled by telegram/bot_polling.py (external process)
+    # Disabled here to prevent conflict with the standalone bot process
+    print("ℹ️  Telegram polling disabled in backend — use telegram/bot_polling.py")
 
 @app.on_event("shutdown")
 async def shutdown_telegram():
