@@ -1174,55 +1174,72 @@ async def meeting_extract_file(
     return {"text": text, "filename": file.filename or saved_name}
 
 
-def _split_audio_file(audio_path, chunk_size_mb=20):
-    """Split audio file into chunks for Whisper processing."""
-    file_size = audio_path.stat().st_size
-    chunk_bytes = chunk_size_mb * 1024 * 1024
-    chunks = []
+def _split_audio_ffmpeg(audio_path: pathlib.Path, chunk_duration_secs: int = 600) -> list:
+    """Split audio into time-based chunks using ffmpeg. Each chunk is a valid audio file."""
+    import subprocess
+    ext = audio_path.suffix or ".mp3"
+    chunk_paths = []
+    idx = 0
 
-    with open(str(audio_path), "rb") as f:
-        while True:
-            chunk = f.read(chunk_bytes)
-            if not chunk:
-                break
-            chunks.append(chunk)
-    return chunks, len(chunks)
+    while True:
+        start = idx * chunk_duration_secs
+        out = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}{ext}"
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y",
+                "-i", str(audio_path),
+                "-ss", str(start),
+                "-t", str(chunk_duration_secs),
+                "-c", "copy",
+                str(out),
+            ],
+            capture_output=True,
+        )
+        # Stop when output is empty (past end of file)
+        if out.exists() and out.stat().st_size > 4096:
+            chunk_paths.append(out)
+            idx += 1
+        else:
+            out.unlink(missing_ok=True)
+            break
+
+    return chunk_paths
 
 
 async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
-    """Transcribe large audio files by splitting into chunks."""
+    """Transcribe audio — single request if small, ffmpeg-split chunks if large."""
     file_size = audio_path.stat().st_size
     max_single_file = MAX_AUDIO_MB * 1024 * 1024
-
-    if file_size <= max_single_file:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        with open(str(audio_path), "rb") as af:
-            result = client.audio.transcriptions.create(model="whisper-1", file=af)
-        return result.text, 1
-
-    chunks, num_chunks = _split_audio_file(audio_path)
-    transcripts = []
 
     from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
-    for i, chunk in enumerate(chunks):
-        if on_progress:
-            on_progress(i + 1, num_chunks, f"Processing chunk {i+1}/{num_chunks}")
+    if file_size <= max_single_file:
+        with open(str(audio_path), "rb") as af:
+            result = client.audio.transcriptions.create(
+                model="whisper-1", file=af, language="th"
+            )
+        return result.text, 1
 
-        chunk_path = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}.tmp"
+    # Split by duration (10 min / chunk → ~10 MB for 128 kbps MP3, well under 25 MB)
+    chunk_paths = _split_audio_ffmpeg(audio_path, chunk_duration_secs=600)
+    if not chunk_paths:
+        raise HTTPException(500, "ไม่สามารถแบ่งไฟล์เสียงได้ — กรุณาตรวจสอบว่าติดตั้ง ffmpeg แล้ว")
+
+    transcripts = []
+    num_chunks = len(chunk_paths)
+
+    for i, cpath in enumerate(chunk_paths):
+        if on_progress:
+            on_progress(i + 1, num_chunks, f"chunk {i+1}/{num_chunks}")
         try:
-            chunk_path.write_bytes(chunk)
-            with open(str(chunk_path), "rb") as cf:
+            with open(str(cpath), "rb") as cf:
                 result = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=cf,
-                    language="th"
+                    model="whisper-1", file=cf, language="th"
                 )
             transcripts.append(result.text)
         finally:
-            chunk_path.unlink(missing_ok=True)
+            cpath.unlink(missing_ok=True)
 
     return " ".join(transcripts), num_chunks
 
