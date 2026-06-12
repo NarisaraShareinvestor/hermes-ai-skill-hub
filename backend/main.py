@@ -1174,74 +1174,204 @@ async def meeting_extract_file(
     return {"text": text, "filename": file.filename or saved_name}
 
 
-def _split_audio_ffmpeg(audio_path: pathlib.Path, chunk_duration_secs: int = 600) -> list:
-    """Split audio into time-based chunks using ffmpeg. Each chunk is a valid audio file."""
+def _get_duration_seconds(path: pathlib.Path) -> float:
+    """Return audio/video duration in seconds via ffprobe. Returns 0 on failure."""
+    import subprocess, json
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)],
+            capture_output=True, text=True, timeout=30,
+        )
+        data = json.loads(r.stdout)
+        return float(data.get("format", {}).get("duration", 0))
+    except Exception:
+        return 0.0
+
+
+def _normalize_to_mp3(source: pathlib.Path) -> pathlib.Path:
+    """Convert any audio/video to mono 16kHz MP3 32kbps — strips video, optimises for Whisper.
+
+    16kHz is Whisper's internal sample rate so there is zero quality loss.
+    32kbps mono ≈ 2.4 MB / 10 min, well within the 25 MB per-chunk limit.
+    Returns path to the normalised file (caller must delete it when done).
+    """
     import subprocess
-    ext = audio_path.suffix or ".mp3"
+    out = UPLOAD_DIR / f"norm_{uuid.uuid4().hex}.mp3"
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-i", str(source),
+         "-vn",          # strip video
+         "-ac", "1",     # mono
+         "-ar", "16000", # 16 kHz
+         "-b:a", "32k",  # 32 kbps
+         str(out)],
+        capture_output=True, timeout=600,
+    )
+    if not out.exists() or out.stat().st_size < 1024:
+        raise RuntimeError(f"ffmpeg normalisation failed: {r.stderr.decode()[:300]}")
+    return out
+
+
+def _split_audio_ffmpeg(audio_path: pathlib.Path, chunk_duration_secs: int = 1200) -> list:
+    """Split a normalised MP3 into time-based chunks. Each chunk is a valid MP3 file."""
+    import subprocess
     chunk_paths = []
     idx = 0
-
     while True:
         start = idx * chunk_duration_secs
-        out = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}{ext}"
-        result = subprocess.run(
-            [
-                "ffmpeg", "-y",
-                "-i", str(audio_path),
-                "-ss", str(start),
-                "-t", str(chunk_duration_secs),
-                "-c", "copy",
-                str(out),
-            ],
+        out = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}.mp3"
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(audio_path),
+             "-ss", str(start), "-t", str(chunk_duration_secs),
+             "-c", "copy", str(out)],
             capture_output=True,
         )
-        # Stop when output is empty (past end of file)
-        if out.exists() and out.stat().st_size > 4096:
+        # Accept chunks ≥ 512 bytes — the final chunk of a meeting may be short
+        if out.exists() and out.stat().st_size > 512:
             chunk_paths.append(out)
             idx += 1
         else:
             out.unlink(missing_ok=True)
             break
-
     return chunk_paths
 
 
-async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
-    """Transcribe audio — single request if small, ffmpeg-split chunks if large."""
-    file_size = audio_path.stat().st_size
-    max_single_file = MAX_AUDIO_MB * 1024 * 1024
+_WHISPER_MEETING_PROMPT = (
+    "การประชุมธุรกิจ ผู้พูดอาจผสมภาษาไทยและอังกฤษ "
+    "รักษาคำภาษาอังกฤษเป็นภาษาอังกฤษ เช่น follow-up, action item, deadline, "
+    "KPI, ROI, budget, proposal, presentation, meeting, agenda, minutes."
+)
 
+
+def _clean_repetitions(text: str) -> str:
+    """Remove Whisper hallucination loops.
+
+    Uses NON-GREEDY capture (.{n,m}?) so the shortest repeating unit is found,
+    not a multi-copy block that would survive as 2 copies after substitution.
+
+    Handles:
+    - Space-separated: "ขอบคุณครับ ขอบคุณครับ ขอบคุณครับ"
+    - Fused phrases:   "ขอบคุณครับขอบคุณครับขอบคุณครับ"
+    - Short syllables: "พี่พี่พี่พี่พี่" / "ขอบขอบขอบขอบ"
+    """
+    import re
+    if not text or len(text) < 4:
+        return text
+    # Apply each pass twice — a single run can leave survivors when repetitions
+    # overlap or the regex engine picks up mid-pattern.
+    for _ in range(2):
+        # Pass 1: space-separated (non-greedy, 3–80 chars, 3+ total copies)
+        text = re.sub(r'(.{3,80}?)(?:\s+\1){2,}', r'\1', text)
+        # Pass 2: fused medium phrases (non-greedy, 3–80 chars, 3+ copies)
+        text = re.sub(r'(.{3,80}?)\1{2,}', r'\1', text)
+        # Pass 3: short Thai syllables fused (non-greedy, 1–8 chars, 4+ copies)
+        text = re.sub(r'(.{1,8}?)\1{3,}', r'\1', text)
+    text = re.sub(r' {2,}', ' ', text).strip()
+    return text
+
+
+def _call_whisper(client, audio_file, filename: str) -> str:
+    """Call transcription API — tries gpt-4o-transcribe first, falls back to whisper-1."""
+    try:
+        result = client.audio.transcriptions.create(
+            model="gpt-4o-transcribe",
+            file=audio_file,
+            prompt=_WHISPER_MEETING_PROMPT,
+            temperature=0,
+        )
+        return _clean_repetitions(result.text)
+    except Exception:
+        # gpt-4o-transcribe not available — fall back to whisper-1.
+        # temperature=0.2 (not 0): temperature=0 makes whisper-1 more prone to repetition loops.
+        result = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            prompt=_WHISPER_MEETING_PROMPT,
+            temperature=0.2,
+        )
+        return _clean_repetitions(result.text)
+
+
+async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
+    """Transcribe audio/video — normalises to MP3 first, then chunks by duration.
+
+    Strategy:
+    1. Convert to 16kHz mono MP3 via ffmpeg (strips video, shrinks file, ensures reliable chunking).
+    2. Detect duration via ffprobe.
+    3. If duration ≤ 20 min AND file ≤ 25 MB → single Whisper call.
+    4. Otherwise → 20-min chunks (≈ 4.8 MB each at 32 kbps).
+
+    This handles 1-hour+ video recordings correctly regardless of original bitrate.
+    """
     from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
-    if file_size <= max_single_file:
-        with open(str(audio_path), "rb") as af:
-            result = client.audio.transcriptions.create(
-                model="whisper-1", file=af, language="th"
-            )
-        return result.text, 1
+    # Step 1: normalise — extract audio, strip video, convert to 16kHz mono MP3
+    norm_path = None
+    try:
+        orig_mb = audio_path.stat().st_size / (1024 * 1024)
+        print(f"[transcribe] original file: {filename} ({orig_mb:.1f} MB)", flush=True)
 
-    # Split by duration (10 min / chunk → ~10 MB for 128 kbps MP3, well under 25 MB)
-    chunk_paths = _split_audio_ffmpeg(audio_path, chunk_duration_secs=600)
-    if not chunk_paths:
-        raise HTTPException(500, "ไม่สามารถแบ่งไฟล์เสียงได้ — กรุณาตรวจสอบว่าติดตั้ง ffmpeg แล้ว")
-
-    transcripts = []
-    num_chunks = len(chunk_paths)
-
-    for i, cpath in enumerate(chunk_paths):
-        if on_progress:
-            on_progress(i + 1, num_chunks, f"chunk {i+1}/{num_chunks}")
         try:
-            with open(str(cpath), "rb") as cf:
-                result = client.audio.transcriptions.create(
-                    model="whisper-1", file=cf, language="th"
-                )
-            transcripts.append(result.text)
-        finally:
-            cpath.unlink(missing_ok=True)
+            norm_path = _normalize_to_mp3(audio_path)
+            work_path = norm_path
+            norm_mb = norm_path.stat().st_size / (1024 * 1024)
+            print(f"[transcribe] normalised to MP3: {norm_mb:.1f} MB", flush=True)
+        except Exception as e:
+            print(f"[transcribe] ffmpeg normalisation failed ({e}) — using original", flush=True)
+            work_path = audio_path
 
-    return " ".join(transcripts), num_chunks
+        # Step 2: check duration and file size
+        duration = _get_duration_seconds(work_path)
+        file_size = work_path.stat().st_size
+        max_single_file = MAX_AUDIO_MB * 1024 * 1024  # 25 MB
+        duration_min = duration / 60
+        print(f"[transcribe] duration={duration_min:.1f} min  size={file_size/(1024*1024):.1f} MB", flush=True)
+
+        if duration > 0:
+            # ffprobe available — use actual duration
+            needs_chunking = (duration > 20 * 60) or (file_size > max_single_file)
+        else:
+            # ffprobe unavailable — be conservative: chunk anything > 5 MB after normalisation.
+            # At 32 kbps mono, 5 MB ≈ 21 min, so this catches all meetings longer than ~20 min.
+            print(f"[transcribe] ffprobe unavailable — using size-only threshold (5 MB)", flush=True)
+            needs_chunking = file_size > 5 * 1024 * 1024
+
+        if not needs_chunking:
+            print(f"[transcribe] single call (short file)", flush=True)
+            with open(str(work_path), "rb") as af:
+                text = _call_whisper(client, af, filename)
+            return text, 1
+
+        # Step 3: chunk into 20-minute segments
+        chunk_paths = _split_audio_ffmpeg(work_path, chunk_duration_secs=20 * 60)
+        if not chunk_paths:
+            raise HTTPException(500, "ไม่สามารถแบ่งไฟล์เสียงได้ — กรุณาตรวจสอบว่าติดตั้ง ffmpeg แล้ว")
+
+        num_chunks = len(chunk_paths)
+        print(f"[transcribe] split into {num_chunks} chunks, transcribing...", flush=True)
+        transcripts = []
+
+        for i, cpath in enumerate(chunk_paths):
+            chunk_mb = cpath.stat().st_size / (1024 * 1024)
+            print(f"[transcribe] chunk {i+1}/{num_chunks} ({chunk_mb:.1f} MB)...", flush=True)
+            if on_progress:
+                on_progress(i + 1, num_chunks, f"chunk {i+1}/{num_chunks}")
+            try:
+                with open(str(cpath), "rb") as cf:
+                    text = _call_whisper(client, cf, cpath.name)
+                char_count = len(text)
+                print(f"[transcribe] chunk {i+1} done: {char_count} chars", flush=True)
+                transcripts.append(text)
+            finally:
+                cpath.unlink(missing_ok=True)
+
+        total_chars = sum(len(t) for t in transcripts)
+        print(f"[transcribe] all done: {num_chunks} chunks, {total_chars} total chars", flush=True)
+        return " ".join(transcripts), num_chunks
+
+    finally:
+        if norm_path and norm_path.exists():
+            norm_path.unlink(missing_ok=True)
 
 
 @app.post("/api/meeting/transcribe")
