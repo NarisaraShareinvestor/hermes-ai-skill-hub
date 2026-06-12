@@ -91,4 +91,6 @@ redis_data/
 *.key
 *.crt
 secrets/
-pass.md/                            
+pass.md/
+ssl/
+*.bak
