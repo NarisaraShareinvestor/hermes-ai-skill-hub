@@ -1418,11 +1418,59 @@ async def meeting_transcribe(
             pass
 
 
+# ── Async transcription jobs (large files) ───────────────────────────────────
+# A 70-min recording → normalise + 4 chunks + 4 Whisper calls takes minutes,
+# far beyond nginx (60s) and Cloudflare Free (~100s) timeouts. So
+# /transcribe-large starts a background thread and returns a job_id at once;
+# the client polls /transcribe-status/{job_id}. uvicorn runs a single worker
+# (no --workers), so an in-process dict is a safe job store.
+_transcription_jobs = {}  # job_id -> {status, progress, total, message, transcript, ...}
+_TRANSCRIPTION_JOBS_MAX = 100
+
+
+def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, filename: str):
+    """Worker thread — owns its own event loop. The pipeline does blocking
+    subprocess (ffmpeg) + sync OpenAI calls, so it must NOT run on the main
+    event loop or it would block status polls (the whole point of going async)."""
+    job = _transcription_jobs.get(job_id)
+    if job is None:
+        return
+    # The OpenAI client honours SOCKS proxy env vars that break httpx — strip them.
+    _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
+    _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
+    try:
+        def on_progress(cur, total, msg):
+            job["progress"] = cur
+            job["total"] = total
+            job["message"] = msg
+        transcript, num_chunks = asyncio.run(
+            _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=on_progress)
+        )
+        job["transcript"] = transcript
+        job["chunks_processed"] = num_chunks
+        job["status"] = "done"
+    except Exception as e:
+        job["status"] = "error"
+        job["error"] = str(e)
+        print(f"[transcribe] job {job_id} failed: {e}", flush=True)
+    finally:
+        for k, v in _saved_env.items():
+            if v is not None:
+                os.environ[k] = v
+        try:
+            audio_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 @app.post("/api/meeting/transcribe-large")
 async def meeting_transcribe_large(
     file: UploadFile = File(...),
 ):
-    """Transcribe large audio files with chunking (supports up to 500 MB)."""
+    """Start an async transcription job for large audio/video (up to 500 MB).
+
+    Returns {job_id, status} immediately; poll /api/meeting/transcribe-status/{job_id}.
+    """
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         raise HTTPException(400, "OPENAI_API_KEY ยังไม่ได้ตั้งค่า")
@@ -1445,27 +1493,52 @@ async def meeting_transcribe_large(
     audio_path = UPLOAD_DIR / saved_name
     audio_path.write_bytes(content)
 
-    _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
-    _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
-    try:
-        transcript, num_chunks = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
-        file_size_mb = len(content) / (1024 * 1024)
-        return {
-            "transcript": transcript,
-            "chunks_processed": num_chunks,
-            "file_size_mb": round(file_size_mb, 2),
-            "filename": file.filename or saved_name
-        }
-    except Exception as e:
-        raise HTTPException(500, f"Transcription error: {str(e)}")
-    finally:
-        for k, v in _saved_env.items():
-            if v is not None:
-                os.environ[k] = v
-        try:
-            audio_path.unlink(missing_ok=True)
-        except Exception:
-            pass
+    # Evict old finished jobs so the in-memory store can't grow unbounded.
+    if len(_transcription_jobs) > _TRANSCRIPTION_JOBS_MAX:
+        for jid in [j for j, v in _transcription_jobs.items()
+                    if v.get("status") in ("done", "error")][:50]:
+            _transcription_jobs.pop(jid, None)
+
+    job_id = uuid.uuid4().hex
+    _transcription_jobs[job_id] = {
+        "status": "processing",
+        "progress": 0,
+        "total": 0,
+        "message": "starting",
+        "filename": file.filename or saved_name,
+        "file_size_mb": round(len(content) / (1024 * 1024), 2),
+    }
+    threading.Thread(
+        target=_run_transcription_job,
+        args=(job_id, audio_path, api_key, file.filename or "audio"),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "status": "processing"}
+
+
+@app.get("/api/meeting/transcribe-status/{job_id}")
+async def meeting_transcribe_status(job_id: str):
+    """Poll a transcription job. A 404 means the job is unknown or was lost
+    (e.g. the server restarted) — the client should treat that as a failure."""
+    job = _transcription_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    resp = {
+        "status": job["status"],
+        "progress": job.get("progress", 0),
+        "total": job.get("total", 0),
+        "message": job.get("message", ""),
+        "filename": job.get("filename", ""),
+        "file_size_mb": job.get("file_size_mb", 0),
+    }
+    if job["status"] == "done":
+        resp["transcript"] = job.get("transcript", "")
+        resp["chunks_processed"] = job.get("chunks_processed", 0)
+        _transcription_jobs.pop(job_id, None)  # one-shot: free memory once delivered
+    elif job["status"] == "error":
+        resp["error"] = job.get("error", "unknown error")
+        _transcription_jobs.pop(job_id, None)
+    return resp
 
 
 @app.post("/api/telegram/draft-email")
