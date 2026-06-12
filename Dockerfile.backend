@@ -3,9 +3,12 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
+# ffmpeg + ffprobe are required by the meeting transcription pipeline
+# (audio/video normalisation, duration detection, time-based chunking).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
