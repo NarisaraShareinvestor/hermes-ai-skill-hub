@@ -3754,6 +3754,43 @@ function miSelectMode(cardId, mode) {
   });
 }
 
+// Transcribe an audio/video file. Small files (≤25MB) = one synchronous call.
+// Large files = async job + polling, which beats the nginx (60s) and
+// Cloudflare Free (~100s) timeouts that would 504 a multi-minute request.
+// onProgress(cur, total, message) fires on each poll for large files.
+// Returns { transcript, chunks_processed }.
+async function miTranscribeFile(file, isLargeFile, onProgress) {
+  const form = new FormData();
+  form.append('file', file);
+
+  if (!isLargeFile) {
+    const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `Transcription failed (${r.status})`); }
+    return await r.json();
+  }
+
+  // Large file: start a background job, then poll its status.
+  const startRes = await fetch(`${API}/api/meeting/transcribe-large`, { method: 'POST', body: form });
+  if (!startRes.ok) { const e = await startRes.json().catch(() => ({})); throw new Error(e.detail || `Transcription failed (${startRes.status})`); }
+  const { job_id } = await startRes.json();
+  if (!job_id) throw new Error('เซิร์ฟเวอร์ไม่ได้ส่ง job id กลับมา');
+
+  const POLL_MS = 3000, MAX_POLLS = 1200;  // ~60 min ceiling
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(res => setTimeout(res, POLL_MS));
+    let sr;
+    try { sr = await fetch(`${API}/api/meeting/transcribe-status/${job_id}`); }
+    catch (netErr) { continue; }  // transient network blip — keep polling
+    if (sr.status === 404) throw new Error('งานถอดเสียงหาย (เซิร์ฟเวอร์อาจรีสตาร์ท) — กรุณาลองใหม่');
+    if (!sr.ok) continue;
+    const s = await sr.json();
+    if (s.status === 'done') return { transcript: s.transcript || '', chunks_processed: s.chunks_processed || 0 };
+    if (s.status === 'error') throw new Error(s.error || 'Transcription error');
+    if (onProgress) onProgress(s.progress || 0, s.total || 0, s.message || '');
+  }
+  throw new Error('ถอดเสียงใช้เวลานานเกินกำหนด');
+}
+
 async function runMeetingFromChat(cardId, originalMsg) {
   const file = _pendingMeetingFile;
   if (!file) return;
@@ -3791,18 +3828,13 @@ async function runMeetingFromChat(cardId, originalMsg) {
     // Choose endpoint based on file size (25MB threshold)
     const fileSizeMB = file.size / (1024 * 1024);
     const isLargeFile = fileSizeMB > 25;
-    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
-
     if (isLargeFile) {
       setProgress(20, `กำลังถอดเสียง (${fileSizeMB.toFixed(1)} MB - แบ่งเป็น chunks)...`);
     }
 
-    const tRes = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: tForm });
-    if (!tRes.ok) {
-      const err = await tRes.json().catch(() => ({}));
-      throw new Error(err.detail || `Transcription failed (${tRes.status})`);
-    }
-    const tData = await tRes.json();
+    const tData = await miTranscribeFile(file, isLargeFile, (cur, total, msg) => {
+      if (total > 0) setProgress(20 + Math.round((cur / total) * 20), `กำลังถอดเสียง ${msg}...`);
+    });
     const rawTranscript = tData.transcript || '';
 
     // Log chunking info if applicable
@@ -5463,10 +5495,9 @@ async function miHandleAudio(input) {
   const form = new FormData();
   form.append('file', file);
   try {
-    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
-    const r = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: form });
-    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
-    const d = await r.json();
+    const d = await miTranscribeFile(file, isLargeFile, (cur, total, msg) => {
+      if (total > 0) $('miAudioStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียง ${file.name} — ${msg} (${cur}/${total})...</div>`;
+    });
     _miCurrentText = d.transcript || '';
 
     let successMsg = `✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร)`;
@@ -5544,10 +5575,9 @@ async function _miTranscribeRecording(blob, mimeType) {
 
   $('miRecordFileStatus').innerHTML = `<div class="mi-status-msg">${statusMsg}</div>`;
   try {
-    const transcribeEndpoint = isLargeFile ? '/api/meeting/transcribe-large' : '/api/meeting/transcribe';
-    const r = await fetch(`${API}${transcribeEndpoint}`, { method: 'POST', body: form });
-    if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.statusText); }
-    const d = await r.json();
+    const d = await miTranscribeFile(file, isLargeFile, (cur, total, msg) => {
+      if (total > 0) $('miRecordFileStatus').innerHTML = `<div class="mi-status-msg">⏳ กำลังถอดเสียง — ${msg} (${cur}/${total})...</div>`;
+    });
     _miCurrentText = d.transcript || '';
 
     let successMsg = `✅ ถอดเสียงสำเร็จ (${_miCurrentText.length.toLocaleString()} ตัวอักษร)`;
