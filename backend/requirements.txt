@@ -11,3 +11,4 @@ openai==2.41.0
 passlib==1.7.4
 bcrypt==3.2.2
 python-jose==3.5.0
+python-multipart==0.0.6
