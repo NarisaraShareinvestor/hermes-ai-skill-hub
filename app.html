@@ -2830,7 +2830,7 @@
 <div id="toast"></div>
 
 <script>
-const API = (!window.location.hostname || window.location.hostname === 'localhost') ? 'http://localhost:8000' : `${window.location.protocol}//${window.location.hostname}/api`;
+const API = (!window.location.hostname || window.location.hostname === 'localhost') ? 'http://localhost:8000' : `${window.location.protocol}//${window.location.hostname}`;
 let chatHistory = [];
 let lastSkillId = null;
 let CURRENT_ROLE = 'member';
