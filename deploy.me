@@ -1,0 +1,46 @@
+Workflow ในการ Update Code:
+Step 1: Push Code ไป GitHub
+ที่ local machine:
+
+
+cd ~/Projects/hermes-ai-skill-hub
+
+git add .
+git commit -m "Update feature/fix"
+git push origin main
+Step 2: Pull Code บน Server
+บน SSH:
+
+
+cd /var/www/hermes-ai-skill-hub
+
+git pull origin main
+Step 3: Rebuild & Restart
+
+# Rebuild Docker images
+docker-compose -f docker-compose.prod.yml build --no-cache
+
+# Restart services
+docker-compose -f docker-compose.prod.yml up -d
+
+# Check logs
+docker-compose -f docker-compose.prod.yml logs -f backend
+วิธีง่ายสุด - สร้าง Deploy Script:
+บน SSH สร้าง script:
+
+
+cat > /usr/local/bin/deploy-hermes.sh << 'EOF'
+#!/bin/bash
+cd /var/www/hermes-ai-skill-hub
+git pull origin main
+docker-compose -f docker-compose.prod.yml build --no-cache
+docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml logs -f backend
+EOF
+
+chmod +x /usr/local/bin/deploy-hermes.sh
+ตอนนี้ Update ได้ง่ายๆ:
+
+# รันแค่คำสั่งนี้
+deploy-hermes.sh
+อยากให้ผมสร้าง auto-deploy ที่ pull เอง หรือแค่นี้พอ? 👈

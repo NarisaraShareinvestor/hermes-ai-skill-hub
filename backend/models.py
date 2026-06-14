@@ -214,6 +214,9 @@ class MemoryType(str, enum.Enum):
     CHAT = "chat"
     CUSTOM = "custom"
     PREFERENCE = "preference"
+    FACT = "fact"          # ข้อเท็จจริงระยะยาวที่สกัดจากบทสนทนาอัตโนมัติ
+    BEHAVIOR = "behavior"  # พฤติกรรมการใช้งาน (intent ที่ทำซ้ำ, skill ที่ใช้) สำหรับ auto-skill suggestion
+    TRANSCRIPT = "transcript"  # transcript ล่าสุดที่ user ถอดเสียง — ให้ chat ถาม-ตอบ/สรุปต่อได้
 
 
 class UserMemory(Base):

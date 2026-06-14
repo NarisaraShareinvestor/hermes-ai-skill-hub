@@ -1007,6 +1007,98 @@
     padding: 16px;
     max-width: 420px;
   }
+  /* ── Full Transcript — big result card ── */
+  .msg-wide { max-width: 96% !important; width: 96%; }
+  .msg-wide .msg-bubble { width: 100%; background: transparent !important; padding: 0 !important; }
+  .mi-transcript-card {
+    background: #fff; border: 1.5px solid #e5e7eb; border-radius: 14px;
+    padding: 18px 22px; width: 100%;
+    box-shadow: 0 1px 3px rgba(15,23,42,.05);
+  }
+  .tr-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tr-title {
+    font-size: 12.5px; font-weight: 800; color: #2563eb;
+    letter-spacing: .6px; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tr-actions { margin-left: auto; display: flex; gap: 8px; }
+  .tr-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: #374151;
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+    padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .tr-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+  .tr-meta {
+    font-size: 12px; color: #6b7280; display: flex; gap: 16px; flex-wrap: wrap;
+    padding-bottom: 12px; border-bottom: 1px solid #f3f4f6;
+  }
+  .tr-meta b { color: #374151; font-weight: 600; }
+  .tr-body { max-height: 480px; overflow-y: auto; }
+  .tr-body.expanded { max-height: none; }
+  .tr-row { display: flex; gap: 14px; padding: 12px 2px; border-bottom: 1px solid #f3f4f6; }
+  .tr-row:last-child { border-bottom: none; }
+  .tr-ts {
+    flex: 0 0 56px; font-size: 12px; font-weight: 700; color: #6b7280;
+    font-variant-numeric: tabular-nums; padding-top: 2px;
+  }
+  .tr-text { font-size: 13px; line-height: 1.8; color: #1f2937; }
+  .tr-spk { font-weight: 700; margin-right: 6px; }
+  .tr-foot {
+    display: flex; justify-content: flex-end; gap: 18px;
+    font-size: 12px; color: #6b7280;
+    padding-top: 10px; border-top: 1px solid #f3f4f6;
+  }
+  .tr-foot b { color: #374151; }
+  /* สีหัวการ์ดตามชนิดผลลัพธ์ */
+  .tr-title.green  { color: #16a34a; }
+  .tr-title.violet { color: #7c3aed; }
+  .tr-title.orange { color: #ea580c; }
+  /* section ภายในการ์ดใหญ่ */
+  .tr-sec { margin-top: 16px; }
+  .tr-sec:first-child { margin-top: 4px; }
+  .tr-sec-h {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 800; color: #374151;
+    letter-spacing: .4px; text-transform: uppercase; margin-bottom: 8px;
+  }
+  .tr-sec-h .cnt {
+    background: #eef2ff; color: #4f46e5; border-radius: 999px;
+    font-size: 10.5px; padding: 1px 8px;
+  }
+  .tr-box {
+    font-size: 13px; line-height: 1.75; color: #1f2937;
+    background: #f9fafb; border: 1px solid #f3f4f6;
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .tr-li {
+    display: flex; gap: 10px; padding: 8px 2px;
+    border-bottom: 1px solid #f3f4f6; font-size: 13px; line-height: 1.65;
+  }
+  .tr-li:last-child { border-bottom: none; }
+  .tr-li .n {
+    flex: 0 0 22px; height: 22px; border-radius: 6px;
+    background: #eef2ff; color: #4f46e5; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .tr-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor; display: inline-block; flex: 0 0 auto;
+  }
+  .tr-sec-h::before {
+    content: ""; width: 3px; height: 13px;
+    background: #cbd5e1; border-radius: 2px; flex: 0 0 auto;
+  }
+  .tr-badge-high {
+    color: #dc2626; font-size: 10px; font-weight: 700;
+    background: #fef2f2; border: 1px solid #fecaca;
+    border-radius: 5px; padding: 1px 6px; margin-left: 6px;
+  }
+  .tr-actions-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding-top: 12px; border-top: 1px solid #f3f4f6; margin-top: 14px;
+  }
+  .tr-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tr-btn.primary:hover { opacity: .92; background: var(--accent); }
   .mi-analysis-success {
     display: flex; align-items: center; gap: 7px;
     font-size: 13px; font-weight: 700; color: #15803d;
@@ -3573,6 +3665,28 @@ async function sendChat() {
     appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
     chatHistory.push({ role:'assistant', content: reply });
 
+    // Auto-Skill Generator: Hermes คิด skill ให้จากพฤติกรรม → การ์ดพร้อมปุ่มตัดสินใจ
+    if (d.skill_suggestion) appendSkillSuggestionCard(d.skill_suggestion);
+
+    // Draft Email popup: open modal with pre-filled content from chat
+    if (d.draft_email) {
+      if (!_contacts || _contacts.length === 0) await loadContacts().catch(() => {});
+      if (!_dirPeople || _dirPeople.length === 0) await loadDirPeople().catch(() => {});
+      // Auto-fill To from last meeting participants
+      const emailParticipants = _lastMeetingData?.participants || [];
+      const resolvedTo = [];
+      for (const name of emailParticipants) {
+        const re = resolveNameToEmail(name);
+        if (re && !resolvedTo.includes(re)) resolvedTo.push(re);
+        else if (name && !resolvedTo.includes(name)) resolvedTo.push(name);
+      }
+      $('emailTo').value      = resolvedTo.join(', ');
+      $('emailSubject').value = d.draft_email.subject || '';
+      $('emailBody').value    = d.draft_email.body    || '';
+      $('emailDraftLoading').style.display = 'none';
+      openModal('draftEmailModal');
+    }
+
     // Suggested Skills panel
     if (d.suggested_skills?.length) {
       $('suggestedSkills').innerHTML = d.suggested_skills.map(s => `
@@ -3762,6 +3876,7 @@ function miSelectMode(cardId, mode) {
 async function miTranscribeFile(file, isLargeFile, onProgress) {
   const form = new FormData();
   form.append('file', file);
+  form.append('user_email', getUserEmail());  // ให้ backend เก็บ transcript ผูกกับ user → chat ถาม-ตอบต่อได้
 
   if (!isLargeFile) {
     const r = await fetch(`${API}/api/meeting/transcribe`, { method: 'POST', body: form });
@@ -3789,6 +3904,12 @@ async function miTranscribeFile(file, isLargeFile, onProgress) {
     if (onProgress) onProgress(s.progress || 0, s.total || 0, s.message || '');
   }
   throw new Error('ถอดเสียงใช้เวลานานเกินกำหนด');
+}
+
+async function _miJson(r) {
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || `เซิร์ฟเวอร์ตอบ ${r.status}`);
+  return data;
 }
 
 async function runMeetingFromChat(cardId, originalMsg) {
@@ -3863,11 +3984,11 @@ async function runMeetingFromChat(cardId, originalMsg) {
       const extractData = await fetch(`${API}/api/meeting/extract`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ text: transcript, user_email: getUserEmail() })
-      }).then(r => r.json()).catch(() => ({}));
+      }).then(_miJson).catch(() => ({}));
       const emailData = await fetch(`${API}/api/meeting/draft-email`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ meeting_text: transcript, participants: extractData.participants || [], action_items: extractData.action_items || [], user_email: getUserEmail() })
-      }).then(r => r.json()).catch(() => ({}));
+        body: JSON.stringify({ meeting_text: transcript, title: extractData.title || '', date: extractData.date || '', participants: extractData.participants || [], action_items: extractData.action_items || [], user_email: getUserEmail() })
+      }).then(_miJson);
       setProgress(100, 'เสร็จสิ้น');
       _lastMeetingData = { ...extractData, email_subject: emailData.subject || '', email_body: emailData.body || '', transcript };
       progressBubble.remove();
@@ -3878,7 +3999,7 @@ async function runMeetingFromChat(cardId, originalMsg) {
       const intelData = await fetch(`${API}/api/meeting/analyze-intelligence`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ text: transcript, user_email: getUserEmail() })
-      }).then(r => r.json());
+      }).then(_miJson);
       setProgress(100, 'เสร็จสิ้น');
       _lastMeetingData = { ...intelData, transcript };
       _lastReportText  = intelData.executive_summary || transcript;
@@ -3889,17 +4010,21 @@ async function runMeetingFromChat(cardId, originalMsg) {
     } else {
       // Quick Summary (default)
       setProgress(50, 'กำลังวิเคราะห์...');
+      // แต่ละส่วนพังได้โดยไม่ล้มทั้งหมด — แสดงเท่าที่วิเคราะห์สำเร็จ
       const [sumData, extractData, momData] = await Promise.all([
-        fetch(`${API}/api/meeting/generate-summary`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
-        fetch(`${API}/api/meeting/extract`,          { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
-        fetch(`${API}/api/meeting/generate-mom`,     { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(r => r.json()),
+        fetch(`${API}/api/meeting/generate-summary`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(_miJson).catch(() => ({})),
+        fetch(`${API}/api/meeting/extract`,          { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(_miJson).catch(() => ({})),
+        fetch(`${API}/api/meeting/generate-mom`,     { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: transcript, user_email: getUserEmail() }) }).then(_miJson).catch(() => ({})),
       ]);
+      if (!sumData.summary && !extractData.title && !momData.mom) {
+        throw new Error('วิเคราะห์การประชุมไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง');
+      }
       setProgress(85, 'กำลังร่างอีเมล...');
       const actionItems = Array.isArray(extractData.action_items) ? extractData.action_items : [];
       const emailData = await fetch(`${API}/api/meeting/draft-email`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ meeting_text: transcript, participants: extractData.participants || [], action_items: actionItems, user_email: getUserEmail() })
-      }).then(r => r.json()).catch(() => ({}));
+        body: JSON.stringify({ meeting_text: transcript, title: extractData.title || '', date: extractData.date || '', participants: extractData.participants || [], action_items: actionItems, user_email: getUserEmail() })
+      }).then(_miJson).catch(() => ({}));
       setProgress(100, 'เสร็จสิ้น');
 
       _lastMeetingData = { ...extractData, summary: sumData.summary || '', mom: momData.mom || '', email_subject: emailData.subject || '', email_body: emailData.body || '', transcript };
@@ -3946,101 +4071,248 @@ function _stripMd(text) {
 }
 
 function appendMeetingAnalysisCard(d) {
+  const esc = s => (s ?? '').toString().replace(/</g,'&lt;');
   const title   = _stripMd(d.title || 'รายงานการประชุม');
   const date    = d.date || new Date().toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' });
   const parts   = Array.isArray(d.participants) ? d.participants : [];
   const actions = Array.isArray(d.action_items)  ? d.action_items  : [];
   const summary = d.summary || '';
+  const mom     = d.mom || '';
 
-  // Clean bullet points from summary
   const bullets = summary.split('\n')
     .map(l => l.trim())
-    .filter(l => l && !l.match(/^#+/) && !l.match(/^\*\*[^*]+\*\*\s*[-:]/))
+    .filter(l => l && !l.match(/^#+/))
     .map(l => _stripMd(l.replace(/^[-*•]\s*|\d+\.\s*/,'')))
     .filter(l => l.length > 4)
-    .slice(0, 5);
+    .slice(0, 10);
 
-  const summaryBody = bullets.length
-    ? `<ul style="margin:0;padding-left:16px;">${bullets.map(b=>`<li style="margin-bottom:3px;">${b.replace(/</g,'&lt;')}</li>`).join('')}</ul>`
-    : `<div style="color:var(--muted);font-size:12px;">-</div>`;
+  const actLine = (a, i) => {
+    const task  = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
+    const owner = typeof a==='object' && a.owner ? ` — ${a.owner}` : '';
+    const due   = typeof a==='object' && (a.due||a.deadline) ? ` (${a.due||a.deadline})` : '';
+    return `${i+1}. ${task}${owner}${due}`;
+  };
 
-  const actionItemsHtml = actions.length
-    ? `<ol style="margin:0;padding-left:18px;">${actions.map(a => {
+  const uid = '_miSum_' + Date.now();
+  window[uid] = `${title} (${date})\n\nสรุปประเด็นสำคัญ\n${bullets.map(b=>'• '+b).join('\n')}` +
+    `\n\nAction Items\n${actions.map(actLine).join('\n') || '-'}` +
+    (mom ? `\n\n${'='.repeat(30)}\nรายงานการประชุม (MOM)\n${mom}` : '') +
+    (d.email_subject ? `\n\n${'='.repeat(30)}\nSubject: ${d.email_subject}\n\n${d.email_body||''}` : '');
+  window[uid + '_name'] = title + '_summary';
+  const bodyId = uid + '_body';
+
+  const bulletHtml = bullets.length
+    ? bullets.map((b,i)=>`<div class="tr-li"><div class="n">${i+1}</div><div>${esc(b)}</div></div>`).join('')
+    : '<div style="font-size:12px;color:var(--muted);">-</div>';
+
+  const actionHtml = actions.length
+    ? actions.map((a,i)=>{
         const task  = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
-        const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);font-size:11px;"> — ${a.owner}</span>` : '';
-        const due   = typeof a==='object' && a.due   ? `<span style="color:var(--muted);font-size:11px;"> · ${a.due}</span>` : '';
-        return `<li style="margin-bottom:5px;font-size:12px;line-height:1.5;">${task.replace(/</g,'&lt;')}${owner}${due}</li>`;
-      }).join('')}</ol>`
+        const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);"> — ${esc(a.owner)}</span>` : '';
+        const due   = typeof a==='object' && (a.due||a.deadline) ? `<span style="color:var(--muted);"> · ${esc(a.due||a.deadline)}</span>` : '';
+        return `<div class="tr-li"><div class="n">${i+1}</div><div>${esc(task)}${owner}${due}</div></div>`;
+      }).join('')
     : '<div style="font-size:12px;color:var(--muted);">ไม่พบ action items</div>';
 
-
-  _appendRawBotMsg(`
-    <div class="mi-analysis-card">
-      <div class="mi-analysis-title">${title.replace(/</g,'&lt;')}</div>
-      <div class="mi-analysis-meta">
-        <span>${date}</span>
-        ${parts.length ? `<span>${parts.length} ผู้เข้าร่วม</span>` : ''}
-        ${actions.length ? `<span>${actions.length} Action Items</span>` : ''}
+  const div = _appendRawBotMsg(`
+    <div class="mi-transcript-card">
+      <div class="tr-head">
+        <span class="tr-title green"><span class="tr-dot"></span>QUICK SUMMARY</span>
+        <div class="tr-actions">
+          <button class="tr-btn" onclick="_dlTranscript('${uid}')">Download .txt</button>
+          <button class="tr-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy</button>
+          <button class="tr-btn" onclick="_trExpand('${bodyId}', this)">ขยาย</button>
+        </div>
       </div>
-      <details class="mi-analysis-section" open>
-        <summary>สรุปประเด็นสำคัญ</summary>
-        <div class="mi-analysis-section-body">${summaryBody}</div>
-      </details>
-      <details class="mi-analysis-section">
-        <summary>Action Items (${actions.length})</summary>
-        <div class="mi-analysis-section-body">${actionItemsHtml}</div>
-      </details>
-      <div class="mi-analysis-actions">
-        <button class="mi-analysis-action-btn primary" onclick="showPanel('meeting')">View Full Report</button>
-        <button class="mi-analysis-action-btn" onclick="openDraftEmail()">Draft Follow-up Email</button>
-        <button class="mi-analysis-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      <div class="tr-meta">
+        <span><b>${esc(title)}</b></span>
+        <span>${esc(date)}</span>
+        ${parts.length ? `<span>ผู้เข้าร่วม: <b>${parts.length}</b></span>` : ''}
+        <span>Action Items: <b>${actions.length}</b></span>
       </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding:3px 8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:5px;font-size:10px;font-weight:600;color:#0369a1;width:fit-content;">
-      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/></svg>
-      Meeting Intelligence Assistant
+      <div class="tr-body" id="${bodyId}">
+        <div class="tr-sec"><div class="tr-sec-h">สรุปประเด็นสำคัญ</div>${bulletHtml}</div>
+        <div class="tr-sec"><div class="tr-sec-h">Action Items <span class="cnt">${actions.length}</span></div>${actionHtml}</div>
+        ${mom ? `<div class="tr-sec"><div class="tr-sec-h">รายงานการประชุม (MOM)</div><div class="tr-box">${mdToHtml(mom)}</div></div>` : ''}
+        ${d.email_subject ? `<div class="tr-sec"><div class="tr-sec-h">ร่างอีเมล Follow-up</div><div class="tr-box"><b>${esc(d.email_subject)}</b><br><br>${esc(d.email_body||'').replace(/\n/g,'<br>')}</div></div>` : ''}
+      </div>
+      <div class="tr-actions-row">
+        <button class="tr-btn primary" onclick="showPanel('meeting')">View Full Report</button>
+        <button class="tr-btn" onclick="openDraftEmail()">Draft Follow-up Email</button>
+        <button class="tr-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      </div>
+      <div class="tr-foot"><span>Quick Summary · Meeting Intelligence Assistant</span></div>
     </div>`);
+  div.classList.add('msg-wide');
+}
+
+// ── Auto-Skill Generator: การ์ด suggestion + ปุ่มตัดสินใจ ──────────────────────
+function appendSkillSuggestionCard(sug) {
+  const esc = s => (s ?? '').toString().replace(/</g,'&lt;');
+  const isInstall = sug.type === 'install';
+  const uid = '_sugCard_' + Date.now();
+  const div = _appendRawBotMsg(`
+    <div class="mi-transcript-card" id="${uid}" style="border-color:#c7d2fe;background:linear-gradient(160deg,#fafbff,#fff);">
+      <div class="tr-head">
+        <span class="tr-title" style="color:#4f46e5;"><span class="tr-dot"></span>AUTO-SKILL GENERATOR</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">จากพฤติกรรมการใช้งานของคุณ</span>
+      </div>
+      <div style="font-size:15px;font-weight:800;color:#1f2937;margin:6px 0 4px;">
+        ${esc(sug.name)}
+      </div>
+      <div style="font-size:13px;color:#4b5563;line-height:1.7;">${esc(sug.description || '')}</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:8px;">
+        คุณสั่งงานแบบ "<b>${esc(sug.intent_desc || sug.intent)}</b>" มาแล้ว <b>${sug.count || 0}</b> ครั้ง
+        ${isInstall ? '— มี Skill นี้ใน Store อยู่แล้ว ติดตั้งได้เลย' : '— Hermes ออกแบบ Skill นี้ให้เฉพาะคุณ'}
+      </div>
+      ${!isInstall && sug.prompt_template ? `
+      <details style="margin-top:10px;">
+        <summary style="font-size:12px;color:#4f46e5;cursor:pointer;font-weight:600;">ดู Prompt ที่ออกแบบให้</summary>
+        <div class="tr-box" style="margin-top:8px;font-size:12px;white-space:pre-wrap;">${esc(sug.prompt_template)}</div>
+      </details>` : ''}
+      <div class="tr-actions-row">
+        <button class="tr-btn primary" onclick="acceptSkillSuggestion('${uid}')">
+          ${isInstall ? 'ติดตั้งเลย' : 'สร้าง Skill เลย'}</button>
+        <button class="tr-btn" onclick="dismissSkillSuggestion('${uid}')">ไม่ต้อง ขอบคุณ</button>
+      </div>
+    </div>`);
+  div.classList.add('msg-wide');
+}
+
+async function acceptSkillSuggestion(cardId) {
+  const card = document.getElementById(cardId);
+  try {
+    const r = await fetch(`${API}/api/skills/suggestions/${encodeURIComponent(getUserEmail())}/accept`, { method:'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'ไม่สำเร็จ');
+    if (card) card.querySelector('.tr-actions-row').innerHTML =
+      `<span style="font-size:13px;font-weight:700;color:#16a34a;">✅ ${d.action === 'installed' ? 'ติดตั้งแล้ว' : 'สร้างแล้ว'}: ${d.name} (#${d.id})</span>`;
+    toast(`${d.action === 'installed' ? 'ติดตั้ง' : 'สร้าง'} Skill "${d.name}" สำเร็จ`, 'success');
+    if (typeof loadMySkills === 'function') loadMySkills();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function dismissSkillSuggestion(cardId) {
+  const card = document.getElementById(cardId);
+  try {
+    await fetch(`${API}/api/skills/suggestions/${encodeURIComponent(getUserEmail())}/dismiss`, { method:'POST' });
+    if (card) card.querySelector('.tr-actions-row').innerHTML =
+      `<span style="font-size:12px;color:#6b7280;">รับทราบ — จะไม่เสนอ Skill นี้อีก</span>`;
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+const _SPK_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0d9488','#db2777','#ca8a04','#4f46e5'];
+
+function _dlTranscript(uid) {
+  const blob = new Blob([window[uid] || ''], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (window[uid + '_name'] || 'transcript').replace(/\.[^.]+$/, '') + '_transcript.txt';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function _trExpand(bodyId, btn) {
+  const el = document.getElementById(bodyId);
+  const expanded = el.classList.toggle('expanded');
+  btn.textContent = expanded ? 'ย่อ' : 'ขยาย';
 }
 
 function appendTranscriptCard(transcript, filename) {
-  const lines = transcript.split('\n').filter(l => l.trim());
-  const html = lines.map(l => `<div style="padding:3px 0;border-bottom:1px solid #f3f4f6;font-size:12px;line-height:1.6;">${l.replace(/</g,'&lt;')}</div>`).join('');
   const uid = '_miTxt_' + Date.now();
   window[uid] = transcript;
-  _appendRawBotMsg(`
-    <div class="mi-analysis-card">
-      <div style="font-size:11px;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Full Transcript</div>
-      <div style="font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">${(filename||'').replace(/</g,'&lt;')}</div>
-      <div style="max-height:320px;overflow-y:auto;">${html || '<div style="color:var(--muted);">ไม่พบเนื้อหา</div>'}</div>
-      <div class="mi-analysis-actions" style="margin-top:12px;">
-        <button class="mi-analysis-action-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Transcript</button>
+  window[uid + '_name'] = filename || 'transcript';
+  const bodyId = uid + '_body';
+  const esc = s => (s || '').replace(/</g, '&lt;');
+
+  // บรรทัดรูปแบบ "[MM:SS] ผู้พูด A: ..." จาก backend (ผู้พูดอาจไม่มีถ้าพูดคนเดียว)
+  const re = /^\[(\d+:\d{2}(?::\d{2})?)\]\s*(?:ผู้พูด\s*([^\s:]+)\s*:)?\s*(.*)$/;
+  const speakers = [];
+  let lastTs = '';
+  const rows = transcript.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const m = l.match(re);
+    if (!m) return `<div class="tr-row"><div class="tr-ts"></div><div class="tr-text">${esc(l)}</div></div>`;
+    const ts = m[1], spk = m[2], text = m[3];
+    lastTs = ts;
+    let spkHtml = '';
+    if (spk) {
+      if (!speakers.includes(spk)) speakers.push(spk);
+      const color = _SPK_COLORS[speakers.indexOf(spk) % _SPK_COLORS.length];
+      spkHtml = `<span class="tr-spk" style="color:${color}">ผู้พูด ${esc(spk)}:</span>`;
+    }
+    return `<div class="tr-row"><div class="tr-ts">[${ts}]</div><div class="tr-text">${spkHtml}${esc(text)}</div></div>`;
+  }).join('');
+
+  const spkFoot = speakers.length
+    ? `<span>Speakers: <b>${speakers.length} (${speakers.map(esc).join(', ')})</b></span>` : '';
+
+  const div = _appendRawBotMsg(`
+    <div class="mi-transcript-card">
+      <div class="tr-head">
+        <span class="tr-title"><span class="tr-dot"></span>FULL TRANSCRIPT</span>
+        <div class="tr-actions">
+          <button class="tr-btn" onclick="_dlTranscript('${uid}')">Download .txt</button>
+          <button class="tr-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Transcript</button>
+          <button class="tr-btn" onclick="_trExpand('${bodyId}', this)">ขยาย</button>
+        </div>
       </div>
+      <div class="tr-meta">
+        <span>ไฟล์ต้นฉบับ: <b>${esc(filename)}</b></span>
+        ${lastTs ? `<span>ความยาว: <b>${lastTs}</b></span>` : ''}
+      </div>
+      <div class="tr-body" id="${bodyId}">${rows || '<div style="color:var(--muted);padding:12px 0;">ไม่พบเนื้อหา</div>'}</div>
+      <div class="tr-foot">${lastTs ? `<span>Total <b>${lastTs}</b></span>` : ''}${spkFoot}</div>
     </div>`);
+  div.classList.add('msg-wide');
 }
 
 function appendEmailDraftCard(d) {
+  const esc = s => (s ?? '').toString().replace(/</g,'&lt;');
   const subject = d.subject || '';
-  const body    = (d.body || '').replace(/\n/g,'<br>').replace(/</g,'&lt;').replace(/&lt;br>/g,'<br>');
+  const bodyTxt = d.body || '';
+
+  if (!subject && !bodyTxt) {
+    _appendRawBotMsg(`<div style="color:#dc2626;font-size:12.5px;">ร่างอีเมลไม่สำเร็จ — กรุณาลองใหม่อีกครั้ง</div>`);
+    return;
+  }
+
   const uid = '_miEmail_' + Date.now();
-  window[uid] = subject + '\n\n' + (d.body || '');
-  _appendRawBotMsg(`
-    <div class="mi-analysis-card">
-      <div style="font-size:11px;font-weight:700;color:#ea580c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Draft Follow-up Email</div>
-      <div style="margin-bottom:10px;">
-        <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;">Subject</div>
-        <div style="font-size:12px;font-weight:600;color:var(--ink);padding:7px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;">${subject.replace(/</g,'&lt;')}</div>
+  window[uid] = subject + '\n\n' + bodyTxt;
+  window[uid + '_name'] = 'email_draft';
+  const bodyId = uid + '_body';
+
+  const div = _appendRawBotMsg(`
+    <div class="mi-transcript-card">
+      <div class="tr-head">
+        <span class="tr-title orange"><span class="tr-dot"></span>DRAFT FOLLOW-UP EMAIL</span>
+        <div class="tr-actions">
+          <button class="tr-btn" onclick="_dlTranscript('${uid}')">Download .txt</button>
+          <button class="tr-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Email</button>
+          <button class="tr-btn" onclick="_trExpand('${bodyId}', this)">ขยาย</button>
+        </div>
       </div>
-      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;">Body</div>
-      <div style="font-size:12px;line-height:1.7;padding:10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;max-height:260px;overflow-y:auto;">${body}</div>
-      <div class="mi-analysis-actions" style="margin-top:12px;">
-        <button class="mi-analysis-action-btn primary" onclick="openDraftEmail()">Open in Email Composer</button>
-        <button class="mi-analysis-action-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Email</button>
+      <div class="tr-meta">
+        <span>Subject: <b>${esc(subject) || '-'}</b></span>
       </div>
+      <div class="tr-body" id="${bodyId}">
+        <div class="tr-sec"><div class="tr-sec-h">เนื้อหาอีเมล</div>
+          <div class="tr-box" style="background:#fff7ed;border-color:#fed7aa;">${esc(bodyTxt).replace(/\n/g,'<br>')}</div>
+        </div>
+      </div>
+      <div class="tr-actions-row">
+        <button class="tr-btn primary" onclick="openDraftEmail()">Open in Email Composer</button>
+        <button class="tr-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      </div>
+      <div class="tr-foot"><span>Draft Email · Meeting Intelligence Assistant</span></div>
     </div>`);
+  div.classList.add('msg-wide');
 }
 
 function appendIntelligenceCard(d) {
+  const esc = s => (s ?? '').toString().replace(/</g,'&lt;');
   const title    = _stripMd(d.title || 'รายงานการประชุม');
+  const date     = d.date || '';
+  const parts    = Array.isArray(d.participants) ? d.participants : [];
   const summary  = d.executive_summary || '';
   const decisions = Array.isArray(d.decisions) ? d.decisions : [];
   const risks     = Array.isArray(d.risks) ? d.risks : [];
@@ -4048,62 +4320,79 @@ function appendIntelligenceCard(d) {
   const nextSteps = Array.isArray(d.next_steps) ? d.next_steps : [];
   const actions   = Array.isArray(d.action_items) ? d.action_items : [];
 
-  const listHtml = (items, key) => items.length
-    ? items.map(i => `<li style="margin-bottom:3px;">${(typeof i==='object' ? (i[key]||JSON.stringify(i)) : i).toString().replace(/</g,'&lt;')}</li>`).join('')
-    : '<li style="color:var(--muted);">-</li>';
+  const itemTxt = v => typeof v==='object' ? (v.decision||v.risk||v.step||JSON.stringify(v)) : v;
+  const numList = items => items.length
+    ? items.map((x,i)=>`<div class="tr-li"><div class="n">${i+1}</div><div>${esc(itemTxt(x))}</div></div>`).join('')
+    : '<div style="font-size:12px;color:var(--muted);">-</div>';
 
-  const timelineHtml = timeline.length
-    ? timeline.map(t => `<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px;font-size:11px;">
-        <span style="color:var(--muted);white-space:nowrap;min-width:60px;">${(t.date||'').replace(/</g,'&lt;')}</span>
-        <span>${(t.milestone||'').replace(/</g,'&lt;')}</span></div>`).join('')
-    : '<div style="font-size:11px;color:var(--muted);">-</div>';
+  const actHtml = actions.length
+    ? actions.map((a,i)=>{
+        const task  = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
+        const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);"> — ${esc(a.owner)}</span>` : '';
+        const due   = typeof a==='object' && (a.due||a.deadline) ? `<span style="color:var(--muted);"> · ${esc(a.due||a.deadline)}</span>` : '';
+        const pri   = typeof a==='object' && a.priority==='high' ? '<span class="tr-badge-high">HIGH</span>' : '';
+        return `<div class="tr-li"><div class="n">${i+1}</div><div>${esc(task)}${owner}${due}${pri}</div></div>`;
+      }).join('')
+    : '<div style="font-size:12px;color:var(--muted);">-</div>';
 
-  _appendRawBotMsg(`
-    <div class="mi-analysis-card">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;">
-        <div style="width:6px;height:6px;border-radius:50%;background:#7c3aed;"></div>
-        <span style="font-size:11px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.5px;">Meeting Intelligence</span>
-      </div>
-      <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px;">${title.replace(/</g,'&lt;')}</div>
-      ${summary ? `<div style="font-size:12px;line-height:1.6;color:var(--ink-2);padding:10px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;margin-bottom:12px;">${summary.replace(/</g,'&lt;')}</div>` : ''}
+  const tlHtml = timeline.length
+    ? timeline.map(t=>`<div class="tr-li"><div style="flex:0 0 95px;color:var(--muted);font-size:12px;font-weight:600;">${esc(t.date||'')}</div><div>${esc(t.milestone||'')}</div></div>`).join('')
+    : '<div style="font-size:12px;color:var(--muted);">-</div>';
 
-      <details class="mi-analysis-section" open>
-        <summary>Decisions (${decisions.length})</summary>
-        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(decisions,'decision')}</ul></div>
-      </details>
-      <details class="mi-analysis-section">
-        <summary>Risks &amp; Issues (${risks.length})</summary>
-        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(risks,'risk')}</ul></div>
-      </details>
-      <details class="mi-analysis-section">
-        <summary>Action Items (${actions.length})</summary>
-        <div class="mi-analysis-section-body">
-          <ol style="margin:0;padding-left:18px;">${actions.map(a => {
-            const task = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
-            const owner = typeof a==='object' && a.owner ? `<span style="color:var(--muted);"> — ${a.owner}</span>` : '';
-            const due   = typeof a==='object' && a.due   ? `<span style="color:var(--muted);"> · ${a.due}</span>` : '';
-            const pri   = typeof a==='object' && a.priority==='high' ? '<span style="color:#dc2626;font-size:10px;font-weight:600;margin-left:4px;">HIGH</span>' : '';
-            return `<li style="margin-bottom:5px;font-size:12px;">${task.replace(/</g,'&lt;')}${owner}${due}${pri}</li>`;
-          }).join('')}</ol>
+  const uid = '_miIntel_' + Date.now();
+  const actLine = (a,i) => {
+    const t = _stripMd(typeof a==='object' ? (a.task||a.description||'') : a);
+    const o = typeof a==='object' && a.owner ? ` — ${a.owner}` : '';
+    const du= typeof a==='object' && (a.due||a.deadline) ? ` (${a.due||a.deadline})` : '';
+    return `${i+1}. ${t}${o}${du}`;
+  };
+  window[uid] = [
+    `${title}${date ? ` (${date})` : ''}`, '',
+    'Executive Summary', summary, '',
+    `Decisions (${decisions.length})`, ...decisions.map((x,i)=>`${i+1}. ${itemTxt(x)}`), '',
+    `Risks (${risks.length})`, ...risks.map((x,i)=>`${i+1}. ${itemTxt(x)}`), '',
+    `Action Items (${actions.length})`, ...actions.map(actLine), '',
+    'Timeline', ...timeline.map(t=>`${t.date||''} — ${t.milestone||''}`), '',
+    'Next Steps', ...nextSteps.map((x,i)=>`${i+1}. ${itemTxt(x)}`),
+  ].join('\n');
+  window[uid + '_name'] = title + '_intelligence';
+  const bodyId = uid + '_body';
+
+  const div = _appendRawBotMsg(`
+    <div class="mi-transcript-card">
+      <div class="tr-head">
+        <span class="tr-title violet"><span class="tr-dot"></span>MEETING INTELLIGENCE</span>
+        <div class="tr-actions">
+          <button class="tr-btn" onclick="_dlTranscript('${uid}')">Download .txt</button>
+          <button class="tr-btn" onclick="navigator.clipboard.writeText(window['${uid}']).then(()=>toast('คัดลอกแล้ว','success'))">Copy Report</button>
+          <button class="tr-btn" onclick="_trExpand('${bodyId}', this)">ขยาย</button>
         </div>
-      </details>
-      <details class="mi-analysis-section">
-        <summary>Timeline</summary>
-        <div class="mi-analysis-section-body">${timelineHtml}</div>
-      </details>
-      <details class="mi-analysis-section">
-        <summary>Next Steps (${nextSteps.length})</summary>
-        <div class="mi-analysis-section-body"><ul style="margin:0;padding-left:16px;">${listHtml(nextSteps,'step')}</ul></div>
-      </details>
-      <div class="mi-analysis-actions">
-        <button class="mi-analysis-action-btn primary" onclick="openDraftEmail()">Draft Follow-up Email</button>
-        <button class="mi-analysis-action-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
       </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:5px;margin-top:8px;padding:3px 8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:5px;font-size:10px;font-weight:600;color:#7c3aed;width:fit-content;">
-      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="8,2 10,6 14,6.5 11,9.5 12,14 8,11.5 4,14 5,9.5 2,6.5 6,6"/></svg>
-      Meeting Intelligence
+      <div class="tr-meta">
+        <span><b>${esc(title)}</b></span>
+        ${date ? `<span>${esc(date)}</span>` : ''}
+        ${parts.length ? `<span>ผู้เข้าร่วม: <b>${parts.length}</b></span>` : ''}
+      </div>
+      <div class="tr-body" id="${bodyId}">
+        ${summary ? `<div class="tr-sec"><div class="tr-sec-h">Executive Summary</div>
+          <div class="tr-box" style="background:#faf5ff;border-color:#e9d5ff;">${esc(summary)}</div></div>` : ''}
+        <div class="tr-sec"><div class="tr-sec-h">Decisions <span class="cnt">${decisions.length}</span></div>${numList(decisions)}</div>
+        <div class="tr-sec"><div class="tr-sec-h">Risks &amp; Issues <span class="cnt">${risks.length}</span></div>${numList(risks)}</div>
+        <div class="tr-sec"><div class="tr-sec-h">Action Items <span class="cnt">${actions.length}</span></div>${actHtml}</div>
+        <div class="tr-sec"><div class="tr-sec-h">Timeline</div>${tlHtml}</div>
+        <div class="tr-sec"><div class="tr-sec-h">Next Steps <span class="cnt">${nextSteps.length}</span></div>${numList(nextSteps)}</div>
+      </div>
+      <div class="tr-actions-row">
+        <button class="tr-btn primary" onclick="openDraftEmail()">Draft Follow-up Email</button>
+        <button class="tr-btn" onclick="openCalendarForm()">Add Follow-up Meeting</button>
+      </div>
+      <div class="tr-foot">
+        <span>Decisions: <b>${decisions.length}</b></span>
+        <span>Risks: <b>${risks.length}</b></span>
+        <span>Actions: <b>${actions.length}</b></span>
+      </div>
     </div>`);
+  div.classList.add('msg-wide');
 }
 
 function miCancelDetect(cardId) {

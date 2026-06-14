@@ -57,6 +57,19 @@ def _run_migrations():
             except Exception as _e:
                 print(f"Migration skip {_table}.{_col}: {_e}")
 
+    # Postgres stores MemoryType as a native enum — new members must be added
+    # to the type or inserts with FACT/BEHAVIOR will fail. SQLite stores enums
+    # as VARCHAR, so nothing to do there.
+    if _is_pg:
+        for _val in ("FACT", "BEHAVIOR", "TRANSCRIPT"):
+            try:
+                # ADD VALUE can't run inside a transaction block → autocommit
+                with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as _conn:
+                    _conn.execute(_sql_text(f"ALTER TYPE memorytype ADD VALUE IF NOT EXISTS '{_val}'"))
+                print(f"Migration: memorytype.{_val} ready")
+            except Exception as _e:
+                print(f"Migration skip memorytype.{_val}: {_e}")
+
 _run_migrations()
 
 app = FastAPI(title="Hermes AI Skill Hub", version="1.0.0")
@@ -102,7 +115,10 @@ _MEETING_EXTRACT_PROMPT = (
     '"follow_up_required":bool,"follow_up_suggested_date":string|null}'
 )
 
-_MEETING_EMAIL_PROMPT = "เขียนอีเมลสรุปการประชุมภาษาไทย เป็นทางการแต่กระชับ ไม่ต้องมีบรรทัด Subject"
+_MEETING_EMAIL_PROMPT = (
+    "เขียนอีเมลสรุปการประชุมภาษาไทย เป็นทางการแต่กระชับ ไม่ต้องมีบรรทัด Subject "
+    "ห้ามใช้ markdown สัญลักษณ์ ** หรือ * หรือ # ให้เป็นข้อความธรรมดาเท่านั้น"
+)
 
 _MEETING_MOM_PROMPT = (
     "คุณเป็นผู้ช่วยจัดทำรายงานการประชุมรูปแบบราชการ (MOM - Minutes of Meeting) "
@@ -134,7 +150,11 @@ _MEETING_MOM_PROMPT = (
     "(ลงชื่อ)  _________________________  ผู้จดรายงานการประชุม\n"
     "( [ชื่อ] )\n"
     "ตำแหน่ง  ...............................\n\n"
-    "หมายเหตุ: ข้อมูลที่ไม่ระบุใน transcript ให้ใช้ [...] แทน ห้ามแต่งเติม"
+    "หมายเหตุ (สำคัญที่สุด ต้องปฏิบัติเคร่งครัด): "
+    "ห้ามสร้างหรือเดาข้อมูลที่ไม่ปรากฏใน transcript เด็ดขาด — "
+    "วันที่ เวลา สถานที่ ครั้งที่ ชื่อคน ตำแหน่ง ถ้าไม่มีใน transcript ให้คงเป็น [...] ไว้ "
+    "เช่น 'เมื่อวัน[...]ที่ [...] เวลา [...] น.' และ 'ณ [...]' "
+    "ถ้า transcript ระบุผู้พูดเป็น 'ผู้พูด A/B' ให้ใช้ชื่อนั้นตามจริง อย่าตั้งชื่อให้"
 )
 
 
@@ -238,9 +258,150 @@ def _startup_seed():
             if skill and not skill.prompt_template:
                 skill.prompt_template = prompt
 
+        _seed_catalog_skills(db)
         db.commit()
     finally:
         db.close()
+
+
+# ── P1 Skill Catalog (ตาม skill-design.html) — seed เข้า Skill Store ──────────
+_CATALOG_OWNER = "hermes@shareinvestor.com"
+
+_CATALOG_SKILLS = [
+    {
+        "name": "Annual Report Summarizer",
+        "department": "ir", "skill_type": "summarizer",
+        "tags": ["ir", "annual-report", "56-1", "financial"],
+        "description": "สรุป Annual Report / 56-1 One Report เป็น Executive Summary + ตัวเลขสำคัญ + ความเสี่ยง + แนวโน้ม",
+        "prompt_template": (
+            "คุณคือนักวิเคราะห์ Investor Relations อาวุโสของ ShareInvestor "
+            "หน้าที่: สรุปรายงานประจำปี / 56-1 One Report ที่ผู้ใช้ส่งมา\n"
+            "โครงสร้างคำตอบ:\n"
+            "## Executive Summary (4-6 ประโยค)\n"
+            "## ตัวเลขสำคัญ (ตาราง: รายได้, กำไรสุทธิ, margin, EPS, เงินปันผล — เทียบปีก่อนถ้ามี)\n"
+            "## จุดเด่นของปีนี้ (bullet)\n"
+            "## ความเสี่ยงสำคัญ (bullet พร้อมอ้างอิงหน้า/ส่วนที่พบ)\n"
+            "## แนวโน้ม/แผนปีหน้า\n"
+            "กฎ: ใช้เฉพาะข้อมูลที่ปรากฏในเอกสาร ห้ามคาดเดาตัวเลข ถ้าข้อมูลไม่มีให้ระบุ '-' "
+            "อ้างอิงเลขหน้า [หน้า N] ทุกครั้งที่เอกสารมีระบุหน้า ตอบภาษาไทย"
+        ),
+    },
+    {
+        "name": "Financial Highlight Extractor",
+        "department": "ir", "skill_type": "analyzer",
+        "tags": ["ir", "financial", "งบการเงิน", "quarterly"],
+        "description": "ดึงตัวเลขสำคัญจากงบการเงินรายไตรมาส เป็นตาราง YoY/QoQ พร้อมคำอธิบายสั้นๆ",
+        "prompt_template": (
+            "คุณคือนักวิเคราะห์การเงินของทีม IR หน้าที่: ดึงตัวเลขสำคัญจากงบการเงินที่ผู้ใช้ส่งมา\n"
+            "Output:\n"
+            "1. ตาราง: รายการ | งวดนี้ | งวดก่อน(QoQ) | ปีก่อน(YoY) | %เปลี่ยนแปลง — "
+            "ครอบคลุม รายได้รวม, กำไรขั้นต้น, EBITDA, กำไรสุทธิ, Gross/Net Margin, EPS\n"
+            "2. คำอธิบายการเปลี่ยนแปลงสำคัญ 3-5 bullet (สาเหตุตามที่เอกสารระบุเท่านั้น)\n"
+            "3. ⚠️ จุดที่ควรตรวจสอบเพิ่ม (ถ้ามีรายการผิดปกติ)\n"
+            "กฎ: ห้ามแต่งตัวเลขเด็ดขาด ข้อมูลไม่มีให้ใส่ '-' ระบุหน่วย (ล้านบาท/%) ทุกตัวเลข ตอบภาษาไทย"
+        ),
+    },
+    {
+        "name": "Code Review Assistant",
+        "department": "dev", "skill_type": "reviewer",
+        "tags": ["dev", "code-review", "security", "bug"],
+        "description": "ตรวจโค้ด/diff หา bug, ช่องโหว่ security, ปัญหา performance เรียงตามความรุนแรงพร้อมวิธีแก้",
+        "prompt_template": (
+            "คุณคือ Senior Code Reviewer หน้าที่: ตรวจโค้ดหรือ diff ที่ผู้ใช้ส่งมา\n"
+            "ตรวจ 4 ด้าน: (1) Bug/Logic error (2) Security (injection, auth, secret รั่ว) "
+            "(3) Performance (4) Maintainability\n"
+            "Output: รายการ findings เรียงตามความรุนแรง โดยแต่ละข้อระบุ:\n"
+            "- [CRITICAL/HIGH/MEDIUM/LOW] สรุปปัญหา\n"
+            "- ตำแหน่ง (ไฟล์/บรรทัด/ฟังก์ชัน)\n"
+            "- ทำไมถึงเป็นปัญหา + ตัวอย่างโค้ดที่แก้แล้ว\n"
+            "ปิดท้ายด้วยสรุป 1 บรรทัด: ควร merge ได้เลย / แก้ก่อน merge\n"
+            "กฎ: รายงานเฉพาะปัญหาที่เห็นจริงในโค้ด ห้ามเดาบริบทที่มองไม่เห็น ตอบภาษาไทย (ศัพท์เทคนิคคงภาษาอังกฤษ)"
+        ),
+    },
+    {
+        "name": "Log Analyzer",
+        "department": "dev", "skill_type": "analyzer",
+        "tags": ["dev", "log", "error", "debug"],
+        "description": "วิเคราะห์ error log / stack trace หา root cause พร้อมวิธีแก้และจุดที่ควรเพิ่ม monitoring",
+        "prompt_template": (
+            "คุณคือ Site Reliability Engineer หน้าที่: วิเคราะห์ log หรือ stack trace ที่ผู้ใช้ส่งมา\n"
+            "Output:\n"
+            "## 🎯 Root Cause (สาเหตุที่แท้จริง 1-2 ประโยค + บรรทัด log ที่ชี้ชัด)\n"
+            "## 🔧 วิธีแก้ (ขั้นตอนเป็นข้อๆ พร้อมโค้ด/คำสั่งถ้าเกี่ยวข้อง)\n"
+            "## 🛡 ป้องกันไม่ให้เกิดซ้ำ (monitoring/alert/test ที่ควรเพิ่ม)\n"
+            "ถ้า log ไม่พอจะสรุป root cause ให้บอกตรงๆ ว่าต้องการ log ส่วนไหนเพิ่ม "
+            "ห้ามเดาสาเหตุโดยไม่มีหลักฐานใน log ตอบภาษาไทย"
+        ),
+    },
+    {
+        "name": "EN-TH IR Translator",
+        "department": "content", "skill_type": "translator",
+        "tags": ["content", "translate", "ir", "en-th"],
+        "description": "แปลข่าว/ประกาศ IR ระหว่างไทย-อังกฤษ ด้วยศัพท์ IR ที่ถูกต้องตามมาตรฐานตลาดหลักทรัพย์",
+        "prompt_template": (
+            "คุณคือนักแปลเอกสาร Investor Relations มืออาชีพ แปลไทย↔อังกฤษตามภาษาต้นทาง\n"
+            "กฎการแปล:\n"
+            "- ใช้ศัพท์ IR มาตรฐาน เช่น เงินปันผล=dividend, มติที่ประชุมคณะกรรมการ=Board resolution, "
+            "กำไรสุทธิ=net profit, งบการเงินรวม=consolidated financial statements, "
+            "ผู้ถือหุ้น=shareholders, วันกำหนดรายชื่อ=record date\n"
+            "- โทนทางการแบบประกาศตลาดหลักทรัพย์ ห้ามแปลแบบคำต่อคำจนผิดธรรมชาติ\n"
+            "- ตัวเลข วันที่ ชื่อบริษัท ต้องตรงต้นฉบับ 100%\n"
+            "- ห้ามเพิ่มหรือตัดเนื้อหา\n"
+            "Output: คำแปลอย่างเดียว ตามด้วยหมายเหตุศัพท์เฉพาะ (ถ้ามีคำที่แปลได้หลายแบบ)"
+        ),
+    },
+    {
+        "name": "Test Case Generator",
+        "department": "qa", "skill_type": "generator",
+        "tags": ["qa", "test-case", "testing"],
+        "description": "สร้าง test cases จาก requirement/user story ครอบคลุม happy path, edge cases และข้อมูลทดสอบ",
+        "prompt_template": (
+            "คุณคือ QA Engineer อาวุโส หน้าที่: ออกแบบ test cases จาก requirement หรือ user story ที่ได้รับ\n"
+            "Output: ตาราง | TC-ID | ชื่อเคส | Precondition | Steps | Expected Result | Priority |\n"
+            "ครอบคลุม: (1) Happy path (2) Edge cases — ค่าว่าง, ค่าสุดขอบ, ภาษาไทย/อักขระพิเศษ, ไฟล์ใหญ่ "
+            "(3) Negative cases — input ผิด, สิทธิ์ไม่พอ, network ล้ม (4) ข้อมูลทดสอบตัวอย่างที่ใช้ได้จริง\n"
+            "ปิดท้าย: รายการคำถามที่ requirement ยังคลุมเครือ (ถ้ามี)\n"
+            "ห้ามสร้างเคสที่ไม่เกี่ยวกับ requirement ที่ให้มา ตอบภาษาไทย"
+        ),
+    },
+    {
+        "name": "Client Email Draft",
+        "department": "sales", "skill_type": "generator",
+        "tags": ["sales", "email", "client"],
+        "description": "ร่างอีเมลถึงลูกค้าแบบมืออาชีพ ไทย/อังกฤษ จากบริบทและประเด็นที่ให้",
+        "prompt_template": (
+            "คุณคือผู้ช่วยร่างอีเมลของทีม Sales/Support ShareInvestor\n"
+            "Input ที่คาดหวัง: บริบท (ลูกค้าคือใคร เรื่องอะไร) + ประเด็นที่ต้องสื่อ\n"
+            "Output:\n"
+            "Subject: (สั้น ชัด ดึงให้เปิดอ่าน)\n"
+            "เนื้อหา: เปิดสุภาพ → ประเด็นหลักเรียงเป็นข้อ → ขั้นตอนถัดไป/คำถามชวนตอบ → ลงท้ายสุภาพ\n"
+            "กฎ: ภาษาตามที่ผู้ใช้ระบุ (ไม่ระบุ = ไทย) ความยาวไม่เกิน 200 คำ "
+            "โทนสุภาพแบบธุรกิจไทย ไม่ขายของเกินจริง ห้ามสัญญาสิ่งที่ข้อมูลไม่ได้ระบุ "
+            "ถ้าเป็นเรื่องร้องเรียนให้เริ่มด้วยการขอโทษและแสดงความเข้าใจก่อน"
+        ),
+    },
+]
+
+
+def _seed_catalog_skills(db: Session):
+    """สร้าง P1 skills ตามแผน skill-design.html เข้า Skill Store (ครั้งแรกเท่านั้น)"""
+    for spec in _CATALOG_SKILLS:
+        if db.query(Skill).filter(Skill.name == spec["name"]).first():
+            continue
+        db.add(Skill(
+            name=spec["name"],
+            description=spec["description"],
+            owner=_CATALOG_OWNER,
+            department=spec["department"],
+            skill_type=spec["skill_type"],
+            tags=spec["tags"],
+            prompt_template=spec["prompt_template"],
+            status=SkillStatus.COMPANY_PUBLISHED,
+            visibility=SkillVisibility.COMPANY,
+            version="1.0.0",
+            published_at=datetime.now(),
+        ))
+        print(f"Seeded catalog skill: {spec['name']}", flush=True)
 
 
 # ── Telegram helper ────────────────────────────────────────────────────────────
@@ -299,7 +460,7 @@ def _notify_n8n(event: str, payload: dict):
 
 
 # ── OpenAI / Hermes helper ─────────────────────────────────────────────────────
-def _claude_chat(messages: list, system: str = "") -> str:
+def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048) -> str:
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         return "⚠️  OPENAI_API_KEY ยังไม่ได้ตั้งค่าใน .env"
@@ -317,7 +478,7 @@ def _claude_chat(messages: list, system: str = "") -> str:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=all_messages,
-            max_tokens=2048,
+            max_tokens=max_tokens,
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -399,29 +560,43 @@ AUDIO_MIME_TYPES = {
 MAX_AUDIO_MB = 25  # Whisper's hard limit
 
 
+# IR Document Q&A: เดิม 8,000 ตัวอักษร = Annual Report เห็นแค่ ~3 หน้าแรก
+# 30,000 ครอบคลุมเอกสารส่วนใหญ่ และ gpt-4o-mini (128k context) รับไหวสบาย
+_FILE_TEXT_MAX_CHARS = 30000
+
+
 def _extract_text(path: pathlib.Path, mime: str) -> str:
-    """Extract readable text from uploaded file."""
+    """Extract readable text from uploaded file.
+
+    PDF ใส่ marker [หน้า N] ทุกหน้า → ตอบคำถามพร้อมอ้างอิงเลขหน้าได้ (IR Document Q&A)
+    """
     try:
         if mime == "application/pdf":
             import pypdf
             reader = pypdf.PdfReader(str(path))
-            return "\n".join(p.extract_text() or "" for p in reader.pages)[:8000]
+            pages = []
+            for i, p in enumerate(reader.pages):
+                txt = (p.extract_text() or "").strip()
+                if txt:
+                    pages.append(f"[หน้า {i+1}]\n{txt}")
+            return "\n\n".join(pages)[:_FILE_TEXT_MAX_CHARS]
         if mime in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "application/msword"):
             import docx as _docx
             doc = _docx.Document(str(path))
-            return "\n".join(p.text for p in doc.paragraphs)[:8000]
+            return "\n".join(p.text for p in doc.paragraphs)[:_FILE_TEXT_MAX_CHARS]
         if mime in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "application/vnd.ms-excel"):
             import openpyxl
             wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
             lines = []
             for ws in wb.worksheets:
+                lines.append(f"[ชีต: {ws.title}]")
                 for row in ws.iter_rows(values_only=True):
                     lines.append("\t".join(str(c) if c is not None else "" for c in row))
-            return "\n".join(lines)[:8000]
+            return "\n".join(lines)[:_FILE_TEXT_MAX_CHARS]
         if mime.startswith("text/"):
-            return path.read_text(errors="ignore")[:8000]
+            return path.read_text(errors="ignore")[:_FILE_TEXT_MAX_CHARS]
     except Exception as e:
         return f"(ไม่สามารถอ่านไฟล์ได้: {e})"
     return ""
@@ -548,6 +723,8 @@ class ChatResponse(BaseModel):
     action_buttons: List[dict] = []
     is_meeting_report: bool = False
     powered_by_skill: Optional[dict] = None  # {"id": int, "name": str}
+    skill_suggestion: Optional[dict] = None  # auto-skill ที่ Hermes คิดให้จาก behavior
+    draft_email: Optional[dict] = None  # {subject, body} → frontend opens email modal popup
 
 
 # ── Auto-run thresholds ───────────────────────────────────────────────────────
@@ -607,6 +784,242 @@ def _is_meeting_report(text: str) -> bool:
     return score >= 2
 
 
+def _parse_json_loose(text: str) -> Optional[dict]:
+    """ดึง JSON object แรกออกจากข้อความ LLM (รองรับ ```json fences)"""
+    import json, re as _re
+    if not text:
+        return None
+    m = _re.search(r'\{.*\}', text, _re.DOTALL)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(0))
+    except Exception:
+        return None
+
+
+_SUGGESTION_THRESHOLD = 3  # intent ซ้ำกี่ครั้งถึงเสนอสร้าง skill
+
+
+def _create_skill_from_suggestion(db: Session, user_email: str, suggestion: dict) -> Optional[Skill]:
+    """สร้าง Skill จริงจาก suggestion ที่ Hermes คิดให้ (Private ของ user)"""
+    try:
+        name = suggestion.get("name", "").strip()
+        if not name:
+            return None
+        # กันชื่อชน unique constraint
+        if db.query(Skill).filter(Skill.name == name).first():
+            name = f"{name} ({user_email.split('@')[0]})"
+        skill = Skill(
+            name=name,
+            description=suggestion.get("description", ""),
+            owner=user_email,
+            status=SkillStatus.PRIVATE,
+            visibility=SkillVisibility.PRIVATE,
+            skill_type=suggestion.get("skill_type", "generator"),
+            tags=suggestion.get("tags", []),
+            prompt_template=suggestion.get("prompt_template", ""),
+        )
+        db.add(skill)
+        db.add(AuditLog(action="auto_skill_created", user_email=user_email,
+                        details={"name": name, "intent": suggestion.get("intent", "")}))
+        db.commit()
+        db.refresh(skill)
+        return skill
+    except Exception as e:
+        db.rollback()
+        print(f"[learn] create skill from suggestion failed: {e}", flush=True)
+        return None
+
+
+def _learn_from_chat(user_email: str, message: str, user_skills_meta: list):
+    """Background worker — เรียนรู้จากข้อความของ user หลังตอบแล้ว (ไม่บล็อก chat)
+
+    ทำ 3 อย่างใน LLM call เดียว:
+    1. จัดหมวด intent ของคำขอ → นับใน BEHAVIOR memory
+    2. สกัดข้อเท็จจริงระยะยาว → FACT memory
+    3. สกัดความชอบ/รูปแบบที่ user ระบุ → PREFERENCE memory
+    แล้วถ้า intent ซ้ำถึง threshold และยังไม่มี skill ที่ตรง → คิด skill ใหม่ให้
+    """
+    from memory_manager import UserMemoryManager
+    from database import SessionLocal
+    if not message or len(message.strip()) < 10:
+        return
+    db = SessionLocal()
+    try:
+        analysis_raw = _claude_chat(
+            [{"role": "user", "content": message[:2000]}],
+            system=(
+                "คุณเป็นตัววิเคราะห์พฤติกรรมผู้ใช้ วิเคราะห์ข้อความแล้วตอบเป็น JSON เท่านั้น:\n"
+                '{"intent": "หมวดงานสั้นๆ เป็น kebab-case ภาษาอังกฤษ เช่น summarize-meeting, draft-email, translate-th-en",\n'
+                ' "intent_desc": "คำอธิบายงานนี้สั้นๆ ภาษาไทย",\n'
+                ' "is_task": true/false (true = ผู้ใช้สั่งให้ทำงาน, false = คุยเล่น/ถามทั่วไป),\n'
+                ' "facts": ["ข้อเท็จจริงระยะยาวเกี่ยวกับ user ที่ควรจำ เช่น ตำแหน่ง โปรเจคที่ทำ ลูกค้า"],\n'
+                ' "preference": {"key": "ชื่อความชอบ", "value": "ค่า"} หรือ null '
+                '(เฉพาะเมื่อ user ระบุรูปแบบที่ต้องการ เช่น ภาษา รูปแบบสรุป ความยาว)}\n'
+                "ถ้าไม่มี facts ให้ใส่ [] อย่าแต่งเติมข้อมูลที่ไม่ปรากฏในข้อความ"
+            ),
+        )
+        analysis = _parse_json_loose(analysis_raw)
+        if not analysis:
+            return
+
+        for fact in (analysis.get("facts") or [])[:5]:
+            if isinstance(fact, str):
+                UserMemoryManager.add_facts(db, user_email, [fact])
+
+        pref = analysis.get("preference")
+        if isinstance(pref, dict) and pref.get("key") and pref.get("value") is not None:
+            UserMemoryManager.save_preference(db, user_email, str(pref["key"])[:100], pref["value"])
+
+        if not analysis.get("is_task"):
+            return
+        intent = (analysis.get("intent") or "").strip()[:80]
+        if not intent or intent in ("unknown", "general", "chat"):
+            return
+
+        entry = UserMemoryManager.record_behavior(db, user_email, intent, example=message)
+
+        behavior = UserMemoryManager.get_behavior(db, user_email)
+        if (entry.get("count", 0) < _SUGGESTION_THRESHOLD
+                or intent in behavior.get("dismissed", [])
+                or behavior.get("pending_suggestion")):
+            return
+
+        # ถ้ามี skill ที่น่าจะครอบคลุม intent นี้อยู่แล้ว ไม่ต้องเสนอซ้ำ
+        intent_words = set(intent.replace("-", " ").split()) | \
+            set((analysis.get("intent_desc") or "").lower().split())
+        for meta in user_skills_meta:
+            skill_words = set((meta or "").lower().replace("-", " ").split())
+            if len(intent_words & skill_words) >= 2:
+                return
+
+        suggestion = _build_skill_suggestion(
+            db, user_email, intent, analysis.get("intent_desc", ""), entry)
+        if suggestion:
+            UserMemoryManager.set_pending_suggestion(db, user_email, suggestion)
+            print(f"[learn] suggestion for {user_email}: {suggestion.get('type')} "
+                  f"'{suggestion.get('name')}' (intent={intent})", flush=True)
+    except Exception as e:
+        print(f"[learn] background learning failed: {e}", flush=True)
+    finally:
+        db.close()
+
+
+def _user_covers_intent(db: Session, user_email: str, intent: str) -> bool:
+    """user มี skill (สร้างเอง/ติดตั้ง) ที่ครอบคลุม intent นี้แล้วหรือยัง"""
+    intent_words = {w for w in intent.replace("-", " ").lower().split() if len(w) > 2}
+    if not intent_words:
+        return False
+    owned = db.query(Skill).filter(Skill.owner == user_email,
+                                   Skill.status.notin_([SkillStatus.DEPRECATED, SkillStatus.BLOCKED])).all()
+    inst_ids = [i.skill_id for i in db.query(SkillInstallation).filter(
+        SkillInstallation.user_email == user_email,
+        SkillInstallation.is_active == True).all()]
+    installed = db.query(Skill).filter(Skill.id.in_(inst_ids)).all() if inst_ids else []
+    for s in owned + installed:
+        meta = " ".join(filter(None, [s.name, s.skill_type or ""] + (s.tags or []))).lower().replace("-", " ")
+        if sum(1 for w in intent_words if w in meta) >= 2:
+            return True
+    return False
+
+
+def _find_matching_store_skill(db: Session, user_email: str, intent: str, intent_desc: str) -> Optional[Skill]:
+    """หา skill ใน Store ที่น่าจะทำงาน intent นี้ได้อยู่แล้ว (จะได้เสนอ install แทนสร้างซ้ำ)"""
+    intent_words = {w for w in (intent.replace("-", " ").lower().split() +
+                                (intent_desc or "").lower().split()) if len(w) > 2}
+    if not intent_words:
+        return None
+    published = db.query(Skill).filter(
+        Skill.status.in_([SkillStatus.COMPANY_PUBLISHED, SkillStatus.TEAM_AVAILABLE]),
+        Skill.owner != user_email,
+    ).all()
+    best, best_score = None, 0
+    for s in published:
+        meta = " ".join(filter(None, [s.name, s.description or "", s.skill_type or ""]
+                                + (s.tags or []))).lower().replace("-", " ")
+        score = sum(1 for w in intent_words if w in meta)
+        if score > best_score:
+            best, best_score = s, score
+    return best if best_score >= 2 else None
+
+
+def _build_skill_suggestion(db: Session, user_email: str, intent: str,
+                            intent_desc: str, entry: dict) -> Optional[dict]:
+    """สร้าง suggestion จาก intent ที่ทำซ้ำ — หัวใจของ Auto-Skill Generator
+
+    ลำดับความฉลาด:
+    1. มี skill ใน Store ที่ตรงอยู่แล้ว → เสนอ "ติดตั้ง" แทนการสร้างซ้ำ
+    2. ไม่มี → ออกแบบ skill ใหม่แบบ personalize: ใช้ตัวอย่างคำขอจริงของ user
+       + ความชอบ (PREFERENCE) + บริบทงาน (FACT/แผนก) เพื่อให้ prompt ตรงกับ
+       วิธีทำงานของคนนั้นจริงๆ ไม่ใช่ template ลอยๆ
+    """
+    from memory_manager import UserMemoryManager
+
+    existing = _find_matching_store_skill(db, user_email, intent, intent_desc)
+    if existing:
+        return {
+            "type": "install",
+            "intent": intent,
+            "intent_desc": intent_desc,
+            "count": entry.get("count"),
+            "skill_id": existing.id,
+            "name": existing.name,
+            "description": existing.description or "",
+            "created_at": datetime.now().isoformat(),
+            "shown": False,
+        }
+
+    # บริบทส่วนตัวของ user → spec ที่ตัดเฉพาะตัว
+    profile = UserMemoryManager.get_active_memory(db, user_email, MemoryType.PROFILE)
+    dept = (profile.content.get("department", "") if profile else "")
+    prefs = UserMemoryManager.get_preferences(db, user_email)
+    facts = UserMemoryManager.get_facts(db, user_email)[-10:]
+    persona = ""
+    if dept:
+        persona += f"\nแผนกของผู้ใช้: {dept}"
+    if prefs:
+        persona += "\nความชอบของผู้ใช้ (skill ต้องทำตามเสมอ): " + \
+            "; ".join(f"{k}={v}" for k, v in list(prefs.items())[-8:])
+    if facts:
+        persona += "\nบริบทงานของผู้ใช้: " + "; ".join(facts)
+
+    examples = "\n".join(f"- {e}" for e in entry.get("examples", []))
+    spec_raw = _claude_chat(
+        [{"role": "user", "content":
+          f"ผู้ใช้สั่งงานประเภท '{intent}' ({intent_desc}) ซ้ำ {entry.get('count')} ครั้ง\n"
+          f"ตัวอย่างคำขอจริงของผู้ใช้:\n{examples}\n{persona}\n\n"
+          f"ออกแบบ AI Skill ที่ทำงานนี้ให้อัตโนมัติ ปรับให้เข้ากับวิธีทำงานของผู้ใช้คนนี้"}],
+        system=(
+            "คุณเป็นผู้ออกแบบ AI Skill มืออาชีพ ตอบเป็น JSON เท่านั้น:\n"
+            '{"name": "ชื่อ skill ภาษาอังกฤษสั้นกระชับ ไม่เกิน 5 คำ",\n'
+            ' "description": "อธิบายว่าทำอะไร input อะไร ได้ output อะไร — 1-2 ประโยคภาษาไทย",\n'
+            ' "prompt_template": "system prompt ภาษาไทยคุณภาพสูงสำหรับ skill นี้ ต้องมี: '
+            '(1) บทบาทของ AI (2) input ที่คาดหวัง (3) โครงสร้าง output ชัดเจน '
+            '(4) ข้อห้าม เช่น ห้ามแต่งเติมข้อมูล (5) สะท้อนความชอบของผู้ใช้ถ้ามี",\n'
+            ' "tags": ["tag1","tag2","tag3"],\n'
+            ' "skill_type": "summarizer|generator|analyzer|translator|reviewer"}'
+        ),
+        max_tokens=4096,
+    )
+    spec = _parse_json_loose(spec_raw)
+    if not spec or not spec.get("name"):
+        return None
+    return {
+        "type": "create",
+        "intent": intent,
+        "intent_desc": intent_desc,
+        "count": entry.get("count"),
+        "name": str(spec.get("name"))[:255],
+        "description": str(spec.get("description", ""))[:1000],
+        "prompt_template": str(spec.get("prompt_template", "")),
+        "tags": [str(t) for t in (spec.get("tags") or [])[:6]],
+        "skill_type": str(spec.get("skill_type", "generator"))[:50],
+        "created_at": datetime.now().isoformat(),
+        "shown": False,
+    }
+
+
 # Intent keyword map: (keywords, skill type/department hints)
 _INTENT_MAP = [
     (["code", "bug", "error", "review", "security", "โค้ด", "คอด", "ตรวจ code", "code review"], ["reviewer", "dev"]),
@@ -636,6 +1049,41 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     if custom_notes:
         notes_text = "\n".join(f"  - {n['note']}" for n in custom_notes)
         custom_memory_block = f"\n\n**สิ่งที่ user บอกให้จำ (ต้องใช้ข้อมูลนี้เสมอ):**\n{notes_text}"
+
+    # โหลดข้อเท็จจริงที่ Hermes เรียนรู้เองจากบทสนทนาก่อนๆ
+    learned_facts = UserMemoryManager.get_facts(db, req.user_email)
+    if learned_facts:
+        facts_text = "\n".join(f"  - {f}" for f in learned_facts[-30:])
+        custom_memory_block += f"\n\n**สิ่งที่ Hermes เรียนรู้เกี่ยวกับ user (ใช้ปรับการตอบให้ตรงใจ):**\n{facts_text}"
+
+    # โหลดความชอบ/รูปแบบที่ user เคยระบุ
+    user_prefs = UserMemoryManager.get_preferences(db, req.user_email)
+    if user_prefs:
+        prefs_text = "\n".join(f"  - {k}: {v}" for k, v in list(user_prefs.items())[-20:])
+        custom_memory_block += f"\n\n**ความชอบของ user (ต้องทำตามเสมอ เช่น รูปแบบ/ภาษา/ความยาว):**\n{prefs_text}"
+
+    # บทสนทนาครั้งก่อน (cross-session) — ใช้เมื่อ frontend ไม่ได้ส่ง history มา
+    if not req.conversation_history:
+        past_chats = UserMemoryManager.get_chat_history(db, req.user_email)[-5:]
+        if past_chats:
+            past_text = "\n".join(
+                f"  - user: {p.get('message','')[:120]} → hermes: {p.get('context',{}).get('reply','')[:120]}"
+                for p in past_chats)
+            custom_memory_block += f"\n\n**บทสนทนาล่าสุดก่อนหน้านี้ (เพื่อความต่อเนื่อง):**\n{past_text}"
+
+    # Transcript ล่าสุดที่ user ถอดเสียงไว้ — ให้ถาม-ตอบ/สรุปต่อได้ทันที
+    trans_mem = UserMemoryManager.get_transcript_memory(db, req.user_email)
+    if trans_mem and trans_mem.get("transcript"):
+        trans_text = _condense_transcript_for_chat(trans_mem["transcript"])
+        custom_memory_block += (
+            f"\n\n**บริบทสำคัญ: ผู้ใช้เพิ่งถอดเสียงไฟล์ \"{trans_mem.get('filename','')}\" ไว้** "
+            f"(บันทึกเมื่อ {trans_mem.get('saved_at','')[:16]}) เนื้อหาคือ:\n"
+            f"--- เริ่ม transcript ---\n{trans_text}\n--- จบ transcript ---\n"
+            f"กฎ: ถ้าผู้ใช้ขอ 'สรุป' ถามคำถามเกี่ยวกับการประชุม/ไฟล์เสียง หรือสั่งทำ MOM/อีเมล "
+            f"โดยไม่แนบเนื้อหาอื่น ให้วิเคราะห์และตอบจาก transcript ข้างบนนี้ "
+            f"(สรุปสาระสำคัญ มติ action items เป็นภาษาไทย) "
+            f"ห้ามตอบว่าไม่มีข้อมูล และห้ามตอบกลับเป็นเนื้อหา transcript ดิบทั้งก้อน"
+        )
 
     # ── Skill ที่ user สร้างเอง ──────────────────────────────────────────────
     owned_skills = db.query(Skill).filter(
@@ -743,7 +1191,11 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         if _f:
             _fpath = UPLOAD_DIR / _f.saved_name
             _ftext = _extract_text(_fpath, _f.mime_type or "")
-            file_context = f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}"
+            file_context = (
+                f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
+                f"[คำสั่ง: ตอบจากเนื้อหาไฟล์นี้เท่านั้น ถ้าเนื้อหามี marker [หน้า N] "
+                f"ให้อ้างอิงเลขหน้าทุกครั้งที่ตอบ เช่น (หน้า 12) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
+            )
             # Detect if file is a meeting report → force-use Meeting Report Assistant
             if _is_meeting_report(_ftext):
                 _file_is_meeting = True
@@ -812,6 +1264,25 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         if len(note) > 2:
             UserMemoryManager.save_custom_memory(db, req.user_email, note)
 
+    # ตรวจจับ "ผู้พูด A คือ คุณสมชาย" → แทนชื่อจริงใน transcript ที่จำไว้
+    _speaker_renames = []
+    for _m in re.finditer(
+            r"ผู้พูด\s*([A-Za-z@\d])\s*(?:คือ|=|ชื่อ)\s*(?:คุณ\s*)?([\w฀-๿][\w฀-๿ .]{1,40}?)(?=\s*(?:,|และ|ผู้พูด|ครับ|ค่ะ|นะ|$))",
+            msg_stripped):
+        _speaker_renames.append((_m.group(1).upper(), _m.group(2).strip()))
+    if _speaker_renames:
+        _tm = UserMemoryManager.get_transcript_memory(db, req.user_email)
+        if _tm and _tm.get("transcript"):
+            _txt = _tm["transcript"]
+            for _label, _name in _speaker_renames:
+                _txt = _txt.replace(f"ผู้พูด {_label}:", f"คุณ{_name}:")
+            UserMemoryManager.save_transcript_memory(
+                db, req.user_email, _tm.get("filename", ""), _txt)
+        # จำ mapping เป็น note ด้วย — ใช้กับ transcript ไฟล์ถัดไปไม่ได้ แต่ช่วยให้คุยรู้เรื่อง
+        for _label, _name in _speaker_renames:
+            UserMemoryManager.save_custom_memory(
+                db, req.user_email, f"ในประชุมล่าสุด ผู้พูด {_label} คือ คุณ{_name}")
+
     msg_lower = effective_message.lower()
     powered_by_skill_info = None
     new_last_skill_id = req.last_skill_id
@@ -825,7 +1296,38 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     if req.file_id:
         is_question = False
 
-    if _file_is_meeting and _forced_meeting_skill:
+    # ── Email draft intent → return popup data instead of inline chat text ────
+    _EMAIL_DRAFT_KWS = [
+        "ทำ email", "ร่างอีเมล", "ร่าง email", "เขียน email", "เขียนอีเมล",
+        "draft email", "สร้าง email", "ทำอีเมล", "ส่ง email ถึง", "write email",
+    ]
+    _chat_wants_email = any(kw in msg_lower for kw in _EMAIL_DRAFT_KWS)
+    draft_email_data = None
+
+    if _chat_wants_email:
+        _tm = UserMemoryManager.get_transcript_memory(db, req.user_email)
+        _transcript_ctx = (_tm.get("transcript", "") if _tm else "").strip()
+        _sender = (req.user_email or "").split("@")[0] or "ทีม Hermes"
+        _email_sys = (
+            _MEETING_EMAIL_PROMPT +
+            " ห้ามใช้ markdown สัญลักษณ์ ** หรือ * ใช้ข้อความธรรมดาเท่านั้น"
+        )
+        _ctx_block = (
+            f"\n\nเนื้อหาการประชุม:\n{_prepare_meeting_text(_transcript_ctx)}"
+            if _transcript_ctx else ""
+        )
+        _ep = (
+            f"ร่างอีเมลสรุปการประชุม ผู้ส่งชื่อ '{_sender}'"
+            f"{_ctx_block}\n\nคำขอ: {effective_message}"
+        )
+        _email_body = _claude_chat(
+            [{"role": "user", "content": _ep}], _email_sys, max_tokens=2000)
+        _email_body = re.sub(r'\*\*(.+?)\*\*', r'\1', _email_body, flags=re.DOTALL)
+        _email_body = re.sub(r'\*(.+?)\*', r'\1', _email_body, flags=re.DOTALL)
+        _email_body = re.sub(r'^#+\s*', '', _email_body, flags=re.MULTILINE)
+        draft_email_data = {"subject": "รายงานการประชุม", "body": _email_body.strip()}
+        reply = "เปิด Draft Email ครับ กรุณาตรวจสอบผู้รับและเนื้อหาก่อนส่ง"
+    elif _file_is_meeting and _forced_meeting_skill:
         # File is a meeting report → always use Meeting Report Assistant
         reply = _claude_chat(
             [{"role": "user", "content": effective_message}],
@@ -904,10 +1406,76 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         message=req.message,
         context={
             "timestamp": datetime.now().isoformat(),
-            "reply": reply[:200] if reply else "",
+            "reply": reply[:500] if reply else "",
             "suggested_skills": [s.get("name") for s in suggested] if suggested else []
         }
     )
+
+    # ── บันทึกการใช้ skill ลง memory (history) ───────────────────────────────
+    if powered_by_skill_info:
+        UserMemoryManager.save_skill_memory(
+            db, req.user_email,
+            skill_id=powered_by_skill_info["id"],
+            skill_name=powered_by_skill_info["name"])
+
+    # ── ยืนยันการจำชื่อผู้พูด ────────────────────────────────────────────────
+    if _speaker_renames:
+        names = ", ".join(f"ผู้พูด {l} = คุณ{n}" for l, n in _speaker_renames)
+        reply += f"\n\nจำแล้วครับ: {names} — อัปเดตชื่อใน transcript ให้แล้ว ถามต่อหรือสั่งทำ MOM ได้เลย"
+
+    # ── Auto-skill suggestion จาก behavior (คิดไว้รอบก่อนโดย background learner) ──
+    skill_suggestion = None
+    behavior = UserMemoryManager.get_behavior(db, req.user_email)
+    pending = behavior.get("pending_suggestion")
+    if pending and not pending.get("shown"):
+        skill_suggestion = pending
+        if pending.get("type") == "install":
+            reply += (
+                f"\n\nผมสังเกตว่าคุณสั่งงานแบบ \"{pending.get('intent_desc') or pending.get('intent')}\" "
+                f"มาแล้ว {pending.get('count', 0)} ครั้ง — ใน Skill Store มี **{pending.get('name')}** "
+                f"ที่ทำงานนี้ได้อยู่แล้ว ({pending.get('description','')})\n"
+                f"พิมพ์ \"ติดตั้งเลย\" เพื่อเพิ่มเข้าผู้ช่วยของคุณ หรือ \"ไม่ต้อง\" เพื่อข้าม"
+            )
+        else:
+            reply += (
+                f"\n\nผมสังเกตว่าคุณสั่งงานแบบ \"{pending.get('intent_desc') or pending.get('intent')}\" "
+                f"มาแล้ว {pending.get('count', 0)} ครั้ง — ผมออกแบบ Skill **{pending.get('name')}** ไว้ให้แล้ว "
+                f"({pending.get('description','')})\n"
+                f"พิมพ์ \"สร้าง skill ที่แนะนำ\" เพื่อสร้างเลย หรือ \"ไม่ต้อง\" เพื่อข้าม"
+            )
+        pending["shown"] = True
+        UserMemoryManager.set_pending_suggestion(db, req.user_email, pending)
+    elif pending and pending.get("shown"):
+        # user ตอบรับ/ปฏิเสธ suggestion ที่โชว์ไปแล้ว
+        _accept_words = ["สร้าง skill ที่แนะนำ", "สร้างเลย", "สร้าง skill เลย", "ตกลงสร้าง",
+                         "create suggested skill", "ติดตั้งเลย", "ติดตั้ง skill", "install"]
+        _reject_words = ["ไม่ต้อง", "ไม่สร้าง", "ข้าม", "no thanks", "dismiss"]
+        _msg_low = req.message.strip().lower()
+        if any(w in _msg_low for w in _accept_words) and len(_msg_low) < 40:
+            try:
+                result = _accept_suggestion(db, req.user_email, pending)
+                if result.get("action") == "installed":
+                    reply = (f"ติดตั้ง Skill **{result['name']}** (#{result['id']}) "
+                             f"เข้าผู้ช่วยของคุณแล้วครับ ลองใช้ได้เลย")
+                else:
+                    reply = (f"สร้าง Skill **{result['name']}** (#{result['id']}) ให้แล้วครับ "
+                             f"เป็น Private Skill ของคุณ ลองใช้ได้เลย หรือกด Share to Skill Store เพื่อแชร์ให้ทีม")
+            except HTTPException as he:
+                reply = f"ไม่สำเร็จ: {he.detail}"
+        elif any(w in _msg_low for w in _reject_words) and len(_msg_low) < 30:
+            UserMemoryManager.dismiss_suggestion(db, req.user_email, pending.get("intent", ""))
+            reply = "รับทราบครับ จะไม่เสนอ Skill นี้อีก"
+
+    # ── Background learning (ไม่บล็อกการตอบ) ────────────────────────────────
+    _skills_meta = [
+        " ".join(filter(None, [s.name, s.skill_type or ""] + (s.tags or [])))
+        for s in user_skills
+    ]
+    threading.Thread(
+        target=_learn_from_chat,
+        args=(req.user_email, req.message, _skills_meta),
+        daemon=True,
+    ).start()
 
     return ChatResponse(
         reply=reply,
@@ -916,6 +1484,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         action_buttons=action_buttons,
         is_meeting_report=is_meeting,
         powered_by_skill=powered_by_skill_info,
+        skill_suggestion=skill_suggestion,
+        draft_email=draft_email_data,
     )
 
 
@@ -976,6 +1546,56 @@ def _auto_save_contacts(text: str, participants: list, user_email: str, db: Sess
     db.commit()
 
 
+_LLM_INPUT_MAX_CHARS = 36000
+
+
+def _prepare_meeting_text(text: str) -> str:
+    """ทำให้ transcript ยาวพอดีกับ context ของ LLM โดยไม่ทิ้งช่วงท้ายประชุม
+
+    เดิมทุก endpoint ตัดข้อความเหลือ 2,000-6,000 ตัวอักษรแรก ทำให้สรุป/MOM
+    ของประชุมยาวขาดเนื้อหาช่วงกลาง-ท้ายทั้งหมด ตอนนี้ถ้ายาวเกิน limit จะย่อ
+    ทีละท่อนแบบเก็บรายละเอียดสำคัญ (มติ, action items, ตัวเลข, ชื่อ) ให้ครบทุกช่วง
+    """
+    text = (text or "").strip()
+    if len(text) <= _LLM_INPUT_MAX_CHARS:
+        return text
+    SEG = 12000
+    segments = [text[i:i + SEG] for i in range(0, len(text), SEG)][:12]
+    condensed = []
+    for i, seg in enumerate(segments):
+        out = _claude_chat(
+            [{"role": "user", "content": seg}],
+            "ย่อบันทึกการประชุมท่อนนี้ให้เหลือสาระสำคัญครบถ้วน: ใครพูดอะไร มติที่ประชุม "
+            "ตัวเลข วันที่ ชื่อคน action items และประเด็นที่ถกเถียง "
+            "ห้ามทิ้งข้อมูลสำคัญ ห้ามแต่งเติม ตอบเป็นเนื้อหาย่อเท่านั้น",
+            max_tokens=4096,
+        )
+        if not out or out.startswith("OpenAI Error") or out.startswith("⚠️"):
+            out = seg[:4000]
+        condensed.append(f"[ช่วงที่ {i+1}]\n{out.strip()}")
+    return "\n\n".join(condensed)[:_LLM_INPUT_MAX_CHARS]
+
+
+# Cache ของ transcript ที่ย่อแล้วสำหรับ chat — การย่อไฟล์ยาวเรียก LLM หลายครั้ง
+# จึงไม่ควรทำซ้ำทุกข้อความแชท (key = md5 ของ transcript เต็ม)
+_chat_transcript_cache = {}
+
+
+def _condense_transcript_for_chat(text: str) -> str:
+    text = (text or "").strip()
+    if len(text) <= _LLM_INPUT_MAX_CHARS:
+        return text
+    import hashlib
+    key = hashlib.md5(text.encode()).hexdigest()
+    if key in _chat_transcript_cache:
+        return _chat_transcript_cache[key]
+    condensed = _prepare_meeting_text(text)
+    if len(_chat_transcript_cache) > 20:
+        _chat_transcript_cache.clear()
+    _chat_transcript_cache[key] = condensed
+    return condensed
+
+
 @app.post("/api/meeting/extract")
 def meeting_extract(body: dict, db: Session = Depends(get_db)):
     text     = (body.get("text") or "").strip()
@@ -991,7 +1611,7 @@ def meeting_extract(body: dict, db: Session = Depends(get_db)):
     skill.last_used_at = datetime.now()
     db.commit()
 
-    raw = _claude_chat([{"role": "user", "content": f"Extract:\n\n{text[:2000]}"}], system)
+    raw = _claude_chat([{"role": "user", "content": f"Extract:\n\n{_prepare_meeting_text(text)}"}], system)
     import json as _json, re as _re
     try:
         m = _re.search(r'\{.*\}', raw, _re.DOTALL)
@@ -1014,14 +1634,24 @@ def meeting_extract(body: dict, db: Session = Depends(get_db)):
 # ── Meeting: Draft email ──────────────────────────────────────────────────────
 @app.post("/api/meeting/draft-email")
 def meeting_draft_email(body: dict, db: Session = Depends(get_db)):
+    # รับได้ทั้ง 2 รูปแบบ: ห่อใน meeting_data หรือส่ง field ตรงๆ (frontend ส่งแบบหลัง
+    # — เดิมอ่านแค่ meeting_data ทำให้ participants/action_items/transcript ถูกทิ้ง
+    # และอีเมลออกมาไม่อิงเนื้อหาประชุมจริง)
     md = body.get("meeting_data") or {}
     sender = (body.get("user_email") or "").split("@")[0] or "ทีม Hermes"
-    title  = md.get("title", "การประชุม")
-    date   = md.get("date", "")
-    pts    = md.get("participants") or []
-    items  = md.get("action_items") or []
-    items_text = "\n".join(f"{i+1}. {it.get('task','')} — {it.get('owner','')} ({it.get('deadline','')})"
-                           for i, it in enumerate(items))
+    title  = md.get("title") or body.get("title") or "การประชุม"
+    date   = md.get("date") or body.get("date") or ""
+    pts    = md.get("participants") or body.get("participants") or []
+    items  = md.get("action_items") or body.get("action_items") or []
+    meeting_text = (body.get("meeting_text") or md.get("transcript") or "").strip()
+
+    def _item_line(i, it):
+        if not isinstance(it, dict):
+            return f"{i+1}. {it}"
+        due = it.get("deadline") or it.get("due") or ""
+        return f"{i+1}. {it.get('task') or it.get('description','')} — {it.get('owner','')} ({due})"
+    items_text = "\n".join(_item_line(i, it) for i, it in enumerate(items))
+    pts_text = ", ".join(str(p) for p in pts if p)
 
     skill = _seed_meeting_skill(db)
     wf = skill.workflow_data or {}
@@ -1031,12 +1661,19 @@ def meeting_draft_email(body: dict, db: Session = Depends(get_db)):
     skill.last_used_at = datetime.now()
     db.commit()
 
+    context_block = ""
+    if meeting_text:
+        context_block = f"\n\nเนื้อหาการประชุม (ใช้อ้างอิงประเด็นจริง ห้ามแต่งเติม):\n{_prepare_meeting_text(meeting_text)}"
     prompt = (f"เขียนอีเมลสรุปการประชุม:\nชื่อ: {title}\nวันที่: {date}\n"
-              f"ผู้เข้าร่วม: {', '.join(pts) or 'ทีมที่เกี่ยวข้อง'}\n"
-              f"Action Items:\n{items_text or '-'}\n\n"
+              f"ผู้เข้าร่วม: {pts_text or 'ทีมที่เกี่ยวข้อง'}\n"
+              f"Action Items:\n{items_text or '-'}"
+              f"{context_block}\n\n"
               f"เริ่มด้วย 'เรียน ผู้เกี่ยวข้องทุกท่าน,' ลงท้ายด้วยชื่อ {sender}")
-    body_text = _claude_chat([{"role": "user", "content": prompt}], system)
-    return {"subject": f"รายงานการประชุม: {title}", "body": body_text,
+    body_text = _claude_chat([{"role": "user", "content": prompt}], system, max_tokens=4096)
+    body_text = re.sub(r'\*\*(.+?)\*\*', r'\1', body_text, flags=re.DOTALL)
+    body_text = re.sub(r'\*(.+?)\*', r'\1', body_text, flags=re.DOTALL)
+    body_text = re.sub(r'^#+\s*', '', body_text, flags=re.MULTILINE)
+    return {"subject": f"รายงานการประชุม: {title}", "body": body_text.strip(),
             "_skill_id": skill.id}
 
 
@@ -1055,8 +1692,9 @@ def meeting_generate_summary(body: dict, db: Session = Depends(get_db)):
     db.commit()
 
     summary = _claude_chat(
-        [{"role": "user", "content": text[:4000]}],
+        [{"role": "user", "content": _prepare_meeting_text(text)}],
         skill.prompt_template or _MEETING_GENERATE_PROMPT,
+        max_tokens=4096,
     )
     return {"summary": summary, "_skill_id": skill.id}
 
@@ -1074,8 +1712,9 @@ def meeting_generate_mom(body: dict, db: Session = Depends(get_db)):
     db.commit()
 
     mom_text = _claude_chat(
-        [{"role": "user", "content": f"สร้าง MOM จาก transcript/บันทึกการประชุมนี้:\n\n{text[:4000]}"}],
+        [{"role": "user", "content": f"สร้าง MOM จาก transcript/บันทึกการประชุมนี้:\n\n{_prepare_meeting_text(text)}"}],
         _MEETING_MOM_PROMPT,
+        max_tokens=4096,
     )
     return {"mom": mom_text, "_skill_id": skill.id}
 
@@ -1101,15 +1740,49 @@ _MEETING_INTEL_PROMPT = """\
 
 @app.post("/api/meeting/clean-transcript")
 def meeting_clean_transcript(body: dict, db: Session = Depends(get_db)):
-    """Use LLM to fix Whisper transcription errors (spelling, proper nouns, Thai words)."""
+    """Use LLM to fix Whisper transcription errors (spelling, proper nouns, Thai words).
+
+    Cleans the FULL transcript segment-by-segment. The previous version
+    truncated input to 6,000 chars + 2,048 output tokens, so long meetings
+    lost most of their transcript at this step.
+    """
     text = (body.get("text") or "").strip()
     if not text:
         return {"transcript": text}
-    cleaned = _claude_chat(
-        [{"role": "user", "content": text[:6000]}],
-        "แก้ไขคำผิดใน transcript ภาษาไทยนี้: แก้ชื่อสถานที่ ชื่อคน และคำสะกดผิดที่เกิดจากการฟังเสียง อย่าเปลี่ยนเนื้อหาหรือความหมาย ตอบแค่ transcript ที่แก้แล้วเท่านั้น ไม่ต้องอธิบายหรือเพิ่มเติมใดๆ",
-    )
-    return {"transcript": cleaned}
+
+    _SYSTEM = ("แก้ไขคำผิดใน transcript ภาษาไทยนี้: แก้ชื่อสถานที่ ชื่อคน และคำสะกดผิดที่เกิดจากการฟังเสียง "
+               "อย่าเปลี่ยนเนื้อหาหรือความหมาย อย่าตัดทอนหรือสรุป ต้องคงความยาวเดิม "
+               "ห้ามแก้ไขหรือลบ timestamp ในวงเล็บเหลี่ยม เช่น [12:34] และป้ายผู้พูด เช่น 'ผู้พูด A:' — คงไว้ตามเดิมทุกตัว "
+               "คงการขึ้นบรรทัดใหม่ตามต้นฉบับ "
+               "ตอบแค่ transcript ที่แก้แล้วเท่านั้น ไม่ต้องอธิบายหรือเพิ่มเติมใดๆ")
+    SEG_CHARS = 4000      # ~ปลอดภัยต่อ max_tokens ของ output
+    MAX_SEGMENTS = 25     # กัน latency เกินเหตุ (~100k chars) — เกินนั้นคงข้อความดิบไว้
+
+    # แบ่งที่ขอบ whitespace ใกล้ๆ ขีดจำกัด เพื่อไม่ตัดกลางคำ
+    segments = []
+    pos = 0
+    while pos < len(text):
+        end = min(pos + SEG_CHARS, len(text))
+        if end < len(text):
+            ws = max(text.rfind("\n", pos, end), text.rfind(" ", pos, end))
+            if ws > pos + SEG_CHARS // 2:
+                end = ws
+        segments.append(text[pos:end])
+        pos = end
+
+    cleaned_parts = []
+    for i, seg in enumerate(segments):
+        if i >= MAX_SEGMENTS:
+            cleaned_parts.append(" ".join(segments[i:]))
+            break
+        out = _claude_chat([{"role": "user", "content": seg}], _SYSTEM, max_tokens=8192)
+        # ถ้า LLM ตอบ error หรือสั้นผิดปกติ (ตัดทอน/สรุปเอง) → ใช้ต้นฉบับของท่อนนั้น
+        if (not out or out.startswith("OpenAI Error") or out.startswith("⚠️")
+                or len(out) < len(seg) * 0.6):
+            out = seg
+        cleaned_parts.append(out.strip())
+
+    return {"transcript": " ".join(cleaned_parts).strip()}
 
 
 @app.post("/api/meeting/analyze-intelligence")
@@ -1125,8 +1798,9 @@ def meeting_analyze_intelligence(body: dict, db: Session = Depends(get_db)):
     db.commit()
 
     raw = _claude_chat(
-        [{"role": "user", "content": f"Transcript:\n\n{text[:6000]}"}],
+        [{"role": "user", "content": f"Transcript:\n\n{_prepare_meeting_text(text)}"}],
         _MEETING_INTEL_PROMPT,
+        max_tokens=4096,
     )
     try:
         import json as _json, re as _re
@@ -1211,28 +1885,55 @@ def _normalize_to_mp3(source: pathlib.Path) -> pathlib.Path:
     return out
 
 
-def _split_audio_ffmpeg(audio_path: pathlib.Path, chunk_duration_secs: int = 1200) -> list:
-    """Split a normalised MP3 into time-based chunks. Each chunk is a valid MP3 file."""
+# ── Transcription tuning ──────────────────────────────────────────────────────
+# 10-min chunks: gpt-4o-transcribe silently truncates long audio (commonly past
+# ~10-15 min), which was the cause of incomplete transcripts on long meetings.
+TRANSCRIBE_CHUNK_SECS   = int(os.getenv("TRANSCRIBE_CHUNK_SECS", "600"))
+TRANSCRIBE_OVERLAP_SECS = int(os.getenv("TRANSCRIBE_OVERLAP_SECS", "15"))
+TRANSCRIBE_LANGUAGE     = os.getenv("TRANSCRIBE_LANGUAGE", "th")  # "" = auto-detect
+
+
+def _split_audio_ffmpeg(audio_path: pathlib.Path,
+                        chunk_duration_secs: int = TRANSCRIBE_CHUNK_SECS,
+                        overlap_secs: int = TRANSCRIBE_OVERLAP_SECS) -> list:
+    """Split a normalised MP3 into overlapping time-based chunks.
+
+    Chunk i covers [i*chunk - overlap, (i+1)*chunk] so consecutive chunks share
+    `overlap_secs` of audio — words at a boundary appear in both chunks and the
+    duplicate is removed at merge time (no more lost words at cut points).
+
+    Returns list of dicts: {path, start (sec), dur (sec)}.
+    """
     import subprocess
-    chunk_paths = []
+    chunks = []
     idx = 0
     while True:
-        start = idx * chunk_duration_secs
+        boundary = idx * chunk_duration_secs
+        start = max(0, boundary - (overlap_secs if idx > 0 else 0))
+        dur = (boundary + chunk_duration_secs) - start
         out = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}.mp3"
         subprocess.run(
             ["ffmpeg", "-y", "-i", str(audio_path),
-             "-ss", str(start), "-t", str(chunk_duration_secs),
+             "-ss", str(start), "-t", str(dur),
              "-c", "copy", str(out)],
             capture_output=True,
         )
         # Accept chunks ≥ 512 bytes — the final chunk of a meeting may be short
         if out.exists() and out.stat().st_size > 512:
-            chunk_paths.append(out)
+            chunks.append({"path": out, "start": start, "dur": dur})
             idx += 1
         else:
             out.unlink(missing_ok=True)
             break
-    return chunk_paths
+    return chunks
+
+
+def _fmt_ts(seconds: float) -> str:
+    """0:00 → "MM:SS" หรือ "H:MM:SS" สำหรับไฟล์ยาวเกินชั่วโมง"""
+    s = int(max(seconds or 0, 0))
+    h, rem = divmod(s, 3600)
+    m, sec = divmod(rem, 60)
+    return f"{h}:{m:02d}:{sec:02d}" if h else f"{m:02d}:{sec:02d}"
 
 
 _WHISPER_MEETING_PROMPT = (
@@ -1256,54 +1957,241 @@ def _clean_repetitions(text: str) -> str:
     import re
     if not text or len(text) < 4:
         return text
+
+    def _collapse(m):
+        unit = m.group(1)
+        # Digits repeat legitimately (years, "5555" laughter, phone numbers)
+        if unit.strip().isdigit():
+            return m.group(0)
+        return unit
+
+    # Thresholds are deliberately high (4-6+ copies): real speech repeats words
+    # 2-3 times all the time — collapsing those mangled legitimate transcripts.
+    # Whisper hallucination loops produce dozens of copies, so they still match.
     # Apply each pass twice — a single run can leave survivors when repetitions
     # overlap or the regex engine picks up mid-pattern.
     for _ in range(2):
-        # Pass 1: space-separated (non-greedy, 3–80 chars, 3+ total copies)
-        text = re.sub(r'(.{3,80}?)(?:\s+\1){2,}', r'\1', text)
-        # Pass 2: fused medium phrases (non-greedy, 3–80 chars, 3+ copies)
-        text = re.sub(r'(.{3,80}?)\1{2,}', r'\1', text)
-        # Pass 3: short Thai syllables fused (non-greedy, 1–8 chars, 4+ copies)
-        text = re.sub(r'(.{1,8}?)\1{3,}', r'\1', text)
+        # Pass 1: space-separated (non-greedy, 3–80 chars, 4+ total copies)
+        text = re.sub(r'(.{3,80}?)(?:\s+\1){3,}', _collapse, text)
+        # Pass 2: fused medium phrases (non-greedy, 3–80 chars, 4+ copies)
+        text = re.sub(r'(.{3,80}?)\1{3,}', _collapse, text)
+        # Pass 3: short Thai syllables fused (non-greedy, 1–8 chars, 6+ copies)
+        text = re.sub(r'(.{1,8}?)\1{5,}', _collapse, text)
     text = re.sub(r' {2,}', ' ', text).strip()
     return text
 
 
-def _call_whisper(client, audio_file, filename: str) -> str:
-    """Call transcription API — tries gpt-4o-transcribe first, falls back to whisper-1."""
-    try:
-        result = client.audio.transcriptions.create(
-            model="gpt-4o-transcribe",
-            file=audio_file,
-            prompt=_WHISPER_MEETING_PROMPT,
-            temperature=0,
-        )
-        return _clean_repetitions(result.text)
-    except Exception:
-        # gpt-4o-transcribe not available — fall back to whisper-1.
-        # temperature=0.2 (not 0): temperature=0 makes whisper-1 more prone to repetition loops.
-        result = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            prompt=_WHISPER_MEETING_PROMPT,
-            temperature=0.2,
-        )
-        return _clean_repetitions(result.text)
+# ── Segment-based transcription (timestamps + speaker diarization) ───────────
+# DIARIZE_MODEL คืน segments {speaker, start, end, text} — ทดสอบจริงแล้ว:
+#   - รองรับ language + chunking_strategy="auto", ไม่รองรับ prompt
+#   - ลิมิต 1,400 วินาที (~23 นาที) ต่อ 1 call → ไฟล์สั้นกว่านั้นเรียกครั้งเดียว
+#     เพื่อให้ป้ายผู้พูด (A/B/C) สม่ำเสมอทั้งไฟล์
+DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
+_DIARIZE_MAX_SECS = 1400
+TRANSCRIBE_DIARIZE = os.getenv("TRANSCRIBE_DIARIZE", "1") not in ("0", "false", "no")
+
+# dual  = ทุก chunk ตรวจซ้ำด้วย whisper-1 แล้วเก็บผลที่เนื้อหาครบกว่า
+#         (gpt-4o-transcribe ตระกูลนี้เคยตัดเนื้อหาทิ้งเงียบๆ กลางไฟล์)
+# single = โมเดลเดียว เร็ว/ถูกกว่า แต่เสี่ยงตกหล่น
+TRANSCRIBE_MODE = os.getenv("TRANSCRIBE_MODE", "dual")
+
+
+def _diarize_segments(client, path) -> list:
+    """ถอดเสียง + แยกผู้พูดด้วย gpt-4o-transcribe-diarize (retry 3 ครั้ง)
+
+    คืน list ของ {speaker, start, end, text} (เวลาเป็นวินาทีภายในไฟล์ที่ส่งไป)
+    """
+    import time as _time
+    kwargs = {}
+    if TRANSCRIBE_LANGUAGE:
+        kwargs["language"] = TRANSCRIBE_LANGUAGE
+    last_err = None
+    for attempt in range(3):
+        try:
+            with open(str(path), "rb") as f:
+                r = client.audio.transcriptions.create(
+                    model=DIARIZE_MODEL, file=f,
+                    response_format="diarized_json",
+                    chunking_strategy="auto", **kwargs)
+            segs = []
+            for s in (r.segments or []):
+                d = s if isinstance(s, dict) else s.model_dump()
+                txt = _clean_repetitions((d.get("text") or "").strip())
+                if txt:
+                    segs.append({"speaker": d.get("speaker"),
+                                 "start": float(d.get("start") or 0),
+                                 "end": float(d.get("end") or 0),
+                                 "text": txt})
+            return segs
+        except Exception as e:
+            last_err = e
+            print(f"[transcribe] diarize attempt {attempt+1} failed: {e}", flush=True)
+            _time.sleep(2 * (attempt + 1))
+    raise last_err
+
+
+def _whisper_segments(client, path, context_prompt: str = "") -> list:
+    """ถอดเสียงด้วย whisper-1 verbose_json → segments มี timestamp (ไม่มีผู้พูด)
+
+    whisper-1 เชื่อถือได้เรื่องความครบของไฟล์ยาว — ใช้เป็นตัวตรวจสอบ/fallback
+    """
+    import time as _time
+    prompt = _WHISPER_MEETING_PROMPT
+    if context_prompt:
+        prompt = f"{_WHISPER_MEETING_PROMPT}\n{context_prompt[-600:]}"
+    kwargs = {}
+    if TRANSCRIBE_LANGUAGE:
+        kwargs["language"] = TRANSCRIBE_LANGUAGE
+    last_err = None
+    for attempt in range(3):
+        try:
+            with open(str(path), "rb") as f:
+                r = client.audio.transcriptions.create(
+                    model="whisper-1", file=f,
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"],
+                    prompt=prompt, temperature=0.2, **kwargs)
+            segs = []
+            for s in (r.segments or []):
+                d = s if isinstance(s, dict) else s.model_dump()
+                txt = _clean_repetitions((d.get("text") or "").strip())
+                if txt:
+                    segs.append({"speaker": None,
+                                 "start": float(d.get("start") or 0),
+                                 "end": float(d.get("end") or 0),
+                                 "text": txt})
+            return segs
+        except Exception as e:
+            last_err = e
+            print(f"[transcribe] whisper-1 attempt {attempt+1} failed: {e}", flush=True)
+            _time.sleep(2 * (attempt + 1))
+    raise last_err
+
+
+def _assign_speakers_by_overlap(target_segs: list, labeled_segs: list) -> None:
+    """ใส่ป้ายผู้พูดให้ segments ที่ไม่มีป้าย โดยเทียบช่วงเวลากับ segments ที่มีป้าย"""
+    for t in target_segs:
+        best, best_ov = None, 0.0
+        for l in labeled_segs:
+            ov = min(t["end"], l["end"]) - max(t["start"], l["start"])
+            if ov > best_ov and l.get("speaker"):
+                best, best_ov = l["speaker"], ov
+        if best:
+            t["speaker"] = best
+
+
+def _transcribe_chunk_segments(client, path, context_prompt: str = "") -> list:
+    """ถอด 1 ไฟล์/chunk เป็น segments — diarize เป็นหลัก + whisper-1 ตรวจความครบ
+
+    ถ้า whisper-1 ได้เนื้อหายาวกว่าเกิน 10% แปลว่า diarize ตัดเนื้อหาทิ้ง →
+    ใช้ข้อความของ whisper-1 (ครบกว่า) แล้วยืมป้ายผู้พูดจาก diarize มาใส่ตามช่วงเวลา
+    """
+    d_segs = []
+    if TRANSCRIBE_DIARIZE:
+        try:
+            d_segs = _diarize_segments(client, path)
+        except Exception as e:
+            print(f"[transcribe] diarize failed entirely ({e}) — whisper-1 only", flush=True)
+
+    w_segs = []
+    if not d_segs or TRANSCRIBE_MODE == "dual":
+        try:
+            w_segs = _whisper_segments(client, path, context_prompt)
+        except Exception as e:
+            if not d_segs:
+                raise
+            print(f"[transcribe] whisper dual-check failed ({e}) — keeping diarize", flush=True)
+
+    d_len = sum(len(s["text"]) for s in d_segs)
+    w_len = sum(len(s["text"]) for s in w_segs)
+
+    if d_segs and (not w_segs or w_len <= d_len * 1.10):
+        print(f"[transcribe] diarize OK (diarize={d_len} chars, whisper={w_len})", flush=True)
+        return d_segs
+    if w_segs and d_segs:
+        print(f"[transcribe] whisper richer ({w_len} vs {d_len}) — whisper text + diarize speakers", flush=True)
+        _assign_speakers_by_overlap(w_segs, d_segs)
+    return w_segs
+
+
+def _remap_chunk_speakers(accepted: list, new_segs: list) -> None:
+    """ป้าย A/B ของแต่ละ chunk เป็นอิสระกัน — map ป้ายของ chunk ใหม่ให้ตรงกับ
+    ของเดิมโดยโหวตจากช่วง overlap ที่ถูกถอดซ้ำทั้งสอง chunk
+    (ป้ายที่ไม่มีหลักฐานใน overlap จะคงไว้ตามเดิม)"""
+    from collections import Counter
+    if not accepted or not new_segs:
+        return
+    votes = {}
+    for ns in new_segs:
+        if not ns.get("speaker"):
+            continue
+        for os_ in accepted:
+            if not os_.get("speaker"):
+                continue
+            ov = min(ns["end"], os_["end"]) - max(ns["start"], os_["start"])
+            if ov > 0.5:
+                votes.setdefault(ns["speaker"], Counter())[os_["speaker"]] += ov
+    mapping = {nl: c.most_common(1)[0][0] for nl, c in votes.items()}
+    for ns in new_segs:
+        sp = ns.get("speaker")
+        if sp in mapping:
+            ns["speaker"] = mapping[sp]
+
+
+def _render_transcript(segments: list) -> str:
+    """แปลง segments → ข้อความอ่านง่าย: "[MM:SS] ผู้พูด A: ..." ต่อบรรทัด
+
+    - รวมประโยคติดกันของผู้พูดคนเดิมเป็นบรรทัดเดียว แต่ตัดบรรทัดใหม่ทุก ~45 วินาที
+      เพื่อให้ timestamp ยังไล่ตามเนื้อหาได้
+    - ถ้ามีผู้พูดคนเดียว (หรือไม่รู้) จะไม่ใส่ป้ายผู้พูดให้รก
+    """
+    segs = [s for s in segments if (s.get("text") or "").strip()]
+    if not segs:
+        return ""
+    speakers = {s.get("speaker") for s in segs if s.get("speaker")}
+    multi = len(speakers) > 1
+    lines = []
+    cur = None
+
+    def flush():
+        nonlocal cur
+        if cur and cur["parts"]:
+            prefix = f"[{_fmt_ts(cur['start'])}]"
+            if multi and cur["speaker"]:
+                prefix += f" ผู้พูด {cur['speaker']}:"
+            lines.append(f"{prefix} {' '.join(cur['parts']).strip()}")
+        cur = None
+
+    for s in segs:
+        if (cur is None
+                or s.get("speaker") != cur["speaker"]
+                or s["end"] - cur["start"] > 45
+                or sum(len(p) for p in cur["parts"]) > 280):
+            flush()
+            cur = {"start": s["start"], "speaker": s.get("speaker"), "parts": []}
+        cur["parts"].append(s["text"].strip())
+    flush()
+    return "\n".join(lines)
+
+
+def _segments_plain_text(segments: list) -> str:
+    return " ".join((s.get("text") or "").strip() for s in segments).strip()
 
 
 async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
-    """Transcribe audio/video — normalises to MP3 first, then chunks by duration.
+    """Transcribe audio/video → (formatted_transcript, num_chunks, segments)
 
     Strategy:
-    1. Convert to 16kHz mono MP3 via ffmpeg (strips video, shrinks file, ensures reliable chunking).
-    2. Detect duration via ffprobe.
-    3. If duration ≤ 20 min AND file ≤ 25 MB → single Whisper call.
-    4. Otherwise → 20-min chunks (≈ 4.8 MB each at 32 kbps).
+    1. Normalise to 16kHz mono MP3 (strips video, shrinks file).
+    2. ≤ 23 min → diarize ครั้งเดียวทั้งไฟล์ (timestamps + ป้ายผู้พูดสม่ำเสมอ 100%)
+    3. ยาวกว่า → chunk 10 นาที + overlap 30 วิ, map ป้ายผู้พูดข้าม chunk
+       ด้วยการโหวตจากช่วง overlap, ตัด segment ซ้ำด้วยเวลา
+    4. ทุก chunk ตรวจความครบด้วย whisper-1 (dual mode)
 
-    This handles 1-hour+ video recordings correctly regardless of original bitrate.
+    formatted_transcript = "[MM:SS] ผู้พูด A: ..." ต่อบรรทัด
     """
     from openai import OpenAI
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=900)
 
     # Step 1: normalise — extract audio, strip video, convert to 16kHz mono MP3
     norm_path = None
@@ -1327,56 +2215,99 @@ async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=No
         duration_min = duration / 60
         print(f"[transcribe] duration={duration_min:.1f} min  size={file_size/(1024*1024):.1f} MB", flush=True)
 
+        # ไฟล์สั้นพอสำหรับ diarize ครั้งเดียว → ป้ายผู้พูดสม่ำเสมอทั้งไฟล์
+        single_max = _DIARIZE_MAX_SECS if TRANSCRIBE_DIARIZE else TRANSCRIBE_CHUNK_SECS
         if duration > 0:
-            # ffprobe available — use actual duration
-            needs_chunking = (duration > 20 * 60) or (file_size > max_single_file)
+            needs_chunking = (duration > single_max) or (file_size > max_single_file)
         else:
-            # ffprobe unavailable — be conservative: chunk anything > 5 MB after normalisation.
-            # At 32 kbps mono, 5 MB ≈ 21 min, so this catches all meetings longer than ~20 min.
-            print(f"[transcribe] ffprobe unavailable — using size-only threshold (5 MB)", flush=True)
-            needs_chunking = file_size > 5 * 1024 * 1024
+            # ffprobe unavailable — be conservative: chunk anything > 2.5 MB after
+            # normalisation. At 32 kbps mono, 2.5 MB ≈ 10 min.
+            print(f"[transcribe] ffprobe unavailable — using size-only threshold (2.5 MB)", flush=True)
+            needs_chunking = file_size > int(2.5 * 1024 * 1024)
 
         if not needs_chunking:
-            print(f"[transcribe] single call (short file)", flush=True)
-            with open(str(work_path), "rb") as af:
-                text = _call_whisper(client, af, filename)
-            return text, 1
+            print(f"[transcribe] single call (≤ {single_max/60:.0f} min)", flush=True)
+            if on_progress:
+                on_progress(1, 1, "กำลังถอดเสียง + แยกผู้พูด...")
+            segments = _transcribe_chunk_segments(client, work_path)
+            return _render_transcript(segments), 1, segments
 
-        # Step 3: chunk into 20-minute segments
-        chunk_paths = _split_audio_ffmpeg(work_path, chunk_duration_secs=20 * 60)
-        if not chunk_paths:
+        # Step 3: chunk — overlap 30 วิ เพื่อให้มีหลักฐานพอสำหรับ map ป้ายผู้พูดข้าม chunk
+        overlap = max(TRANSCRIBE_OVERLAP_SECS, 30) if TRANSCRIBE_DIARIZE else TRANSCRIBE_OVERLAP_SECS
+        chunks = _split_audio_ffmpeg(work_path, TRANSCRIBE_CHUNK_SECS, overlap)
+        if not chunks:
             raise HTTPException(500, "ไม่สามารถแบ่งไฟล์เสียงได้ — กรุณาตรวจสอบว่าติดตั้ง ffmpeg แล้ว")
 
-        num_chunks = len(chunk_paths)
-        print(f"[transcribe] split into {num_chunks} chunks, transcribing...", flush=True)
-        transcripts = []
+        num_chunks = len(chunks)
+        print(f"[transcribe] split into {num_chunks} chunks (overlap {overlap}s), transcribing...", flush=True)
+        accepted = []        # segments ที่รับแล้ว (เวลา global)
+        context_text = ""    # ท้าย transcript สำหรับ prompt ต่อเนื่องของ whisper
+        failed_chunks = 0
 
-        for i, cpath in enumerate(chunk_paths):
+        for i, chunk in enumerate(chunks):
+            cpath = chunk["path"]
             chunk_mb = cpath.stat().st_size / (1024 * 1024)
             print(f"[transcribe] chunk {i+1}/{num_chunks} ({chunk_mb:.1f} MB)...", flush=True)
             if on_progress:
                 on_progress(i + 1, num_chunks, f"chunk {i+1}/{num_chunks}")
             try:
-                with open(str(cpath), "rb") as cf:
-                    text = _call_whisper(client, cf, cpath.name)
-                char_count = len(text)
-                print(f"[transcribe] chunk {i+1} done: {char_count} chars", flush=True)
-                transcripts.append(text)
+                segs = _transcribe_chunk_segments(client, cpath, context_prompt=context_text)
+                # เวลาใน chunk → เวลา global ของทั้งไฟล์
+                for s in segs:
+                    s["start"] += chunk["start"]
+                    s["end"] += chunk["start"]
+                # ป้ายผู้พูดของ chunk นี้ → ป้ายเดียวกับ chunk ก่อนหน้า (โหวตจาก overlap)
+                _remap_chunk_speakers(accepted, segs)
+                # ตัดส่วน overlap ที่ถอดซ้ำ: รับเฉพาะ segment ที่เริ่มหลังจุดที่ครอบคลุมแล้ว
+                covered = max((s["end"] for s in accepted), default=0.0)
+                fresh = [s for s in segs if s["start"] >= covered - 1.0]
+                accepted.extend(fresh)
+                context_text = _segments_plain_text(accepted)[-600:]
+                print(f"[transcribe] chunk {i+1} done: {len(fresh)} segments accepted", flush=True)
+            except Exception as e:
+                # One bad chunk must not destroy an hour of transcription —
+                # mark the gap and keep going.
+                failed_chunks += 1
+                start_min = int(chunk["start"] // 60)
+                end_min = int((chunk["start"] + chunk["dur"]) // 60)
+                print(f"[transcribe] chunk {i+1} FAILED after retries: {e}", flush=True)
+                accepted.append({"speaker": None, "start": float(chunk["start"]),
+                                 "end": float(chunk["start"] + chunk["dur"]),
+                                 "text": f"[ช่วงนาทีที่ {start_min}–{end_min} ถอดเสียงไม่สำเร็จ]"})
             finally:
                 cpath.unlink(missing_ok=True)
 
-        total_chars = sum(len(t) for t in transcripts)
-        print(f"[transcribe] all done: {num_chunks} chunks, {total_chars} total chars", flush=True)
-        return " ".join(transcripts), num_chunks
+        total_chars = sum(len(s["text"]) for s in accepted)
+        n_speakers = len({s.get("speaker") for s in accepted if s.get("speaker")})
+        print(f"[transcribe] all done: {num_chunks} chunks ({failed_chunks} failed), "
+              f"{len(accepted)} segments, {n_speakers} speakers, {total_chars} chars", flush=True)
+        return _render_transcript(accepted), num_chunks, accepted
 
     finally:
         if norm_path and norm_path.exists():
             norm_path.unlink(missing_ok=True)
 
 
+def _save_transcript_to_memory(user_email: str, filename: str, transcript: str):
+    """เก็บ transcript ล่าสุดผูกกับ user — ให้ Hermes chat ถาม-ตอบ/สรุปต่อได้ทันที"""
+    if not user_email or not transcript:
+        return
+    from memory_manager import UserMemoryManager
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        UserMemoryManager.save_transcript_memory(db, user_email, filename, transcript)
+        print(f"[transcribe] saved transcript to memory for {user_email} ({len(transcript)} chars)", flush=True)
+    except Exception as e:
+        print(f"[transcribe] save transcript memory failed: {e}", flush=True)
+    finally:
+        db.close()
+
+
 @app.post("/api/meeting/transcribe")
 async def meeting_transcribe(
     file: UploadFile = File(...),
+    user_email: str = Form(""),
 ):
     """Transcribe audio/video file to text via OpenAI Whisper (supports files > 25 MB)."""
     api_key = os.getenv("OPENAI_API_KEY", "")
@@ -1404,8 +2335,10 @@ async def meeting_transcribe(
     _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
     _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
     try:
-        transcript, num_chunks = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
-        return {"transcript": transcript, "chunks_processed": num_chunks}
+        transcript, num_chunks, segments = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
+        _save_transcript_to_memory(user_email, file.filename or "audio", transcript)
+        return {"transcript": transcript, "chunks_processed": num_chunks,
+                "segments": segments, "plain_text": _segments_plain_text(segments)}
     except Exception as e:
         raise HTTPException(500, f"Whisper error: {e}")
     finally:
@@ -1428,7 +2361,7 @@ _transcription_jobs = {}  # job_id -> {status, progress, total, message, transcr
 _TRANSCRIPTION_JOBS_MAX = 100
 
 
-def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, filename: str):
+def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, filename: str, user_email: str = ""):
     """Worker thread — owns its own event loop. The pipeline does blocking
     subprocess (ffmpeg) + sync OpenAI calls, so it must NOT run on the main
     event loop or it would block status polls (the whole point of going async)."""
@@ -1443,12 +2376,15 @@ def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, 
             job["progress"] = cur
             job["total"] = total
             job["message"] = msg
-        transcript, num_chunks = asyncio.run(
+        transcript, num_chunks, segments = asyncio.run(
             _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=on_progress)
         )
         job["transcript"] = transcript
+        job["segments"] = segments
+        job["plain_text"] = _segments_plain_text(segments)
         job["chunks_processed"] = num_chunks
         job["status"] = "done"
+        _save_transcript_to_memory(user_email, filename, transcript)
     except Exception as e:
         job["status"] = "error"
         job["error"] = str(e)
@@ -1466,6 +2402,7 @@ def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, 
 @app.post("/api/meeting/transcribe-large")
 async def meeting_transcribe_large(
     file: UploadFile = File(...),
+    user_email: str = Form(""),
 ):
     """Start an async transcription job for large audio/video (up to 500 MB).
 
@@ -1510,7 +2447,7 @@ async def meeting_transcribe_large(
     }
     threading.Thread(
         target=_run_transcription_job,
-        args=(job_id, audio_path, api_key, file.filename or "audio"),
+        args=(job_id, audio_path, api_key, file.filename or "audio", user_email),
         daemon=True,
     ).start()
     return {"job_id": job_id, "status": "processing"}
@@ -1533,6 +2470,8 @@ async def meeting_transcribe_status(job_id: str):
     }
     if job["status"] == "done":
         resp["transcript"] = job.get("transcript", "")
+        resp["segments"] = job.get("segments", [])
+        resp["plain_text"] = job.get("plain_text", "")
         resp["chunks_processed"] = job.get("chunks_processed", 0)
         _transcription_jobs.pop(job_id, None)  # one-shot: free memory once delivered
     elif job["status"] == "error":
@@ -2740,6 +3679,96 @@ def telegram_polling_thread():
 
 
 # ───────── User Memory Endpoints ──────────
+# ── Auto-skill suggestions (จาก behavior learning) ───────────────────────────
+@app.get("/api/skills/suggestions/{user_email}")
+def get_skill_suggestion(user_email: str, db: Session = Depends(get_db)):
+    """ดู skill ที่ Hermes คิดให้จากพฤติกรรมการใช้งาน (ถ้ามี)"""
+    from memory_manager import UserMemoryManager
+    behavior = UserMemoryManager.get_behavior(db, user_email)
+    return {
+        "pending_suggestion": behavior.get("pending_suggestion"),
+        "intents": behavior.get("intents", {}),
+    }
+
+
+def _accept_suggestion(db: Session, user_email: str, pending: dict) -> dict:
+    """รับ suggestion: type=create → สร้าง skill ใหม่ / type=install → ติดตั้งจาก Store"""
+    from memory_manager import UserMemoryManager
+    if pending.get("type") == "install" and pending.get("skill_id"):
+        skill = db.query(Skill).filter(Skill.id == pending["skill_id"]).first()
+        if not skill:
+            raise HTTPException(404, "skill ใน Store หายไปแล้ว")
+        already = db.query(SkillInstallation).filter(
+            SkillInstallation.skill_id == skill.id,
+            SkillInstallation.user_email == user_email,
+            SkillInstallation.is_active == True).first()
+        if not already:
+            db.add(SkillInstallation(skill_id=skill.id, user_email=user_email))
+            db.commit()
+        UserMemoryManager.set_pending_suggestion(db, user_email, None)
+        return {"id": skill.id, "name": skill.name, "action": "installed"}
+    skill = _create_skill_from_suggestion(db, user_email, pending)
+    if not skill:
+        raise HTTPException(500, "สร้าง skill ไม่สำเร็จ")
+    UserMemoryManager.set_pending_suggestion(db, user_email, None)
+    return {"id": skill.id, "name": skill.name, "action": "created",
+            "status": skill.status.value}
+
+
+@app.post("/api/skills/suggestions/{user_email}/accept")
+def accept_skill_suggestion(user_email: str, db: Session = Depends(get_db)):
+    """รับ suggestion ที่ค้างอยู่ (สร้างใหม่ หรือติดตั้งจาก Store ตามชนิด)"""
+    from memory_manager import UserMemoryManager
+    behavior = UserMemoryManager.get_behavior(db, user_email)
+    pending = behavior.get("pending_suggestion")
+    if not pending:
+        raise HTTPException(404, "ไม่มี skill suggestion ที่ค้างอยู่")
+    return _accept_suggestion(db, user_email, pending)
+
+
+@app.post("/api/skills/suggestions/{user_email}/generate")
+def generate_skill_suggestion(user_email: str, db: Session = Depends(get_db)):
+    """สั่งให้ Hermes วิเคราะห์พฤติกรรมแล้วคิด skill ให้เดี๋ยวนี้ (ไม่ต้องรอครบ threshold)
+
+    เลือก intent ที่ทำซ้ำบ่อยสุดที่ยังไม่ถูก dismiss และยังไม่มี skill ครอบคลุม
+    """
+    from memory_manager import UserMemoryManager
+    behavior = UserMemoryManager.get_behavior(db, user_email)
+    if behavior.get("pending_suggestion"):
+        return {"pending_suggestion": behavior["pending_suggestion"], "source": "existing"}
+
+    intents = behavior.get("intents", {})
+    dismissed = set(behavior.get("dismissed", []))
+    candidates = sorted(
+        [(label, e) for label, e in intents.items()
+         if label not in dismissed and e.get("count", 0) >= 2],
+        key=lambda x: (-x[1].get("count", 0), x[1].get("last_at", "")))
+    if not candidates:
+        raise HTTPException(404, "ยังมีข้อมูลพฤติกรรมไม่พอ — ลองสั่งงานในแชทก่อนสัก 2-3 ครั้ง")
+
+    for intent, entry in candidates:
+        # ข้าม intent ที่ user มี skill ครอบคลุมอยู่แล้ว (สร้างเอง/ติดตั้งแล้ว)
+        if _user_covers_intent(db, user_email, intent):
+            continue
+        suggestion = _build_skill_suggestion(db, user_email, intent, "", entry)
+        if suggestion:
+            UserMemoryManager.set_pending_suggestion(db, user_email, suggestion)
+            return {"pending_suggestion": suggestion, "source": "generated"}
+    raise HTTPException(404, "งานที่คุณทำซ้ำบ่อยมี skill ครอบคลุมหมดแล้ว 🎉")
+
+
+@app.post("/api/skills/suggestions/{user_email}/dismiss")
+def dismiss_skill_suggestion(user_email: str, db: Session = Depends(get_db)):
+    """ปฏิเสธ suggestion — จะไม่เสนอ intent นี้ซ้ำอีก"""
+    from memory_manager import UserMemoryManager
+    behavior = UserMemoryManager.get_behavior(db, user_email)
+    pending = behavior.get("pending_suggestion")
+    if not pending:
+        raise HTTPException(404, "ไม่มี skill suggestion ที่ค้างอยู่")
+    UserMemoryManager.dismiss_suggestion(db, user_email, pending.get("intent", ""))
+    return {"dismissed": pending.get("intent", "")}
+
+
 @app.post("/api/memory/save", response_model=UserMemoryResponse)
 def save_memory(user_email: str, body: UserMemorySave, db: Session = Depends(get_db)):
     """บันทึกข้อมูลลง User Memory"""
@@ -2959,9 +3988,11 @@ def _user_to_employee(user: User, team: Optional[Team] = None) -> dict:
 
 @app.get("/api/directory/stats")
 def directory_stats(db: Session = Depends(get_db)):
-    total_employees = db.query(User).filter(User.is_active == True, User.password_set == True).count()
+    # ไม่กรอง password_set — พนักงานที่เพิ่มผ่าน Add Employee ยังไม่ได้ตั้งรหัสผ่าน
+    # แต่ต้องโผล่ใน directory (เดิมกรองจน list ว่าง แต่ปุ่มเพิ่มบอก already exists)
+    total_employees = db.query(User).filter(User.is_active == True).count()
     departments = db.query(User.department).filter(
-        User.is_active == True, User.password_set == True,
+        User.is_active == True,
         User.department != None, User.department != ""
     ).distinct().count()
     total_teams = db.query(Team).count()
@@ -2984,7 +4015,7 @@ def list_directory_employees(
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    q = db.query(User).filter(User.is_active == True, User.password_set == True)
+    q = db.query(User).filter(User.is_active == True)
     if department:
         q = q.filter(User.department == department)
     if team_id is not None:
@@ -3075,7 +4106,7 @@ def update_directory_employee(email: str, body: EmployeeUpdate, db: Session = De
 @app.get("/api/directory/departments")
 def list_departments(db: Session = Depends(get_db)):
     rows = db.query(User.department).filter(
-        User.is_active == True, User.password_set == True,
+        User.is_active == True,
         User.department != None, User.department != ""
     ).distinct().all()
     return {"departments": [r[0] for r in rows]}
@@ -3165,7 +4196,7 @@ async def directory_assistant(body: DirectoryAssistantRequest, db: Session = Dep
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
 
     # Build a compact directory snapshot for context
-    users = db.query(User).filter(User.is_active == True, User.password_set == True).limit(200).all()
+    users = db.query(User).filter(User.is_active == True).limit(200).all()
     teams = db.query(Team).all()
     teams_map = {t.id: t.name for t in teams}
 

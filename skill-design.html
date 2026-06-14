@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes × ShareInvestor — Skill Blueprint & Memory Architecture</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#16213a; --line:#23304f;
+    --txt:#e8eefc; --muted:#93a4c8; --blue:#4f8cff; --cyan:#2dd4bf;
+    --amber:#fbbf24; --rose:#fb7185; --violet:#a78bfa; --green:#34d399;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font-family:-apple-system,"Segoe UI","Sukhumvit Set","Noto Sans Thai",sans-serif;
+       background:var(--bg); color:var(--txt); line-height:1.65}
+  .wrap{max-width:1100px; margin:0 auto; padding:32px 20px 80px}
+
+  /* header */
+  .hero{padding:48px 0 28px; border-bottom:1px solid var(--line); margin-bottom:36px}
+  .hero .tag{display:inline-block; font-size:13px; color:var(--cyan); border:1px solid var(--cyan);
+             border-radius:999px; padding:3px 14px; margin-bottom:14px; letter-spacing:.5px}
+  .hero h1{font-size:34px; line-height:1.3; font-weight:800}
+  .hero h1 span{color:var(--blue)}
+  .hero p{color:var(--muted); margin-top:10px; max-width:760px; font-size:15.5px}
+
+  h2{font-size:22px; margin:48px 0 6px; display:flex; align-items:center; gap:10px}
+  h2 .n{font-size:13px; color:var(--bg); background:var(--blue); border-radius:8px;
+        width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; font-weight:800}
+  .sub{color:var(--muted); font-size:14.5px; margin-bottom:20px}
+
+  /* principle chips */
+  .chips{display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 4px}
+  .chip{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+        padding:10px 16px; font-size:13.5px; color:var(--txt)}
+  .chip b{color:var(--cyan)}
+
+  /* dept grid */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; margin-top:18px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px}
+  .card .dept{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .card .dept .ic{font-size:22px}
+  .card .dept h3{font-size:17px}
+  .card .dept .who{font-size:12px; color:var(--muted)}
+  .skill{border-top:1px dashed var(--line); padding:11px 0}
+  .skill:last-child{padding-bottom:0}
+  .skill .name{font-weight:700; font-size:14.5px; display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .skill .io{font-size:12.5px; color:var(--muted); margin-top:3px}
+  .skill .io b{color:#b9c8e8; font-weight:600}
+  .pill{font-size:10.5px; border-radius:999px; padding:1px 9px; font-weight:700; letter-spacing:.3px}
+  .p1{background:rgba(251,113,133,.15); color:var(--rose); border:1px solid rgba(251,113,133,.4)}
+  .p2{background:rgba(251,191,36,.13); color:var(--amber); border:1px solid rgba(251,191,36,.4)}
+  .p3{background:rgba(147,164,200,.13); color:var(--muted); border:1px solid var(--line)}
+  .done{background:rgba(52,211,153,.13); color:var(--green); border:1px solid rgba(52,211,153,.4)}
+
+  /* hero skills */
+  .heroes{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; margin-top:18px}
+  .hcard{background:linear-gradient(160deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+         border-radius:16px; padding:22px; position:relative; overflow:hidden}
+  .hcard::before{content:""; position:absolute; inset:0 0 auto 0; height:3px;
+                 background:linear-gradient(90deg,var(--blue),var(--cyan))}
+  .hcard h3{font-size:17px; margin-bottom:8px}
+  .hcard p{font-size:13.5px; color:var(--muted)}
+  .hcard .why{margin-top:12px; font-size:12.5px; color:var(--cyan); background:rgba(45,212,191,.08);
+              border:1px solid rgba(45,212,191,.25); border-radius:10px; padding:8px 12px}
+
+  /* memory */
+  .memflow{display:flex; align-items:stretch; gap:0; margin:22px 0 8px; flex-wrap:wrap}
+  .mstep{flex:1; min-width:150px; background:var(--panel); border:1px solid var(--line);
+         border-radius:14px; padding:16px 14px; text-align:center; position:relative; margin-right:26px}
+  .mstep:last-child{margin-right:0}
+  .mstep::after{content:"→"; position:absolute; right:-22px; top:50%; transform:translateY(-50%);
+                color:var(--blue); font-size:18px; font-weight:800}
+  .mstep:last-child::after{display:none}
+  .mstep .ic{font-size:24px; margin-bottom:6px}
+  .mstep .t{font-size:13.5px; font-weight:700}
+  .mstep .d{font-size:11.5px; color:var(--muted); margin-top:4px}
+
+  table{width:100%; border-collapse:collapse; margin-top:16px; font-size:13.5px}
+  th{text-align:left; color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.5px;
+     text-transform:uppercase; padding:10px 12px; border-bottom:1px solid var(--line)}
+  td{padding:12px; border-bottom:1px solid rgba(35,48,79,.6); vertical-align:top}
+  td:first-child{white-space:nowrap}
+  .mt{font-weight:800; font-size:13px; padding:2px 10px; border-radius:8px; display:inline-block}
+  .mt1{background:rgba(79,140,255,.15); color:var(--blue)}
+  .mt2{background:rgba(45,212,191,.13); color:var(--cyan)}
+  .mt3{background:rgba(167,139,250,.15); color:var(--violet)}
+  .mt4{background:rgba(251,191,36,.13); color:var(--amber)}
+  .mt5{background:rgba(52,211,153,.13); color:var(--green)}
+  .mt6{background:rgba(251,113,133,.13); color:var(--rose)}
+  .ex{color:var(--muted); font-size:12.5px}
+  .ex code{background:var(--panel2); border:1px solid var(--line); border-radius:6px;
+           padding:1px 7px; font-size:11.5px; color:#c8d6f5}
+
+  /* example chat */
+  .demo{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; margin-top:18px}
+  .demo .row{display:flex; gap:10px; margin-bottom:14px}
+  .demo .b{border-radius:14px; padding:10px 16px; font-size:13.5px; max-width:78%}
+  .demo .u{margin-left:auto}
+  .demo .u .b{background:var(--blue); color:#fff; border-bottom-right-radius:4px}
+  .demo .a .b{background:var(--panel2); border:1px solid var(--line); border-bottom-left-radius:4px}
+  .demo .a .b .hl{color:var(--cyan)}
+  .demo .note{font-size:11.5px; color:var(--muted); text-align:center; margin:6px 0 14px}
+
+  /* roadmap */
+  .road{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin-top:18px}
+  .ph{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px}
+  .ph .when{font-size:11.5px; font-weight:800; letter-spacing:1px; color:var(--cyan); margin-bottom:8px}
+  .ph h4{font-size:15px; margin-bottom:8px}
+  .ph ul{list-style:none}
+  .ph li{font-size:12.8px; color:var(--muted); padding:4px 0 4px 18px; position:relative}
+  .ph li::before{content:"◆"; position:absolute; left:0; color:var(--blue); font-size:9px; top:9px}
+  .ph li.ok::before{content:"✓"; color:var(--green); font-size:12px; top:5px}
+  .ph li.ok{color:var(--green)}
+
+  footer{margin-top:56px; padding-top:20px; border-top:1px solid var(--line);
+         color:var(--muted); font-size:12.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  @media print{ body{background:#fff;color:#111} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ════════ HEADER ════════ -->
+  <div class="hero">
+    <span class="tag">DESIGN BLUEPRINT · มิ.ย. 2026</span>
+    <h1>Hermes AI Skill Hub <span>×</span> ShareInvestor</h1>
+    <p>พิมพ์เขียว Skill ที่ควรมีสำหรับแต่ละทีมใน ShareInvestor และสถาปัตยกรรม
+       <b style="color:var(--txt)">ความจำรายบุคคล (Per-User Memory)</b> ที่ทำให้ AI ของแต่ละคน
+       "รู้จักเจ้าของ" มากขึ้นทุกครั้งที่ใช้งาน — จำได้ เรียนรู้เอง และคิด Skill ใหม่ให้เอง</p>
+  </div>
+
+  <div class="chips">
+    <div class="chip">🎯 <b>หลักคิด 1:</b> Skill ที่ดีมาจากงานที่ทำซ้ำ ≥ 3 ครั้ง</div>
+    <div class="chip">🧠 <b>หลักคิด 2:</b> ความจำแยกขาดต่อ user — AI ของใครของมัน</div>
+    <div class="chip">🔁 <b>หลักคิด 3:</b> Personal → Skill Store → ทั้งบริษัทใช้ต่อ</div>
+    <div class="chip">📐 <b>หลักคิด 4:</b> ทุก Skill ระบุ Input → Output ชัดเจน</div>
+  </div>
+
+  <!-- ════════ 1. HERO SKILLS ════════ -->
+  <h2><span class="n">1</span> Hero Skills — ตัวชูโรงระดับองค์กร</h2>
+  <p class="sub">Skill ที่สร้างมูลค่าข้ามทุกแผนก ควรลงทุนให้ดีที่สุดก่อน</p>
+  <div class="heroes">
+    <div class="hcard">
+      <h3>🎙️ Meeting Intelligence <span class="pill done">ใช้งานได้แล้ว</span></h3>
+      <p>อัดเสียง/อัปไฟล์ประชุม → transcript แบบ <code>[MM:SS] ผู้พูด A:</code> ครบทุกนาที
+         → สรุป, MOM ราชการ, Action Items, ร่างอีเมล follow-up</p>
+      <div class="why">💰 จุดขาย: "เมื่อ 3 เดือนก่อนเราตัดสินใจอะไรเรื่องนี้?" — ความจำองค์กรที่ค้นหาได้</div>
+    </div>
+    <div class="hcard">
+      <h3>📊 IR Document Q&A <span class="pill p1">ควรทำต่อไป</span></h3>
+      <p>อัปโหลด 56-1 One Report / งบการเงิน / Annual Report แล้วถาม-ตอบได้ทันที
+         พร้อมอ้างอิงหน้า เหมาะกับงานหลักของ ShareInvestor ที่สุด</p>
+      <div class="why">💰 จุดขาย: ทีม IR ตอบคำถามนักลงทุน/ลูกค้าได้ใน 30 วินาที แทน 30 นาที</div>
+    </div>
+    <div class="hcard">
+      <h3>✨ Auto-Skill Generator <span class="pill done">ใช้งานได้แล้ว</span></h3>
+      <p>Hermes สังเกตพฤติกรรม — สั่งงานแบบเดิมครบ 3 ครั้ง ระบบออกแบบ Skill ให้เอง
+         (ชื่อ + prompt + tags) กดยอมรับคำเดียวได้ Skill ใหม่</p>
+      <div class="why">💰 จุดขาย: Skill Store โตเองโดยไม่ต้องบังคับให้ใครมานั่งสร้าง</div>
+    </div>
+  </div>
+
+  <!-- ════════ 2. SKILL CATALOG ════════ -->
+  <h2><span class="n">2</span> Skill Catalog ตามแผนก</h2>
+  <p class="sub">
+    <span class="pill p1">P1 ทำก่อน</span>&nbsp; <span class="pill p2">P2 ถัดไป</span>&nbsp;
+    <span class="pill p3">P3 รอได้</span>&nbsp; <span class="pill done">มีแล้ว</span>
+  </p>
+
+  <div class="grid">
+    <!-- IR -->
+    <div class="card">
+      <div class="dept"><span class="ic">📈</span><div><h3>IR Team</h3><div class="who">งานหลักของบริษัท — ลงทุนมากสุด</div></div></div>
+      <div class="skill"><div class="name">Annual Report Summarizer <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> PDF 56-1 / Annual Report → <b>Out:</b> Executive summary + ตัวเลขสำคัญ + ความเสี่ยง</div></div>
+      <div class="skill"><div class="name">Financial Highlight Extractor <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> งบการเงินรายไตรมาส → <b>Out:</b> ตาราง Revenue/Profit/Margin YoY, QoQ พร้อมคำอธิบาย</div></div>
+      <div class="skill"><div class="name">AGM FAQ Generator <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> วาระประชุมผู้ถือหุ้น + ผลประกอบการ → <b>Out:</b> ชุดคำถาม-คำตอบที่ผู้ถือหุ้นน่าจะถาม</div></div>
+      <div class="skill"><div class="name">SET/SGX Announcement Drafter <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> ข้อเท็จจริงเหตุการณ์ → <b>Out:</b> ร่างประกาศตลาดหลักทรัพย์ตามรูปแบบมาตรฐาน TH/EN</div></div>
+      <div class="skill"><div class="name">Earnings Call Brief <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> เสียง/transcript earnings call → <b>Out:</b> ประเด็นนักวิเคราะห์ + คำตอบผู้บริหาร + sentiment</div></div>
+      <div class="skill"><div class="name">Dividend Policy Finder <span class="pill p3">P3</span></div>
+        <div class="io"><b>In:</b> ชื่อบริษัท/เอกสาร → <b>Out:</b> นโยบายปันผล + ประวัติจ่ายย้อนหลัง</div></div>
+    </div>
+
+    <!-- Dev -->
+    <div class="card">
+      <div class="dept"><span class="ic">💻</span><div><h3>Dev Team</h3><div class="who">เร่ง velocity ของทีมพัฒนา</div></div></div>
+      <div class="skill"><div class="name">Code Review Assistant <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> diff / ไฟล์โค้ด → <b>Out:</b> bug, security, แนวทางแก้ เรียงตามความรุนแรง</div></div>
+      <div class="skill"><div class="name">Log Analyzer <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> error log / stack trace → <b>Out:</b> root cause + วิธีแก้ + จุดที่ควรเพิ่ม monitoring</div></div>
+      <div class="skill"><div class="name">API Doc Generator <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> โค้ด endpoint → <b>Out:</b> เอกสาร API + ตัวอย่าง request/response</div></div>
+      <div class="skill"><div class="name">SQL Helper (IR Data) <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> คำถามภาษาคน → <b>Out:</b> SQL พร้อมคำอธิบาย สำหรับ schema ข้อมูลหุ้น/ลูกค้า</div></div>
+      <div class="skill"><div class="name">Deployment Checklist Bot <span class="pill p3">P3</span></div>
+        <div class="io"><b>In:</b> รายการ change → <b>Out:</b> checklist ก่อน deploy + rollback plan</div></div>
+    </div>
+
+    <!-- Content/SEO -->
+    <div class="card">
+      <div class="dept"><span class="ic">✍️</span><div><h3>Content / SEO Team</h3><div class="who">คอนเทนต์เว็บ IR ของลูกค้า</div></div></div>
+      <div class="skill"><div class="name">EN↔TH IR Translator <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> ข่าว/ประกาศ → <b>Out:</b> คำแปลที่ใช้ศัพท์ IR ถูกต้อง (ปันผล, มติบอร์ด, backlog ฯลฯ)</div></div>
+      <div class="skill"><div class="name">SEO IR Article Writer <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> หัวข้อ + keyword → <b>Out:</b> บทความพร้อม meta description + heading structure</div></div>
+      <div class="skill"><div class="name">IR Website Copy Reviewer <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> URL/ข้อความหน้าเว็บ → <b>Out:</b> แก้ภาษา + ความถูกต้องเชิง compliance</div></div>
+      <div class="skill"><div class="name">Infographic Brief Generator <span class="pill p3">P3</span></div>
+        <div class="io"><b>In:</b> งบการเงิน → <b>Out:</b> โครงร่าง infographic + ตัวเลขที่ควรเน้น</div></div>
+    </div>
+
+    <!-- QA -->
+    <div class="card">
+      <div class="dept"><span class="ic">🧪</span><div><h3>QA Team</h3><div class="who">คุณภาพก่อนถึงมือลูกค้า</div></div></div>
+      <div class="skill"><div class="name">Test Case Generator <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> requirement / user story → <b>Out:</b> test cases + edge cases + ข้อมูลทดสอบ</div></div>
+      <div class="skill"><div class="name">Bug Report Writer <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> อาการที่เจอ (เล่าสั้นๆ) → <b>Out:</b> bug report มาตรฐาน steps-to-reproduce ครบ</div></div>
+      <div class="skill"><div class="name">Regression Summary <span class="pill p3">P3</span></div>
+        <div class="io"><b>In:</b> ผลรันเทสต์ → <b>Out:</b> สรุป pass/fail + ความเสี่ยงที่ควร block release</div></div>
+    </div>
+
+    <!-- Sales/Support -->
+    <div class="card">
+      <div class="dept"><span class="ic">🤝</span><div><h3>Sales / Support Team</h3><div class="who">หน้าบ้าน — เร็ว = ชนะ</div></div></div>
+      <div class="skill"><div class="name">Client Email Draft <span class="pill p1">P1</span></div>
+        <div class="io"><b>In:</b> บริบท + ประเด็น → <b>Out:</b> อีเมลสุภาพแบบไทย/อังกฤษ ตามโทนที่ user ชอบ (จากความจำ)</div></div>
+      <div class="skill"><div class="name">Meeting → Follow-up <span class="pill done">มีแล้ว</span></div>
+        <div class="io"><b>In:</b> บันทึกประชุมลูกค้า → <b>Out:</b> อีเมล follow-up + action items + กำหนดส่ง</div></div>
+      <div class="skill"><div class="name">Proposal Drafter <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> ความต้องการลูกค้า + แพ็กเกจ → <b>Out:</b> ร่าง proposal โครงสร้างมาตรฐานบริษัท</div></div>
+      <div class="skill"><div class="name">FAQ Answer Bot <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> คำถามลูกค้า → <b>Out:</b> คำตอบจากคลังความรู้ product ของ ShareInvestor</div></div>
+    </div>
+
+    <!-- HR/Internal -->
+    <div class="card">
+      <div class="dept"><span class="ic">🏢</span><div><h3>HR / Internal</h3><div class="who">งานหลังบ้านที่ทุกคนต้องเจอ</div></div></div>
+      <div class="skill"><div class="name">Onboarding Buddy <span class="pill p2">P2</span></div>
+        <div class="io"><b>In:</b> คำถามพนักงานใหม่ → <b>Out:</b> ตอบจากคู่มือบริษัท + แนะนำ Skill ที่ทีมนั้นใช้บ่อย</div></div>
+      <div class="skill"><div class="name">Policy Q&A <span class="pill p3">P3</span></div>
+        <div class="io"><b>In:</b> "ลาพักร้อนยังไง" → <b>Out:</b> ตอบจากระเบียบ HR พร้อมลิงก์แบบฟอร์ม</div></div>
+    </div>
+  </div>
+
+  <!-- ════════ 3. MEMORY ARCHITECTURE ════════ -->
+  <h2><span class="n">3</span> ความจำรายบุคคล (Per-User Memory)</h2>
+  <p class="sub">ทุกความจำผูกกับ <code>user_email</code> — AI ของใครจำของคนนั้น ไม่ปนกัน
+     และส่วนใหญ่<b style="color:var(--txt)">เรียนรู้เองอัตโนมัติ</b>โดย user ไม่ต้องสั่ง</p>
+
+  <div class="memflow">
+    <div class="mstep"><div class="ic">💬</div><div class="t">User คุยปกติ</div><div class="d">สั่งงาน / ถาม / เล่า</div></div>
+    <div class="mstep"><div class="ic">🤖</div><div class="t">Hermes ตอบทันที</div><div class="d">ใช้ความจำเดิมปรับคำตอบ</div></div>
+    <div class="mstep"><div class="ic">🧠</div><div class="t">Background Learner</div><div class="d">วิเคราะห์เงียบๆ ไม่หน่วงแชท</div></div>
+    <div class="mstep"><div class="ic">💾</div><div class="t">บันทึกความจำ</div><div class="d">Fact / Preference / Behavior</div></div>
+    <div class="mstep"><div class="ic">✨</div><div class="t">ฉลาดขึ้นรอบหน้า</div><div class="d">+ เสนอ Skill ใหม่เมื่อเห็น pattern</div></div>
+  </div>
+
+  <table>
+    <thead><tr><th>ชนิดความจำ</th><th>จำอะไร</th><th>มาจากไหน</th><th>ตัวอย่าง</th></tr></thead>
+    <tbody>
+      <tr><td><span class="mt mt1">PROFILE</span></td>
+          <td>ชื่อ แผนก ตำแหน่ง</td><td>สมัครใช้งาน + แก้ผ่านแชทได้ ("ฉันย้ายมาแผนก IR")</td>
+          <td class="ex"><code>นริศรา · IR Team · AI Engineer</code></td></tr>
+      <tr><td><span class="mt mt2">FACT</span></td>
+          <td>ข้อเท็จจริงระยะยาวเกี่ยวกับ user</td><td>สกัดอัตโนมัติจากบทสนทนา (dedup, เก็บสูงสุด 100)</td>
+          <td class="ex"><code>ดูแลลูกค้ากลุ่มธนาคาร</code> <code>กำลังทำโปรเจค SEO Audit</code></td></tr>
+      <tr><td><span class="mt mt3">PREFERENCE</span></td>
+          <td>รูปแบบที่ชอบ — ต้องทำตามเสมอ</td><td>สกัดอัตโนมัติเมื่อ user ระบุ ("ขอสั้นๆ เป็น bullet")</td>
+          <td class="ex"><code>รูปแบบสรุป: bullet</code> <code>ภาษาอีเมล: อังกฤษ</code></td></tr>
+      <tr><td><span class="mt mt4">BEHAVIOR</span></td>
+          <td>งานที่ทำซ้ำ (intent + ความถี่)</td><td>จัดหมวดทุกข้อความใน background</td>
+          <td class="ex"><code>summarize-meeting × 5</code> → 💡 เสนอสร้าง Skill</td></tr>
+      <tr><td><span class="mt mt5">SKILL</span></td>
+          <td>ประวัติการใช้ Skill 50 ครั้งล่าสุด</td><td>บันทึกทุกครั้งที่ Skill ถูกเรียก</td>
+          <td class="ex"><code>Meeting Report Assistant · เมื่อวาน 14:02</code></td></tr>
+      <tr><td><span class="mt mt6">CHAT</span></td>
+          <td>บทสนทนา 40 ข้อความล่าสุด</td><td>บันทึกอัตโนมัติ — เปิดแชทใหม่ก็ยังจำต่อได้ (cross-session)</td>
+          <td class="ex"><code>"เมื่อกี้คุยเรื่อง proposal ลูกค้า A ค้างไว้"</code></td></tr>
+      <tr><td><span class="mt mt1">CUSTOM</span></td>
+          <td>สิ่งที่ user สั่งให้จำตรงๆ</td><td>trigger คำว่า "จำไว้นะ / ให้จำว่า"</td>
+          <td class="ex"><code>จำไว้นะ ลูกค้า B ขอใบเสนอราคาทุกต้นเดือน</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- demo conversation -->
+  <div class="demo">
+    <div class="note">— ตัวอย่างการทำงานจริงของความจำ + Auto-Skill —</div>
+    <div class="row u"><div class="b">ช่วยสรุปประชุมนี้เป็น MOM หน่อย (ครั้งที่ 3 ของสัปดาห์)</div></div>
+    <div class="row a"><div class="b">นี่ครับ MOM <span class="hl">แบบ bullet สั้นๆ ตามที่คุณชอบ</span> ...<br><br>
+      💡 ผมสังเกตว่าคุณสั่ง "สรุปประชุมเป็น MOM" มาแล้ว 3 ครั้ง — ผมออกแบบ Skill
+      <b>"Meeting MOM Generator"</b> ไว้ให้แล้ว พิมพ์ <span class="hl">"สร้าง skill ที่แนะนำ"</span> เพื่อสร้างเลย</div></div>
+    <div class="row u"><div class="b">สร้าง skill ที่แนะนำ</div></div>
+    <div class="row a"><div class="b">✅ สร้าง Skill <b>Meeting MOM Generator (#12)</b> ให้แล้วครับ เป็น Private Skill ของคุณ
+      — ถ้าใช้ดีกด <span class="hl">Share to Skill Store</span> ให้ทีมอื่นใช้ต่อได้เลย</div></div>
+  </div>
+
+  <!-- ════════ 4. PRIVACY ════════ -->
+  <h2><span class="n">4</span> ขอบเขตและความเป็นส่วนตัวของความจำ</h2>
+  <div class="chips" style="margin-top:14px">
+    <div class="chip">🔒 ความจำแยกตาม <b>user_email</b> — คนอื่นมองไม่เห็น</div>
+    <div class="chip">🗑️ ลบได้ทุกเมื่อ — รายชิ้น (<b>DELETE /api/memory/{id}</b>) หรือทั้งหมด</div>
+    <div class="chip">✏️ แก้ได้ผ่านแชท — "ชื่อจริงฉันคือ..." อัปเดต Profile ทันที</div>
+    <div class="chip">🚫 สิ่งที่<b>ไม่จำ</b>: รหัสผ่าน, ข้อมูลส่วนตัวอ่อนไหว, เนื้อหาไฟล์ลูกค้า</div>
+    <div class="chip">📤 Skill ที่แชร์เข้า Store จะ<b>ไม่พ่วงความจำส่วนตัว</b>ของผู้สร้างไปด้วย</div>
+  </div>
+
+  <!-- ════════ 5. ROADMAP ════════ -->
+  <h2><span class="n">5</span> Roadmap</h2>
+  <div class="road">
+    <div class="ph"><div class="when">เสร็จแล้ว — มิ.ย. 2026</div><h4>Foundation</h4>
+      <ul>
+        <li class="ok">Skill Store + Install/Share</li>
+        <li class="ok">ถอดเสียงครบทุกนาที + timestamp + แยกผู้พูด</li>
+        <li class="ok">Memory 7 ชนิด + เรียนรู้อัตโนมัติ</li>
+        <li class="ok">Auto-Skill Suggestion (ซ้ำ 3 ครั้ง → เสนอ)</li>
+      </ul></div>
+    <div class="ph"><div class="when">ถัดไป 2-4 สัปดาห์</div><h4>IR Power Pack</h4>
+      <ul>
+        <li>IR Document Q&A (อ้างอิงหน้า)</li>
+        <li>Annual Report Summarizer</li>
+        <li>Financial Highlight Extractor</li>
+        <li>แทนชื่อจริงผู้พูดใน MOM ("ผู้พูด A = คุณจอห์น")</li>
+      </ul></div>
+    <div class="ph"><div class="when">1-2 เดือน</div><h4>Organization Memory</h4>
+      <ul>
+        <li>Semantic search ทุกประชุม (pgvector)</li>
+        <li>Team Memory — ความจำระดับทีม (opt-in)</li>
+        <li>Action Item tracking + Telegram reminder</li>
+        <li>Skill Analytics — skill ไหนถูกใช้/ช่วยประหยัดเวลาเท่าไหร่</li>
+      </ul></div>
+    <div class="ph"><div class="when">ไตรมาสถัดไป</div><h4>Enterprise</h4>
+      <ul>
+        <li>Outlook / Calendar integration</li>
+        <li>Knowledge Base UI ("เราเคยตัดสินใจอะไรเรื่องนี้")</li>
+        <li>SSO + role-based access</li>
+        <li>n8n automation เต็มรูปแบบ</li>
+      </ul></div>
+  </div>
+
+  <footer>
+    <span>Hermes AI Skill Hub — Skill Blueprint & Memory Architecture</span>
+    <span>ShareInvestor · จัดทำ 13 มิ.ย. 2026</span>
+  </footer>
+</div>
+</body>
+</html>
