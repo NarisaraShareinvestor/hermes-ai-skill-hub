@@ -1859,6 +1859,39 @@
     margin-left: -6px;
   }
   .dir-group-av:first-child { margin-left: 0; }
+
+  /* ── AI Engineer Dashboard ── */
+  .aie-tab { background:none; border:none; padding:10px 16px; font-size:13px; font-weight:600;
+             color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .aie-tab:hover { color:var(--ink); }
+  .aie-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .aie-tab-badge { background:#dc2626; color:#fff; font-size:10px; font-weight:700; border-radius:9px; padding:1px 6px; margin-left:2px; }
+  .aie-card { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+  .aie-card-label { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .aie-card-value { font-size:26px; font-weight:700; color:var(--ink); margin-top:4px; line-height:1.1; }
+  .aie-card-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+  .aie-card.warn .aie-card-value { color:#d97706; }
+  .aie-card.bad  .aie-card-value { color:#dc2626; }
+  .aie-card.good .aie-card-value { color:#16a34a; }
+  .aie-box { background:#fff; border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .aie-box-h { font-size:12px; font-weight:700; color:var(--ink); margin-bottom:12px; text-transform:uppercase; letter-spacing:.4px; }
+  .aie-row { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid #f1f5f9; font-size:13px; }
+  .aie-row:last-child { border-bottom:none; }
+  .aie-sev { font-size:10px; font-weight:700; padding:2px 8px; border-radius:6px; text-transform:uppercase; }
+  .aie-sev.critical { background:#fef2f2; color:#dc2626; }
+  .aie-sev.high     { background:#fff7ed; color:#c2410c; }
+  .aie-sev.warning  { background:#fffbeb; color:#d97706; }
+  .aie-sev.medium   { background:#eff6ff; color:#2563eb; }
+  .aie-sev.low      { background:#f1f5f9; color:#64748b; }
+  .aie-sev.info     { background:#f1f5f9; color:#64748b; }
+  .aie-item { background:#fff; border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:10px; }
+  .aie-item-title { font-size:14px; font-weight:600; color:var(--ink); }
+  .aie-item-desc { font-size:12.5px; color:var(--muted); margin-top:4px; line-height:1.5; }
+  .aie-report-item { padding:10px 12px; border-radius:8px; cursor:pointer; border:1px solid transparent; margin-bottom:4px; }
+  .aie-report-item:hover { background:#f8fafc; }
+  .aie-report-item.active { background:#eff6ff; border-color:#bfdbfe; }
+  .aie-sec-h { font-size:12px; font-weight:700; color:var(--ink); margin:16px 0 8px; }
+  .aie-empty { font-size:13px; color:var(--muted); text-align:center; padding:32px; }
 </style>
 </head>
 <body>
@@ -1993,6 +2026,15 @@
     <div class="nav-item" data-panel="directory" onclick="showPanel('directory')">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm11-6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm1 5h-1v-1a3 3 0 0 0-.5-1.658C13.898 10.13 15 10.78 15 12v1z"/></svg>
       Company Directory
+    </div>
+  </div>
+
+  <div class="sidebar-section" id="adminSection" style="display:none;">
+    <div class="sidebar-section-label">Engineering</div>
+    <div class="nav-item" data-panel="ai-engineer" onclick="showPanel('ai-engineer')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 0 0-2 2v.5L4.8 4 4 3.3a2 2 0 1 0-1 1.7l.7.8-.5 1.2H2a2 2 0 1 0 0 2h1.2l.5 1.2-.7.8a2 2 0 1 0 1 1.7l.8-.7 1.2.5V14a2 2 0 1 0 2 0v-.5l1.2-.5.8.7a2 2 0 1 0 1-1.7l-.7-.8.5-1.2H14a2 2 0 1 0 0-2h-1.2l-.5-1.2.7-.8a2 2 0 1 0-1-1.7L11.2 4 10 3.5V3a2 2 0 0 0-2-2zm0 4.5A2.5 2.5 0 1 1 8 10.5a2.5 2.5 0 0 1 0-5z"/></svg>
+      AI Engineer
+      <span id="adminAlertDot" style="display:none;margin-left:auto;background:#dc2626;color:#fff;font-size:9px;font-weight:700;border-radius:9px;padding:1px 6px;">0</span>
     </div>
   </div>
 
@@ -2573,6 +2615,60 @@
       </div>
     </div>
 
+    <!-- ── PANEL: AI Engineer (admin-only) ── -->
+    <div id="panel-ai-engineer" class="panel">
+      <div style="padding:20px 24px;max-width:1200px;margin:0 auto;width:100%;">
+        <!-- tab bar -->
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;">
+          <button class="aie-tab active" data-tab="dashboard" onclick="aieTab('dashboard')">Dashboard</button>
+          <button class="aie-tab" data-tab="alerts" onclick="aieTab('alerts')">Alerts <span id="aieAlertCount" class="aie-tab-badge" style="display:none;">0</span></button>
+          <button class="aie-tab" data-tab="tickets" onclick="aieTab('tickets')">Tickets</button>
+          <button class="aie-tab" data-tab="reports" onclick="aieTab('reports')">Reports</button>
+          <button class="aie-tab" data-tab="opportunities" onclick="aieTab('opportunities')">Opportunities</button>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+            <span id="aieUpdated" style="font-size:11px;color:var(--muted);"></span>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="loadObservability()">รีเฟรช</button>
+          </div>
+        </div>
+
+        <!-- Dashboard tab -->
+        <div id="aiePane-dashboard" class="aie-pane">
+          <div id="aieCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div class="aie-box"><div class="aie-box-h">Top Skills (24 ชม.)</div><div id="aieTopSkills"></div></div>
+            <div class="aie-box"><div class="aie-box-h">Recent Errors</div><div id="aieRecentErrors"></div></div>
+          </div>
+        </div>
+
+        <!-- Alerts tab -->
+        <div id="aiePane-alerts" class="aie-pane" style="display:none;">
+          <div id="aieAlerts"></div>
+        </div>
+
+        <!-- Tickets tab -->
+        <div id="aiePane-tickets" class="aie-pane" style="display:none;">
+          <div id="aieTickets"></div>
+        </div>
+
+        <!-- Reports tab -->
+        <div id="aiePane-reports" class="aie-pane" style="display:none;">
+          <div style="margin-bottom:14px;">
+            <button class="btn btn-primary btn-sm" onclick="aieRunNightly()" id="aieRunBtn">รันวิเคราะห์ตอนนี้ (Nightly)</button>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">ปกติระบบรันอัตโนมัติทุกเที่ยงคืน</span>
+          </div>
+          <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;">
+            <div id="aieReportList" class="aie-box" style="max-height:560px;overflow-y:auto;"></div>
+            <div id="aieReportDetail" class="aie-box"><div style="font-size:12px;color:var(--muted);">เลือกรายงานเพื่อดูรายละเอียด</div></div>
+          </div>
+        </div>
+
+        <!-- Opportunities tab -->
+        <div id="aiePane-opportunities" class="aie-pane" style="display:none;">
+          <div id="aieOpps"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -2737,6 +2833,8 @@
 const API = (!window.location.hostname || window.location.hostname === 'localhost') ? 'http://localhost:8000' : `${window.location.protocol}//${window.location.hostname}/api`;
 let chatHistory = [];
 let lastSkillId = null;
+let CURRENT_ROLE = 'member';
+let _obsPollTimer = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -2769,17 +2867,22 @@ function showPanel(name) {
                    store:'Skill Store', create:'Create Skill',
                    files:'File Manager',
                    directory:'Company Directory',
-                   meeting:'Meeting Intelligence Assistant' };
+                   meeting:'Meeting Intelligence Assistant',
+                   'ai-engineer':'AI Engineer — Self-Improving Platform' };
   $('panelTitle').textContent = titles[name] || name;
 
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.dataset.panel === name) n.classList.add('active');
   });
 
+  // หยุด polling เมื่อออกจากหน้า AI Engineer
+  if (name !== 'ai-engineer' && _obsPollTimer) { clearInterval(_obsPollTimer); _obsPollTimer = null; }
+
   if (name === 'skills')    loadMySkills();
   if (name === 'store')     loadStore();
   if (name === 'directory') loadDirectory();
   if (name === 'files')     loadFiles();
+  if (name === 'ai-engineer') loadObservability();
 }
 
 // ── Status Badge ──────────────────────────────────────────────────────────────
@@ -4943,16 +5046,39 @@ function appendMsg(text, role, actionButtons = [], poweredBy = null) {
        </div>`
     : '';
 
+  // ปุ่มให้ feedback 👍/👎 (เฉพาะคำตอบบอท) — เก็บไว้วิเคราะห์ปรับปรุงระบบ
+  const fbRef = 'fb_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+  const fbSkill = poweredBy ? poweredBy.name : '';
+  const fbHtml = (role === 'bot')
+    ? `<div class="msg-fb" data-ref="${fbRef}" style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+        <button title="คำตอบดี" onclick="sendFeedback('${fbRef}',1,'${(fbSkill||'').replace(/'/g,"")}')" style="background:none;border:1px solid #e5e7eb;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px;">👍</button>
+        <button title="คำตอบไม่ดี" onclick="sendFeedback('${fbRef}',-1,'${(fbSkill||'').replace(/'/g,"")}')" style="background:none;border:1px solid #e5e7eb;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px;">👎</button>
+       </div>`
+    : '';
+
   div.innerHTML = `
     <div class="msg-sender">${role === 'user' ? 'YOU' : 'HERMES'}</div>
     <div class="msg-bubble">
       ${skillBadge}
       ${role === 'bot' ? mdToHtml(text) : text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
       ${btnHtml}
+      ${fbHtml}
     </div>`;
   const msgs = $('chatMessages');
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendFeedback(ref, rating, skillName) {
+  try {
+    await fetch(`${API}/api/feedback`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_email: getUserEmail(), rating,
+        skill_name: skillName || null, message_ref: ref })
+    });
+    const box = document.querySelector(`.msg-fb[data-ref="${ref}"]`);
+    if (box) box.innerHTML = `<span style="font-size:11px;color:var(--muted);">${rating>0?'ขอบคุณสำหรับ feedback 👍':'ขอบคุณ เราจะปรับปรุง 🙏'}</span>`;
+  } catch { toast('ส่ง feedback ไม่สำเร็จ','error'); }
 }
 
 // ── Skill Detail Modal ────────────────────────────────────────────────────────
@@ -5040,6 +5166,11 @@ async function loadUserProfile() {
     $('userRole').textContent = roleText + (p.department ? ` · ${p.department}` : '');
     $('userAvatar').textContent = initial;
 
+    // เผยเมนู AI Engineer เฉพาะ admin
+    CURRENT_ROLE = p.role || 'member';
+    $('adminSection').style.display = (CURRENT_ROLE === 'admin') ? '' : 'none';
+    if (CURRENT_ROLE === 'admin') refreshAdminAlertDot();
+
     // Sync profile data → directory automatically on every login
     const dirPatch = { presence_status: 'active' };
     if (p.full_name)   dirPatch.full_name   = p.full_name;
@@ -5065,6 +5196,200 @@ async function loadUserProfile() {
 
 function roleLabel(role) {
   return { admin: 'Admin', team_lead: 'Team Lead', member: 'Member' }[role] || 'Member';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AI ENGINEER DASHBOARD (admin-only) — Self-Improving Platform
+// ══════════════════════════════════════════════════════════════════════════════
+let _aieActiveTab = 'dashboard';
+const _esc = s => (s ?? '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function aieTab(tab) {
+  _aieActiveTab = tab;
+  document.querySelectorAll('.aie-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.aie-pane').forEach(p => p.style.display = 'none');
+  $('aiePane-' + tab).style.display = '';
+  if (tab === 'alerts')        loadAieAlerts();
+  if (tab === 'tickets')       loadAieTickets();
+  if (tab === 'reports')       loadAieReports();
+  if (tab === 'opportunities') loadAieOpps();
+}
+
+async function _aieFetch(path, opts) {
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(`${API}/api/admin${path}${sep}user_email=${encodeURIComponent(getUserEmail())}`, opts);
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.status);
+  return r.json();
+}
+
+async function loadObservability() {
+  // เริ่ม polling overview ทุก 20 วิ ระหว่างอยู่หน้านี้
+  if (_obsPollTimer) { clearInterval(_obsPollTimer); }
+  await loadAieOverview();
+  _obsPollTimer = setInterval(() => {
+    if (_aieActiveTab === 'dashboard') loadAieOverview();
+    refreshAdminAlertDot();
+  }, 20000);
+  // โหลด tab ปัจจุบัน
+  if (_aieActiveTab !== 'dashboard') aieTab(_aieActiveTab);
+}
+
+async function loadAieOverview() {
+  try {
+    const d = await _aieFetch('/observability/overview');
+    const card = (label, val, sub, cls) => `<div class="aie-card ${cls||''}"><div class="aie-card-label">${label}</div><div class="aie-card-value">${val}</div>${sub?`<div class="aie-card-sub">${sub}</div>`:''}</div>`;
+    const errCls = d.error_rate_24h >= 30 ? 'bad' : (d.error_rate_24h >= 10 ? 'warn' : 'good');
+    const fbCls  = d.feedback_score == null ? '' : (d.feedback_score >= 70 ? 'good' : (d.feedback_score >= 40 ? 'warn' : 'bad'));
+    $('aieCards').innerHTML =
+      card('Active Users (24h)', d.active_users_24h, '') +
+      card('Requests (24h)', d.requests_24h, `${d.tokens_24h.toLocaleString()} tokens`) +
+      card('Error Rate', d.error_rate_24h + '%', `${d.error_count_24h} errors`, errCls) +
+      card('p95 Latency', d.p95_latency_ms + ' ms', `avg ${d.avg_latency_ms} ms`, d.p95_latency_ms>=15000?'warn':'') +
+      card('Cost วันนี้', '$' + d.cost_today_usd, 'gpt-4o-mini') +
+      card('Feedback Score', d.feedback_score == null ? '—' : d.feedback_score + '%', `👍${d.feedback_up_24h} 👎${d.feedback_down_24h}`, fbCls) +
+      card('Alerts ค้าง', d.unresolved_alerts, '', d.unresolved_alerts>0?'bad':'good') +
+      card('Tickets เปิด', d.open_tickets, `${d.draft_opportunities} opportunities`, d.open_tickets>0?'warn':'');
+
+    $('aieTopSkills').innerHTML = (d.top_skills && d.top_skills.length)
+      ? d.top_skills.map(s => `<div class="aie-row"><span>${_esc(s.name)}</span><b>${s.count}</b></div>`).join('')
+      : '<div class="aie-empty">ยังไม่มีข้อมูล</div>';
+
+    $('aieRecentErrors').innerHTML = (d.recent_errors && d.recent_errors.length)
+      ? d.recent_errors.map(e => `<div class="aie-row"><span style="color:#dc2626;">${_esc(e.error_type||'error')}</span><span style="font-size:11px;color:var(--muted);">${_esc(e.request_kind||'')} · ${_esc((e.user_email||'').split('@')[0])}</span></div>`).join('')
+      : '<div class="aie-empty">ไม่มี error — ระบบทำงานปกติ</div>';
+
+    $('aieAlertCount').style.display = d.unresolved_alerts > 0 ? '' : 'none';
+    $('aieAlertCount').textContent = d.unresolved_alerts;
+    const now = new Date();
+    $('aieUpdated').textContent = 'อัปเดต ' + now.toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  } catch (e) {
+    $('aieCards').innerHTML = `<div class="aie-empty" style="grid-column:1/-1;">โหลดข้อมูลไม่ได้: ${_esc(e.message)}</div>`;
+  }
+}
+
+async function loadAieAlerts() {
+  try {
+    const rows = await _aieFetch('/alerts?resolved=false');
+    $('aieAlerts').innerHTML = rows.length
+      ? rows.map(a => `<div class="aie-item" style="display:flex;align-items:center;gap:12px;">
+          <span class="aie-sev ${_esc(a.severity)}">${_esc(a.severity)}</span>
+          <div style="flex:1;"><div class="aie-item-title" style="font-size:13px;">${_esc(a.message)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${_esc(a.alert_type)} · ${new Date(a.created_at).toLocaleString('th-TH')}</div></div>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="aieResolveAlert(${a.id})">Resolve</button>
+        </div>`).join('')
+      : '<div class="aie-empty">ไม่มี alert ค้าง — ระบบสุขภาพดี ✓</div>';
+  } catch (e) { $('aieAlerts').innerHTML = `<div class="aie-empty">${_esc(e.message)}</div>`; }
+}
+
+async function aieResolveAlert(id) {
+  try { await _aieFetch(`/alerts/${id}/resolve`, {method:'POST'}); toast('Resolved','success'); loadAieAlerts(); refreshAdminAlertDot(); }
+  catch (e) { toast(e.message,'error'); }
+}
+
+async function loadAieTickets() {
+  try {
+    const rows = await _aieFetch('/tickets');
+    $('aieTickets').innerHTML = rows.length
+      ? rows.map(t => `<div class="aie-item">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="aie-sev ${_esc(t.severity)}">${_esc(t.severity)}</span>
+            <div class="aie-item-title" style="flex:1;">${_esc(t.title)}</div>
+            <select onchange="aiePatchTicket(${t.id}, this.value)" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;">
+              ${['open','in_progress','resolved','dismissed'].map(s=>`<option value="${s}"${t.status===s?' selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          ${t.description?`<div class="aie-item-desc">${_esc(t.description)}</div>`:''}
+          ${t.suggested_fix?`<div class="aie-item-desc"><b>แนวทาง:</b> ${_esc(t.suggested_fix)}</div>`:''}
+        </div>`).join('')
+      : '<div class="aie-empty">ยังไม่มี ticket</div>';
+  } catch (e) { $('aieTickets').innerHTML = `<div class="aie-empty">${_esc(e.message)}</div>`; }
+}
+
+async function aiePatchTicket(id, status) {
+  try { await _aieFetch(`/tickets/${id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({status})}); toast('อัปเดตแล้ว','success'); }
+  catch (e) { toast(e.message,'error'); }
+}
+
+async function loadAieReports() {
+  try {
+    const rows = await _aieFetch('/reports');
+    $('aieReportList').innerHTML = rows.length
+      ? rows.map(r => `<div class="aie-report-item" id="aieRep-${r.id}" onclick="aieShowReport(${r.id})">
+          <div style="font-weight:600;font-size:13px;">${_esc(r.report_date)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${r.issue_count} issues · ${r.opportunity_count} opps · ${_esc(r.generated_by)}</div>
+        </div>`).join('')
+      : '<div class="aie-empty">ยังไม่มีรายงาน</div>';
+    if (rows.length) aieShowReport(rows[0].id);
+  } catch (e) { $('aieReportList').innerHTML = `<div class="aie-empty">${_esc(e.message)}</div>`; }
+}
+
+async function aieShowReport(id) {
+  document.querySelectorAll('.aie-report-item').forEach(el => el.classList.remove('active'));
+  const li = $('aieRep-' + id); if (li) li.classList.add('active');
+  try {
+    const r = await _aieFetch(`/reports/${id}`);
+    const m = r.metrics_snapshot || {};
+    const listIssues = (arr) => (arr&&arr.length) ? arr.map(i => `<div class="aie-row"><span>${_esc(i.title||i)}</span>${i.severity?`<span class="aie-sev ${_esc(i.severity)}">${_esc(i.severity)}</span>`:''}</div>`).join('') : '<div style="font-size:12px;color:var(--muted);">—</div>';
+    const listFixes = (arr) => (arr&&arr.length) ? arr.map(f => `<div class="aie-item" style="margin-bottom:6px;"><div style="display:flex;gap:8px;align-items:center;"><span class="aie-sev ${_esc(f.priority||'medium')}">${_esc(f.priority||'')}</span><b style="font-size:13px;">${_esc(f.title||'')}</b></div><div class="aie-item-desc">${_esc(f.fix||'')}</div></div>`).join('') : '<div style="font-size:12px;color:var(--muted);">—</div>';
+    const listActions = (arr) => (arr&&arr.length) ? arr.map(a => `<div class="aie-row"><span>${_esc(a.title||a)}</span><span style="font-size:11px;color:var(--muted);">${_esc(a.owner_hint||'')}</span></div>`).join('') : '<div style="font-size:12px;color:var(--muted);">—</div>';
+    const listOpps = (arr) => (arr&&arr.length) ? arr.map(o => `<div class="aie-row"><span>${_esc(o.pattern_label||'')}</span><span style="font-size:11px;color:var(--muted);">${o.user_count} users · ${o.occurrence}×</span></div>`).join('') : '<div style="font-size:12px;color:var(--muted);">—</div>';
+    $('aieReportDetail').innerHTML = `
+      <div style="font-size:15px;font-weight:700;">รายงานวันที่ ${_esc(r.report_date)}</div>
+      <div style="font-size:11px;color:var(--muted);margin:6px 0 14px;">requests ${m.requests||0} · error ${m.error_rate_pct||0}% · p95 ${m.p95_latency_ms||0}ms · cost $${m.cost_usd||0} · 👍${m.feedback_up||0} 👎${m.feedback_down||0}</div>
+      <div class="aie-item-desc" style="font-size:13px;color:var(--ink);">${_esc(r.summary)}</div>
+      <div class="aie-sec-h">ปัญหาเด่น</div>${listIssues(r.top_issues)}
+      <div class="aie-sec-h">สาเหตุที่แท้จริง (Root Cause)</div><div class="aie-item-desc" style="font-size:13px;">${_esc(r.root_cause)||'—'}</div>
+      <div class="aie-sec-h">แนวทางแก้ไขที่แนะนำ</div>${listFixes(r.recommended_fixes)}
+      <div class="aie-sec-h">งานที่ควรทำต่อ</div>${listActions(r.action_items)}
+      <div class="aie-sec-h">โอกาสพัฒนา</div>${listOpps(r.opportunities)}`;
+  } catch (e) { $('aieReportDetail').innerHTML = `<div class="aie-empty">${_esc(e.message)}</div>`; }
+}
+
+async function aieRunNightly() {
+  const btn = $('aieRunBtn'); btn.disabled = true; btn.textContent = 'กำลังวิเคราะห์...';
+  try { const r = await _aieFetch('/nightly/run?force=true', {method:'POST'});
+    toast(r.skipped ? 'มีรายงานวันนี้แล้ว' : `สร้างรายงานแล้ว (${r.tickets_created||0} tickets, ${r.opportunities_created||0} opportunities)`, 'success');
+    loadAieReports();
+  } catch (e) { toast(e.message,'error'); }
+  finally { btn.disabled = false; btn.textContent = 'รันวิเคราะห์ตอนนี้ (Nightly)'; }
+}
+
+async function loadAieOpps() {
+  try {
+    const rows = await _aieFetch('/guidance?status=draft');
+    $('aieOpps').innerHTML = rows.length
+      ? rows.map(g => `<div class="aie-item">
+          <div class="aie-item-title">${_esc(g.title)}</div>
+          <div class="aie-item-desc">${_esc(g.description)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">pattern: <b>${_esc(g.pattern_label)}</b> · ${g.user_count} users · ${g.occurrence}×</div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn btn-success btn-sm" style="font-size:11px;" onclick="aieApproveOpp(${g.id})">อนุมัติ → สร้าง Skill (Draft)</button>
+            <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="aieRejectOpp(${g.id})">ปฏิเสธ</button>
+          </div>
+        </div>`).join('')
+      : '<div class="aie-empty">ยังไม่มีโอกาสพัฒนาที่ตรวจพบ</div>';
+  } catch (e) { $('aieOpps').innerHTML = `<div class="aie-empty">${_esc(e.message)}</div>`; }
+}
+
+async function aieApproveOpp(id) {
+  try { const r = await _aieFetch(`/guidance/${id}/approve`, {method:'POST'});
+    toast(r.created_skill_id ? `สร้าง Skill draft #${r.created_skill_id} แล้ว` : 'อนุมัติแล้ว', 'success'); loadAieOpps(); }
+  catch (e) { toast(e.message,'error'); }
+}
+
+async function aieRejectOpp(id) {
+  try { await _aieFetch(`/guidance/${id}/reject`, {method:'POST'}); toast('ปฏิเสธแล้ว','success'); loadAieOpps(); }
+  catch (e) { toast(e.message,'error'); }
+}
+
+async function refreshAdminAlertDot() {
+  if (CURRENT_ROLE !== 'admin') return;
+  try {
+    const d = await _aieFetch('/observability/overview');
+    const dot = $('adminAlertDot');
+    if (d.unresolved_alerts > 0) { dot.style.display = ''; dot.textContent = d.unresolved_alerts; }
+    else dot.style.display = 'none';
+  } catch {}
 }
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -5384,6 +5709,9 @@ function doLogout() {
   localStorage.removeItem('hermes_email');
   lastSkillId = null;
   chatHistory = [];
+  CURRENT_ROLE = 'member';
+  $('adminSection').style.display = 'none';
+  if (_obsPollTimer) { clearInterval(_obsPollTimer); _obsPollTimer = null; }
   $('userEmail').value = '';
   $('userDisplayName').textContent = 'ผู้ใช้งาน';
   $('userRole').textContent = 'member';

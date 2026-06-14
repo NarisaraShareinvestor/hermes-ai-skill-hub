@@ -12,3 +12,5 @@ passlib==1.7.4
 bcrypt==3.2.2
 python-jose==3.5.0
 python-multipart==0.0.6
+apscheduler==3.10.4
+tzdata==2024.1

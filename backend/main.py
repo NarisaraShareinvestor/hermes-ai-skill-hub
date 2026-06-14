@@ -28,6 +28,8 @@ from schemas import (
 )
 
 load_dotenv()
+# import observability ก่อน create_all เพื่อให้ตาราง telemetry/alert/report/ticket/guidance ถูกสร้าง
+import observability
 Base.metadata.create_all(bind=engine)
 
 # ── DB Migration: add new columns that create_all won't add to existing tables ─
@@ -264,6 +266,17 @@ def _startup_seed():
         db.close()
 
 
+@app.on_event("startup")
+def _startup_scheduler():
+    """เริ่ม APScheduler (nightly self-improvement + monitor). หลัง migration เสร็จแล้ว."""
+    observability.start_scheduler()
+
+
+@app.on_event("shutdown")
+def _shutdown_scheduler():
+    observability.stop_scheduler()
+
+
 # ── P1 Skill Catalog (ตาม skill-design.html) — seed เข้า Skill Store ──────────
 _CATALOG_OWNER = "hermes@shareinvestor.com"
 
@@ -460,7 +473,13 @@ def _notify_n8n(event: str, payload: dict):
 
 
 # ── OpenAI / Hermes helper ─────────────────────────────────────────────────────
-def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048) -> str:
+def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048,
+                 _kind: str = "chat", _skill_name: str = None,
+                 _skill_id: int = None, _user_email: str = None) -> str:
+    """LLM wrapper (OpenAI gpt-4o-mini). บันทึก telemetry แบบ best-effort —
+    ความล้มเหลวในการ log ห้ามกระทบคำตอบ. คืน str เสมอ (ไม่ raise)."""
+    import time as _time
+    _MODEL = "gpt-4o-mini"
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         return "⚠️  OPENAI_API_KEY ยังไม่ได้ตั้งค่าใน .env"
@@ -468,6 +487,7 @@ def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048) -> st
     # Use HTTP proxy only — remove SOCKS (ALL_PROXY) which needs socksio package
     _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
     _saved = {k: os.environ.pop(k, None) for k in _socks_vars}
+    _t0 = _time.perf_counter()
     try:
         from openai import OpenAI
         client = OpenAI(api_key=api_key)
@@ -476,17 +496,49 @@ def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048) -> st
             all_messages.append({"role": "system", "content": system})
         all_messages.extend(messages)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=_MODEL,
             messages=all_messages,
             max_tokens=max_tokens,
         )
+        _latency = int((_time.perf_counter() - _t0) * 1000)
+        try:
+            _u = getattr(response, "usage", None)
+            _pt = getattr(_u, "prompt_tokens", 0) or 0
+            _ct = getattr(_u, "completion_tokens", 0) or 0
+            _tt = getattr(_u, "total_tokens", 0) or (_pt + _ct)
+            observability.record_telemetry(
+                user_email=_user_email, request_kind=_kind,
+                skill_id=_skill_id, skill_name=_skill_name,
+                status="ok", latency_ms=_latency, model=_MODEL,
+                prompt_tokens=_pt, completion_tokens=_ct, total_tokens=_tt,
+                est_cost_usd=observability.estimate_cost(_pt, _ct))
+        except Exception:
+            pass
         return response.choices[0].message.content
     except Exception as e:
+        _latency = int((_time.perf_counter() - _t0) * 1000)
+        try:
+            observability.record_telemetry(
+                user_email=_user_email, request_kind=_kind,
+                skill_id=_skill_id, skill_name=_skill_name,
+                status="error", error_type=type(e).__name__,
+                latency_ms=_latency, model=_MODEL,
+                meta={"detail": str(e)[:300]})
+        except Exception:
+            pass
         return f"OpenAI Error: {e}"
     finally:
         for k, v in _saved.items():
             if v is not None:
                 os.environ[k] = v
+
+
+# ── Admin gate (role-level — สอดคล้องกับ auth เดิมที่เชื่อ user_email จาก client) ──
+def _require_admin(user_email: str, db: Session) -> User:
+    u = db.query(User).filter(User.email == (user_email or "").strip().lower()).first()
+    if not u or u.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="admin only")
+    return u
 
 
 # ── Mail Open (redirect to mailto: for Telegram buttons) ─────────────────────
@@ -1321,7 +1373,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             f"{_ctx_block}\n\nคำขอ: {effective_message}"
         )
         _email_body = _claude_chat(
-            [{"role": "user", "content": _ep}], _email_sys, max_tokens=2000)
+            [{"role": "user", "content": _ep}], _email_sys, max_tokens=2000,
+            _kind="draft_email", _user_email=req.user_email)
         _email_body = re.sub(r'\*\*(.+?)\*\*', r'\1', _email_body, flags=re.DOTALL)
         _email_body = re.sub(r'\*(.+?)\*', r'\1', _email_body, flags=re.DOTALL)
         _email_body = re.sub(r'^#+\s*', '', _email_body, flags=re.MULTILINE)
@@ -1332,6 +1385,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         reply = _claude_chat(
             [{"role": "user", "content": effective_message}],
             _skill_system_prompt(_forced_meeting_skill),
+            _kind="run_skill", _skill_id=_forced_meeting_skill.id,
+            _skill_name=_forced_meeting_skill.name, _user_email=req.user_email,
         )
         _forced_meeting_skill.usage_count = (_forced_meeting_skill.usage_count or 0) + 1
         _forced_meeting_skill.last_used_at = datetime.now()
@@ -1347,15 +1402,17 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             reply = _claude_chat(
                 [{"role": "user", "content": effective_message}],
                 _skill_system_prompt(best),
+                _kind="run_skill", _skill_id=best.id, _skill_name=best.name,
+                _user_email=req.user_email,
             )
             best.usage_count = (best.usage_count or 0) + 1
             best.last_used_at = datetime.now()
             new_last_skill_id = best.id
             powered_by_skill_info = {"id": best.id, "name": best.name}
         else:
-            reply = _claude_chat(messages, system_prompt)
+            reply = _claude_chat(messages, system_prompt, _kind="chat", _user_email=req.user_email)
     else:
-        reply = _claude_chat(messages, system_prompt)
+        reply = _claude_chat(messages, system_prompt, _kind="chat", _user_email=req.user_email)
 
     # Strip --- separators
     reply = re.sub(r'\n\s*---+\s*\n', '\n', reply)
@@ -2570,6 +2627,8 @@ def run_skill(skill_id: int, req: RunSkillRequest, db: Session = Depends(get_db)
     output = _claude_chat(
         [{"role": "user", "content": req.input_text}],
         system,
+        _kind="run_skill", _skill_id=skill.id, _skill_name=skill.name,
+        _user_email=req.user_email,
     )
 
     # อัปเดต usage
@@ -3232,6 +3291,218 @@ def stats(db: Session = Depends(get_db)):
         "total_installations": installs,
         "draft_skills": drafts,
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SELF-IMPROVING PLATFORM — Feedback + AI Engineer Dashboard (admin-only)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class FeedbackBody(BaseModel):
+    user_email: str
+    rating: int                      # +1 / -1
+    skill_id: Optional[int] = None
+    skill_name: Optional[str] = None
+    message_ref: Optional[str] = None
+    comment: Optional[str] = None
+
+
+@app.post("/api/feedback")
+def submit_feedback(body: FeedbackBody, db: Session = Depends(get_db)):
+    """ผู้ใช้กด 👍/👎 บนคำตอบบอท — เก็บไว้วิเคราะห์ปรับปรุง."""
+    rec = observability.record_feedback(
+        db, user_email=body.user_email, rating=body.rating,
+        skill_id=body.skill_id, skill_name=body.skill_name,
+        message_ref=body.message_ref, comment=body.comment)
+    return {"ok": True, "id": rec.id}
+
+
+@app.get("/api/admin/observability/overview")
+def admin_overview(user_email: str = Query(...), db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    return observability.build_overview(db)
+
+
+@app.get("/api/admin/alerts")
+def admin_alerts(user_email: str = Query(...), resolved: bool = False,
+                 db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    q = (db.query(observability.SystemAlert)
+         .filter(observability.SystemAlert.resolved == resolved)
+         .order_by(observability.SystemAlert.created_at.desc()).limit(100).all())
+    return [{
+        "id": a.id, "created_at": a.created_at.isoformat() if a.created_at else None,
+        "severity": a.severity, "alert_type": a.alert_type, "message": a.message,
+        "metric_value": a.metric_value, "threshold": a.threshold,
+        "resolved": a.resolved,
+    } for a in q]
+
+
+@app.post("/api/admin/alerts/{alert_id}/resolve")
+def admin_resolve_alert(alert_id: int, user_email: str = Query(...),
+                        db: Session = Depends(get_db)):
+    u = _require_admin(user_email, db)
+    a = db.query(observability.SystemAlert).filter(
+        observability.SystemAlert.id == alert_id).first()
+    if not a:
+        raise HTTPException(404, "ไม่พบ alert")
+    a.resolved = True
+    a.resolved_by = u.email
+    a.resolved_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/admin/reports")
+def admin_reports(user_email: str = Query(...), limit: int = 30,
+                  db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    rows = (db.query(observability.ImprovementReport)
+            .order_by(observability.ImprovementReport.report_date.desc())
+            .limit(limit).all())
+    return [{
+        "id": r.id, "report_date": r.report_date, "summary": r.summary,
+        "status": r.status, "generated_by": r.generated_by,
+        "metrics_snapshot": r.metrics_snapshot,
+        "issue_count": len(r.top_issues or []),
+        "opportunity_count": len(r.opportunities or []),
+    } for r in rows]
+
+
+@app.get("/api/admin/reports/{report_id}")
+def admin_report_detail(report_id: int, user_email: str = Query(...),
+                        db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    r = db.query(observability.ImprovementReport).filter(
+        observability.ImprovementReport.id == report_id).first()
+    if not r:
+        raise HTTPException(404, "ไม่พบรายงาน")
+    return {
+        "id": r.id, "report_date": r.report_date, "created_at": r.created_at.isoformat() if r.created_at else None,
+        "summary": r.summary, "top_issues": r.top_issues, "recurring_issues": r.recurring_issues,
+        "root_cause": r.root_cause, "recommended_fixes": r.recommended_fixes,
+        "action_items": r.action_items, "opportunities": r.opportunities,
+        "metrics_snapshot": r.metrics_snapshot, "status": r.status, "generated_by": r.generated_by,
+    }
+
+
+@app.get("/api/admin/tickets")
+def admin_tickets(user_email: str = Query(...), status: str = None,
+                  db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    q = db.query(observability.Ticket)
+    if status:
+        q = q.filter(observability.Ticket.status == status)
+    rows = q.order_by(observability.Ticket.created_at.desc()).limit(100).all()
+    return [{
+        "id": t.id, "created_at": t.created_at.isoformat() if t.created_at else None,
+        "title": t.title, "description": t.description, "severity": t.severity,
+        "status": t.status, "assignee": t.assignee, "suggested_fix": t.suggested_fix,
+        "source_report_id": t.source_report_id,
+    } for t in rows]
+
+
+class TicketPatch(BaseModel):
+    status: Optional[str] = None
+    assignee: Optional[str] = None
+    severity: Optional[str] = None
+
+
+@app.patch("/api/admin/tickets/{ticket_id}")
+def admin_patch_ticket(ticket_id: int, body: TicketPatch, user_email: str = Query(...),
+                       db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    t = db.query(observability.Ticket).filter(
+        observability.Ticket.id == ticket_id).first()
+    if not t:
+        raise HTTPException(404, "ไม่พบ ticket")
+    if body.status is not None:
+        t.status = body.status
+    if body.assignee is not None:
+        t.assignee = body.assignee
+    if body.severity is not None:
+        t.severity = body.severity
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/admin/guidance")
+def admin_guidance(user_email: str = Query(...), status: str = "draft",
+                   db: Session = Depends(get_db)):
+    _require_admin(user_email, db)
+    rows = (db.query(observability.LearnedGuidance)
+            .filter(observability.LearnedGuidance.status == status)
+            .order_by(observability.LearnedGuidance.user_count.desc(),
+                      observability.LearnedGuidance.occurrence.desc())
+            .limit(100).all())
+    return [{
+        "id": g.id, "kind": g.kind, "title": g.title, "description": g.description,
+        "pattern_label": g.pattern_label, "user_count": g.user_count,
+        "occurrence": g.occurrence, "examples": g.examples, "status": g.status,
+    } for g in rows]
+
+
+@app.post("/api/admin/guidance/{gid}/approve")
+def admin_approve_guidance(gid: int, user_email: str = Query(...),
+                           db: Session = Depends(get_db)):
+    """อนุมัติ opportunity → สร้าง Skill เป็น DRAFT (ไม่ publish — รอ human ทำต่อ)."""
+    u = _require_admin(user_email, db)
+    g = db.query(observability.LearnedGuidance).filter(
+        observability.LearnedGuidance.id == gid).first()
+    if not g:
+        raise HTTPException(404, "ไม่พบ guidance")
+    g.status = "approved"
+    g.approved_by = u.email
+    g.approved_at = datetime.utcnow()
+
+    created_skill_id = None
+    if g.kind == "skill_proposal":
+        base = f"[เสนอ] {g.pattern_label}"[:200]
+        name = base
+        i = 2
+        while db.query(Skill).filter(Skill.name == name).first():
+            name = f"{base} ({i})"
+            i += 1
+        sk = Skill(
+            name=name, description=(g.description or "")[:500], owner=u.email,
+            status=SkillStatus.DRAFT, visibility=SkillVisibility.PRIVATE,
+            skill_type="generator",
+            tags=["auto-proposed", g.pattern_label][:5],
+        )
+        db.add(sk)
+        db.flush()
+        created_skill_id = sk.id
+    db.commit()
+    return {"ok": True, "created_skill_id": created_skill_id}
+
+
+@app.post("/api/admin/guidance/{gid}/reject")
+def admin_reject_guidance(gid: int, user_email: str = Query(...),
+                          db: Session = Depends(get_db)):
+    u = _require_admin(user_email, db)
+    g = db.query(observability.LearnedGuidance).filter(
+        observability.LearnedGuidance.id == gid).first()
+    if not g:
+        raise HTTPException(404, "ไม่พบ guidance")
+    g.status = "rejected"
+    g.approved_by = u.email
+    g.approved_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/admin/nightly/run")
+def admin_run_nightly(user_email: str = Query(...), force: bool = False,
+                      db: Session = Depends(get_db)):
+    """trigger การวิเคราะห์เที่ยงคืนด้วยมือ (idempotent ต่อวัน เว้นแต่ force=true)."""
+    _require_admin(user_email, db)
+    return observability.run_nightly(db, force=force, generated_by="manual")
+
+
+@app.post("/api/admin/monitor/run")
+def admin_run_monitor(user_email: str = Query(...), db: Session = Depends(get_db)):
+    """trigger เช็ค threshold ด้วยมือ (ปกติ scheduler ทำทุก N นาที)."""
+    _require_admin(user_email, db)
+    return observability.run_monitor(db)
 
 
 # ── Telegram Bot Integration ──────────────────────────────────────────────────
