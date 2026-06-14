@@ -4374,6 +4374,16 @@ def update_directory_employee(email: str, body: EmployeeUpdate, db: Session = De
     return _user_to_employee(user, team)
 
 
+@app.delete("/api/directory/employees/{email}")
+def delete_directory_employee(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    db.delete(user)
+    db.commit()
+    return {"detail": "Employee deleted"}
+
+
 @app.get("/api/directory/departments")
 def list_departments(db: Session = Depends(get_db)):
     rows = db.query(User.department).filter(

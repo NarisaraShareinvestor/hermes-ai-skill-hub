@@ -6016,6 +6016,22 @@ async function saveEditEmployee() {
   } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
 }
 
+async function deleteEmployee() {
+  const email = $('editEmpEmail').value;
+  if (!confirm(`ลบพนักงาน ${email} ใช่ไหม? (ไม่สามารถกู้คืนได้)`)) return;
+  try {
+    const r = await fetch(`${API}/api/directory/employees/${encodeURIComponent(email)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (r.ok) {
+      closeModal('editEmpModal');
+      toast('ลบพนักงานสำเร็จ', 'success');
+      loadDirectory();
+    } else { toast('ลบไม่สำเร็จ', 'error'); }
+  } catch { toast('เชื่อมต่อระบบไม่ได้', 'error'); }
+}
+
 // ── Create Team ────────────────────────────────────────────────────────────────
 function openCreateTeam() {
   $('ctmName').value = ''; $('ctmDept').value = '';
@@ -6452,9 +6468,12 @@ if (_savedEmail) {
         </select>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('editEmpModal')">ยกเลิก</button>
-      <button class="btn btn-primary btn-sm" onclick="saveEditEmployee()">บันทึก</button>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:space-between;">
+      <button class="btn btn-sm" onclick="deleteEmployee()" style="background:#ef4444;color:#fff;border:none;cursor:pointer;border-radius:6px;font-weight:500;padding:6px 12px;">ลบ</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('editEmpModal')">ยกเลิก</button>
+        <button class="btn btn-primary btn-sm" onclick="saveEditEmployee()">บันทึก</button>
+      </div>
     </div>
   </div>
 </div>
