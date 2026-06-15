@@ -601,7 +601,7 @@ ALLOWED_TYPES = {
     "text/plain", "text/csv",
     "image/png", "image/jpeg", "image/gif", "image/webp",
 }
-MAX_FILE_MB = 20
+MAX_FILE_MB = 500
 
 AUDIO_MIME_TYPES = {
     "audio/mpeg", "audio/mp3", "audio/mp4", "audio/x-m4a", "audio/m4a",
