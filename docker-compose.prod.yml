@@ -73,6 +73,7 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
       - ./app.html:/usr/share/nginx/html/app.html:ro
       - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./logo:/usr/share/nginx/html/logo:ro
       - nginx_logs:/var/log/nginx
     networks:
       - hermes_network
