@@ -2129,7 +2129,7 @@
               </button>
               <textarea class="chat-textarea" id="chatInput" placeholder="พิมพ์ข้อความ หรือแนบไฟล์เสียง / เอกสาร..." rows="1"
                 oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px';"
-                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();sendChat();}"></textarea>
               <button class="btn btn-primary" onclick="sendChat()" id="sendBtn">Send</button>
             </div>
           </div>
@@ -3652,6 +3652,7 @@ function onChatFileSelect(input) {
   }
   $('chatMeetingIntelBtn').style.display = isAudio ? 'inline-block' : 'none';
   input.value = '';
+  $('chatInput').focus();
 }
 
 function clearChatFile() {
