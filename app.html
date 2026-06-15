@@ -3704,8 +3704,16 @@ async function sendChat() {
   sendBtn.innerHTML = '<span class="spinner"></span>';
   sendBtn.disabled = true;
 
-  // If file attached — upload first, then send through /api/chat for full skill/meeting detection
+  // If file attached — audio → Meeting Intelligence; document → /api/files/upload
   if (fileToUpload) {
+    if (_isChatAudioFile(fileToUpload)) {
+      // Audio: ไม่รองรับใน /api/files/upload → เปิด Meeting Intelligence อัตโนมัติ
+      sendBtn.innerHTML = 'Send';
+      sendBtn.disabled = false;
+      _chatFile = fileToUpload;
+      openMeetingIntelFromFile();
+      return;
+    }
     try {
       const form = new FormData();
       form.append('file', fileToUpload);
