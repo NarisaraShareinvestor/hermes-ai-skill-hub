@@ -2243,7 +2243,7 @@ def _segments_plain_text(segments: list) -> str:
     return " ".join((s.get("text") or "").strip() for s in segments).strip()
 
 
-async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None):
+async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=None, user_email=""):
     """Transcribe audio/video → (formatted_transcript, num_chunks, segments)
 
     Strategy:
@@ -2256,7 +2256,30 @@ async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=No
     formatted_transcript = "[MM:SS] ผู้พูด A: ..." ต่อบรรทัด
     """
     from openai import OpenAI
+    import time as _t
     client = OpenAI(api_key=api_key, timeout=900)
+    _t0 = _t.perf_counter()
+
+    def _emit(status, dur_sec, dual, error_type=None):
+        """บันทึกค่าใช้จ่าย/สถานะการถอดเสียง 1 ครั้ง (best-effort, ห้าม raise)."""
+        try:
+            cost = observability.estimate_audio_cost(dur_sec, dual=dual) if status == "ok" else 0.0
+            observability.record_telemetry(
+                user_email=user_email or "",
+                request_kind="meeting_transcribe",
+                skill_name="Meeting Intelligence Assistant",
+                status=status, error_type=error_type,
+                latency_ms=int((_t.perf_counter() - _t0) * 1000),
+                model=DIARIZE_MODEL if dual else "whisper-1",
+                est_cost_usd=cost,
+                meta={"duration_sec": int(dur_sec or 0),
+                      "duration_min": round((dur_sec or 0) / 60, 1),
+                      "mode": "dual" if dual else "single",
+                      "filename": filename})
+        except Exception as _e:
+            print(f"[telemetry] transcribe emit skip: {_e}", flush=True)
+
+    _dual = (TRANSCRIBE_MODE == "dual")
 
     # Step 1: normalise — extract audio, strip video, convert to 16kHz mono MP3
     norm_path = None
@@ -2295,6 +2318,7 @@ async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=No
             if on_progress:
                 on_progress(1, 1, "กำลังถอดเสียง + แยกผู้พูด...")
             segments = _transcribe_chunk_segments(client, work_path)
+            _emit("ok", duration, _dual)
             return _render_transcript(segments), 1, segments
 
         # Step 3: chunk — overlap 30 วิ เพื่อให้มีหลักฐานพอสำหรับ map ป้ายผู้พูดข้าม chunk
@@ -2360,8 +2384,13 @@ async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=No
         n_speakers = len({s.get("speaker") for s in accepted if s.get("speaker")})
         print(f"[transcribe] all done: {num_chunks} chunks ({failed_chunks} failed), "
               f"{len(accepted)} segments, {n_speakers} speakers, {total_chars} chars", flush=True)
+        _emit("ok", duration, _dual)
         return _render_transcript(accepted), num_chunks, accepted
 
+    except Exception as e:
+        # บันทึกความล้มเหลว (เช่น quota หมด) เพื่อให้ dashboard เห็น error rate
+        _emit("error", 0, _dual, error_type=type(e).__name__)
+        raise
     finally:
         if norm_path and norm_path.exists():
             norm_path.unlink(missing_ok=True)
@@ -2414,7 +2443,7 @@ async def meeting_transcribe(
     _socks_vars = ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']
     _saved_env = {k: os.environ.pop(k, None) for k in _socks_vars}
     try:
-        transcript, num_chunks, segments = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio")
+        transcript, num_chunks, segments = await _transcribe_audio_chunks(audio_path, api_key, file.filename or "audio", user_email=user_email)
         _save_transcript_to_memory(user_email, file.filename or "audio", transcript)
         return {"transcript": transcript, "chunks_processed": num_chunks,
                 "segments": segments, "plain_text": _segments_plain_text(segments)}
@@ -2456,7 +2485,7 @@ def _run_transcription_job(job_id: str, audio_path: pathlib.Path, api_key: str, 
             job["total"] = total
             job["message"] = msg
         transcript, num_chunks, segments = asyncio.run(
-            _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=on_progress)
+            _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=on_progress, user_email=user_email)
         )
         job["transcript"] = transcript
         job["segments"] = segments

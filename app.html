@@ -2644,6 +2644,10 @@
         <!-- Dashboard tab -->
         <div id="aiePane-dashboard" class="aie-pane">
           <div id="aieCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="aie-box"><div class="aie-box-h">💰 ค่าใช้จ่ายแยกตามประเภท (24 ชม.)</div><div id="aieCostByKind"></div></div>
+            <div class="aie-box"><div class="aie-box-h">🧾 รายการล่าสุด (แต่ละครั้งใช้เท่าไร)</div><div id="aieRecentCosts" style="max-height:280px;overflow-y:auto;"></div></div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
             <div class="aie-box"><div class="aie-box-h">Top Skills (24 ชม.)</div><div id="aieTopSkills"></div></div>
             <div class="aie-box"><div class="aie-box-h">Recent Errors</div><div id="aieRecentErrors"></div></div>
@@ -5361,10 +5365,29 @@ async function loadAieOverview() {
       card('Requests (24h)', d.requests_24h, `${d.tokens_24h.toLocaleString()} tokens`) +
       card('Error Rate', d.error_rate_24h + '%', `${d.error_count_24h} errors`, errCls) +
       card('p95 Latency', d.p95_latency_ms + ' ms', `avg ${d.avg_latency_ms} ms`, d.p95_latency_ms>=15000?'warn':'') +
-      card('Cost วันนี้', '$' + d.cost_today_usd, 'gpt-4o-mini') +
+      card('Cost วันนี้', '$' + d.cost_today_usd, `24 ชม. $${d.cost_24h_usd ?? 0}`) +
       card('Feedback Score', d.feedback_score == null ? '—' : d.feedback_score + '%', `👍${d.feedback_up_24h} 👎${d.feedback_down_24h}`, fbCls) +
       card('Alerts ค้าง', d.unresolved_alerts, '', d.unresolved_alerts>0?'bad':'good') +
       card('Tickets เปิด', d.open_tickets, `${d.draft_opportunities} opportunities`, d.open_tickets>0?'warn':'');
+
+    // แปลงชื่อประเภทงานเป็นภาษาไทยอ่านง่าย
+    const KIND_TH = { chat:'แชท', run_skill:'รัน Skill', meeting_transcribe:'ถอดเสียงประชุม',
+                      meeting_extract:'วิเคราะห์ประชุม', other:'อื่นๆ' };
+    const kindLabel = k => KIND_TH[k] || k || 'อื่นๆ';
+
+    $('aieCostByKind').innerHTML = (d.cost_by_kind && d.cost_by_kind.length)
+      ? d.cost_by_kind.map(c => `<div class="aie-row"><span>${_esc(kindLabel(c.kind))} <span style="color:var(--muted);font-size:11px;">×${c.count}</span></span><b>$${(c.cost||0).toFixed(4)}</b></div>`).join('')
+      : '<div class="aie-empty">ยังไม่มีค่าใช้จ่าย</div>';
+
+    $('aieRecentCosts').innerHTML = (d.recent_costs && d.recent_costs.length)
+      ? d.recent_costs.map(c => {
+          const t = c.created_at ? new Date(c.created_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '';
+          const dur = c.duration_min != null ? ` · ${c.duration_min} นาที` : '';
+          const who = (c.user_email||'').split('@')[0];
+          const err = c.status === 'error' ? ' <span style="color:#dc2626;">(error)</span>' : '';
+          return `<div class="aie-row"><span style="font-size:12px;">${_esc(kindLabel(c.request_kind))}${dur}${err}<br><span style="color:var(--muted);font-size:10px;">${t} · ${_esc(who)}</span></span><b style="color:#16a34a;">$${(c.cost||0).toFixed(4)}</b></div>`;
+        }).join('')
+      : '<div class="aie-empty">ยังไม่มีรายการ</div>';
 
     $('aieTopSkills').innerHTML = (d.top_skills && d.top_skills.length)
       ? d.top_skills.map(s => `<div class="aie-row"><span>${_esc(s.name)}</span><b>${s.count}</b></div>`).join('')

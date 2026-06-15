@@ -42,6 +42,20 @@ def estimate_cost(prompt_tokens: int, completion_tokens: int) -> float:
     return (prompt_tokens or 0) * _COST_IN_PER_TOKEN + (completion_tokens or 0) * _COST_OUT_PER_TOKEN
 
 
+# ── ราคาถอดเสียง (ต่อนาที): whisper-1 = $0.006, gpt-4o-transcribe = $0.006 ──────
+# โหมด dual ถอด 2 รอบต่อ chunk (diarize + whisper) → ~$0.012/นาที
+# โหมด single ใช้โมเดลเดียว → ~$0.006/นาที
+_AUDIO_COST_PER_MIN_SINGLE = 0.006
+_AUDIO_COST_PER_MIN_DUAL   = 0.012
+
+
+def estimate_audio_cost(duration_seconds: float, dual: bool = True) -> float:
+    """ประเมินค่าถอดเสียงจากความยาวเสียง (วินาที)."""
+    minutes = max(float(duration_seconds or 0), 0) / 60.0
+    rate = _AUDIO_COST_PER_MIN_DUAL if dual else _AUDIO_COST_PER_MIN_SINGLE
+    return round(minutes * rate, 4)
+
+
 # ── สตริงที่ _claude_chat คืนเมื่อ "พัง" (ไม่ raise) — ต้องนับเป็น error ───────
 _ERROR_PREFIXES = ("OpenAI Error:", "⚠️")
 
@@ -244,6 +258,28 @@ def build_overview(db: Session) -> dict:
         "skill_name": e.skill_name, "user_email": e.user_email,
     } for e in sorted(errors, key=lambda x: x.created_at or datetime.min, reverse=True)[:10]]
 
+    # ค่าใช้จ่ายแยกตามประเภทงาน 24 ชม. (chat ถูกมาก / ถอดเสียงแพงสุด)
+    kind_cost = {}
+    for e in events:
+        k = e.request_kind or "other"
+        agg = kind_cost.setdefault(k, {"kind": k, "count": 0, "cost": 0.0})
+        agg["count"] += 1
+        agg["cost"] += (e.est_cost_usd or 0)
+    cost_by_kind = sorted(
+        [{"kind": v["kind"], "count": v["count"], "cost": round(v["cost"], 4)}
+         for v in kind_cost.values()],
+        key=lambda x: x["cost"], reverse=True)
+
+    # รายการล่าสุดที่มีค่าใช้จ่าย — ให้เห็น "แต่ละครั้ง" ใช้เงินเท่าไร
+    paid = [e for e in events if (e.est_cost_usd or 0) > 0]
+    recent_costs = [{
+        "created_at": e.created_at.isoformat() if e.created_at else None,
+        "request_kind": e.request_kind, "skill_name": e.skill_name,
+        "user_email": e.user_email, "status": e.status,
+        "cost": round(e.est_cost_usd or 0, 4),
+        "duration_min": (e.meta or {}).get("duration_min") if isinstance(e.meta, dict) else None,
+    } for e in sorted(paid, key=lambda x: x.created_at or datetime.min, reverse=True)[:15]]
+
     # feedback score 24 ชม.
     fb = db.query(FeedbackEvent).filter(FeedbackEvent.created_at >= since).all()
     up = sum(1 for f in fb if f.rating > 0)
@@ -263,7 +299,10 @@ def build_overview(db: Session) -> dict:
         "avg_latency_ms": int(sum(latencies) / len(latencies)) if latencies else 0,
         "p95_latency_ms": _percentile(latencies, 95),
         "cost_today_usd": round(float(cost_today), 4),
+        "cost_24h_usd": round(sum((e.est_cost_usd or 0) for e in events), 4),
         "tokens_24h": sum((e.total_tokens or 0) for e in events),
+        "cost_by_kind": cost_by_kind,
+        "recent_costs": recent_costs,
         "top_skills": top_skills,
         "recent_errors": recent_errors,
         "feedback_up_24h": up,
