@@ -4341,7 +4341,9 @@ async function dismissSkillSuggestion(cardId) {
 const _SPK_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0d9488','#db2777','#ca8a04','#4f46e5'];
 
 function _dlTranscript(uid) {
-  const blob = new Blob([window[uid] || ''], { type: 'text/plain;charset=utf-8' });
+  // Prepend a UTF-8 BOM so editors that default to the system codepage (e.g.
+  // Windows Notepad) don't misread Thai as Latin-1 mojibake ("à¸ªà¸à¸²à¸¢").
+  const blob = new Blob(['﻿', window[uid] || ''], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = (window[uid + '_name'] || 'transcript').replace(/\.[^.]+$/, '') + '_transcript.txt';

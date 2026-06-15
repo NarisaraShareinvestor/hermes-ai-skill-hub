@@ -1969,10 +1969,18 @@ def _split_audio_ffmpeg(audio_path: pathlib.Path,
         start = max(0, boundary - (overlap_secs if idx > 0 else 0))
         dur = (boundary + chunk_duration_secs) - start
         out = UPLOAD_DIR / f"chunk_{uuid.uuid4().hex}.mp3"
+        # RE-ENCODE each chunk — do NOT stream-copy (-c copy). Cutting an MP3 with
+        # -c copy can only break at frame boundaries, so chunks start with broken
+        # frames / wrong headers. Whisper then receives a corrupted file and
+        # hallucinates a single token on a loop ("สบาย สบาย สบาย…"). Re-encoding
+        # the already-tiny 16kHz mono 32kbps source is cheap and yields clean,
+        # accurately-seeked standalone MP3 chunks. -ss before -i = fast seek.
         subprocess.run(
-            ["ffmpeg", "-y", "-i", str(audio_path),
+            ["ffmpeg", "-y",
              "-ss", str(start), "-t", str(dur),
-             "-c", "copy", str(out)],
+             "-i", str(audio_path),
+             "-ac", "1", "-ar", "16000", "-b:a", "32k",
+             str(out)],
             capture_output=True,
         )
         # Accept chunks ≥ 512 bytes — the final chunk of a meeting may be short
