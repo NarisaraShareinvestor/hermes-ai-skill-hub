@@ -3843,19 +3843,26 @@ let _pendingMeetingFile = null;   // audio File object waiting to be analyzed
 let _meetingFiles       = [];     // files attached to the current meeting session
 let _miCardCounter      = 0;      // unique IDs for detect/analysis cards
 
-function _getAudioDuration(file) {
+// Returns audio length in seconds (0 if it can't be read).
+function _getAudioDurationSecs(file) {
   return new Promise(resolve => {
     const url = URL.createObjectURL(file);
     const audio = new Audio(url);
     audio.onloadedmetadata = () => {
       URL.revokeObjectURL(url);
-      const secs = Math.round(audio.duration) || 0;
-      const m = String(Math.floor(secs / 60)).padStart(2, '0');
-      const s = String(secs % 60).padStart(2, '0');
-      resolve(`${m}:${s}`);
+      resolve(Math.round(audio.duration) || 0);
     };
-    audio.onerror = () => { URL.revokeObjectURL(url); resolve('--:--'); };
-    setTimeout(() => resolve('--:--'), 3000);
+    audio.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+    setTimeout(() => resolve(0), 3000);
+  });
+}
+
+function _getAudioDuration(file) {
+  return _getAudioDurationSecs(file).then(secs => {
+    if (!secs) return '--:--';
+    const m = String(Math.floor(secs / 60)).padStart(2, '0');
+    const s = String(secs % 60).padStart(2, '0');
+    return `${m}:${s}`;
   });
 }
 
@@ -4071,11 +4078,16 @@ async function runMeetingFromChat(cardId, originalMsg) {
     const tForm = new FormData();
     tForm.append('file', file);
 
-    // Choose endpoint based on file size (25MB threshold)
-    const fileSizeMB = file.size / (1024 * 1024);
-    const isLargeFile = fileSizeMB > 25;
+    // Pick endpoint by BOTH size and duration. A long but small file (e.g. a
+    // 68-min M4A under 25MB) processed synchronously takes minutes and gets
+    // killed by the Cloudflare/proxy ~100s window (HTTP 524). Anything that
+    // could exceed that window must go through the async job + polling path.
+    const fileSizeMB  = file.size / (1024 * 1024);
+    const durationSec = await _getAudioDurationSecs(file);
+    const isLargeFile = fileSizeMB > 20 || durationSec > 240;  // >20MB or >4 min
     if (isLargeFile) {
-      setProgress(20, `กำลังถอดเสียง (${fileSizeMB.toFixed(1)} MB - แบ่งเป็น chunks)...`);
+      const why = durationSec > 240 ? `${Math.round(durationSec / 60)} นาที` : `${fileSizeMB.toFixed(1)} MB`;
+      setProgress(20, `กำลังถอดเสียง (${why} - แบ่งเป็น chunks)...`);
     }
 
     const tData = await miTranscribeFile(file, isLargeFile, (cur, total, msg) => {
