@@ -2330,8 +2330,22 @@ async def _transcribe_audio_chunks(audio_path, api_key, filename, on_progress=No
                 context_text = _segments_plain_text(accepted)[-600:]
                 print(f"[transcribe] chunk {i+1} done: {len(fresh)} segments accepted", flush=True)
             except Exception as e:
-                # One bad chunk must not destroy an hour of transcription —
-                # mark the gap and keep going.
+                # Account-level failures (no quota / bad key / rate limit) hit
+                # EVERY chunk — retrying the rest is pointless and just produces
+                # an all-"failed" transcript that looks like an audio problem.
+                # Abort with a clear, actionable message instead.
+                msg = str(e).lower()
+                if "insufficient_quota" in msg or "exceeded your current quota" in msg:
+                    cpath.unlink(missing_ok=True)
+                    raise RuntimeError(
+                        "OpenAI เครดิตหมด (insufficient_quota) — กรุณาเติมเงินใน OpenAI billing "
+                        "แล้วลองใหม่อีกครั้ง"
+                    )
+                if "invalid_api_key" in msg or "incorrect api key" in msg or "error code: 401" in msg:
+                    cpath.unlink(missing_ok=True)
+                    raise RuntimeError("OPENAI_API_KEY ไม่ถูกต้อง — กรุณาตรวจสอบ key")
+                # One genuinely bad chunk must not destroy an hour of
+                # transcription — mark the gap and keep going.
                 failed_chunks += 1
                 start_min = int(chunk["start"] // 60)
                 end_min = int((chunk["start"] + chunk["dur"]) // 60)

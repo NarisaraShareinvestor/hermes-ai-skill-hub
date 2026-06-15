@@ -2107,7 +2107,7 @@
             <div class="chat-recording-chip" id="chatRecordingChip">
               <div class="chat-rec-dot"></div>
               <span id="chatRecordTimer">00:00</span>
-              <button onclick="stopChatRecording()" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:14px;line-height:1;margin-left:2px;" title="หยุดบันทึก">■</button>
+              <button onclick="stopChatVoice()" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:14px;line-height:1;margin-left:2px;" title="หยุด">■</button>
             </div>
             <div class="chat-input-row">
               <!-- hidden file input -->
@@ -2119,7 +2119,7 @@
                   <path d="M4 10.5V5a5 5 0 0 1 10 0v8a3 3 0 0 1-6 0V6" stroke-linecap="round"/>
                 </svg>
               </button>
-              <button class="chat-record-btn" id="chatRecordBtn" title="บันทึกเสียง" onclick="startChatRecording()">
+              <button class="chat-record-btn" id="chatRecordBtn" title="พูดเพื่อพิมพ์ (Voice to text)" onclick="toggleChatDictation()">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" style="width:16px;height:16px;">
                   <rect x="7" y="2" width="6" height="10" rx="3" stroke-linecap="round"/>
                   <path d="M4 10a6 6 0 0 0 12 0" stroke-linecap="round"/>
@@ -3633,6 +3633,82 @@ function stopChatRecording() {
   if (_chatRecorder && _chatRecorder.state === 'recording') {
     _chatRecorder.stop();
   }
+}
+
+// ── Voice-to-text dictation (ChatGPT-style) ─────────────────────────────────
+// Uses the browser's on-device Web Speech API — instant, live, and FREE
+// (no OpenAI/Whisper call). Speaking types straight into the chat box.
+// Browsers without SpeechRecognition (e.g. Firefox) fall back to the
+// record→Whisper meeting flow.
+let _chatRecognition = null;
+let _chatDictating   = false;
+
+function toggleChatDictation() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { startChatRecording(); return; }   // unsupported → old flow
+  if (_chatDictating) { stopChatDictation(); return; }
+
+  const input = $('chatInput');
+  const rec = new SR();
+  rec.lang = 'th-TH';            // ไทย + อังกฤษปนได้
+  rec.continuous = true;
+  rec.interimResults = true;
+
+  // Keep whatever is already typed; dictation appends after it.
+  const base = input.value ? input.value.replace(/\s*$/, '') + ' ' : '';
+  let finalText = '';
+
+  rec.onresult = (e) => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tr = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += tr;
+      else interim += tr;
+    }
+    input.value = base + finalText + interim;
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  };
+  rec.onerror = (e) => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed')
+      toast('กรุณาอนุญาตไมโครโฟนใน browser', 'error');
+    else if (e.error === 'no-speech')
+      toast('ไม่ได้ยินเสียง — ลองพูดอีกครั้ง', 'info');
+    stopChatDictation();
+  };
+  rec.onend = () => {
+    // continuous mode can stop on its own after a long pause — restart while
+    // the user still wants to dictate; otherwise reset the UI.
+    if (_chatDictating) { try { rec.start(); } catch (_) {} }
+    else _setChatMicActive(false);
+  };
+
+  _chatRecognition = rec;
+  _chatDictating = true;
+  _setChatMicActive(true);
+  try { rec.start(); } catch (_) {}
+}
+
+function stopChatDictation() {
+  _chatDictating = false;
+  if (_chatRecognition) { try { _chatRecognition.stop(); } catch (_) {} }
+  _setChatMicActive(false);
+  $('chatInput').focus();
+}
+
+// ปุ่มหยุดใน chip — หยุดได้ทั้ง dictation และการอัดเสียงแบบเดิม
+function stopChatVoice() {
+  if (_chatDictating) stopChatDictation();
+  else stopChatRecording();
+}
+
+function _setChatMicActive(on) {
+  const btn = $('chatRecordBtn');
+  if (btn) btn.classList.toggle('recording', on);
+  const chip = $('chatRecordingChip');
+  if (chip) chip.classList.toggle('active', on);
+  const timer = $('chatRecordTimer');
+  if (timer) timer.textContent = on ? 'กำลังฟัง...' : '00:00';
 }
 
 function onChatFileSelect(input) {
