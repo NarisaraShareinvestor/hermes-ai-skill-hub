@@ -474,12 +474,15 @@ def _notify_n8n(event: str, payload: dict):
 
 # ── OpenAI / Hermes helper ─────────────────────────────────────────────────────
 def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048,
+                 temperature: float = 0.3,
                  _kind: str = "chat", _skill_name: str = None,
                  _skill_id: int = None, _user_email: str = None) -> str:
-    """LLM wrapper (OpenAI gpt-4o-mini). บันทึก telemetry แบบ best-effort —
-    ความล้มเหลวในการ log ห้ามกระทบคำตอบ. คืน str เสมอ (ไม่ raise)."""
+    """LLM wrapper (OpenAI). โมเดลตั้งผ่าน env OPENAI_MODEL (ดีฟอลต์ gpt-4o-mini)
+    เปลี่ยนเป็น gpt-4o ได้โดยไม่ต้องแก้โค้ด. temperature ต่ำ = แม่นยำ/นิ่งกว่า.
+    บันทึก telemetry แบบ best-effort — ความล้มเหลวในการ log ห้ามกระทบคำตอบ.
+    คืน str เสมอ (ไม่ raise)."""
     import time as _time
-    _MODEL = "gpt-4o-mini"
+    _MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         return "⚠️  OPENAI_API_KEY ยังไม่ได้ตั้งค่าใน .env"
@@ -499,6 +502,7 @@ def _claude_chat(messages: list, system: str = "", max_tokens: int = 2048,
             model=_MODEL,
             messages=all_messages,
             max_tokens=max_tokens,
+            temperature=temperature,
         )
         _latency = int((_time.perf_counter() - _t0) * 1000)
         try:
@@ -2675,9 +2679,16 @@ def run_skill(skill_id: int, req: RunSkillRequest, db: Session = Depends(get_db)
         f"ทำงานตามที่ผู้ใช้ขอ ตอบภาษาไทย"
     )
 
+    # temperature ต่อประเภทงาน: งานที่ต้องแม่นยำ/ห้ามมั่ว (การเงิน, โค้ด, แปล, log,
+    # test case) ใช้ค่าต่ำเพื่อให้ผลนิ่งและลด hallucination; งานเขียนเชิงสร้างสรรค์
+    # (อีเมล, รายงานประชุม) ให้สูงขึ้นเล็กน้อยเพื่อสำนวนที่ลื่นขึ้น
+    _DETERMINISTIC_DEPTS = {"ir", "dev", "qa", "content"}
+    _temp = 0.2 if (skill.department or "").lower() in _DETERMINISTIC_DEPTS else 0.5
+
     output = _claude_chat(
         [{"role": "user", "content": req.input_text}],
         system,
+        temperature=_temp,
         _kind="run_skill", _skill_id=skill.id, _skill_name=skill.name,
         _user_email=req.user_email,
     )
