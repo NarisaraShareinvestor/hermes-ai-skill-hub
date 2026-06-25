@@ -2663,8 +2663,9 @@ def telegram_draft_email(body: dict, db: Session = Depends(get_db)):
 
 # ── Run a Skill ────────────────────────────────────────────────────────────────
 class RunSkillRequest(BaseModel):
-    input_text: str
+    input_text: str = ""
     user_email: str = "user@example.com"
+    file_id: Optional[int] = None  # แนบไฟล์ที่ upload แล้ว (PDF/Word/Excel/TXT) ให้ skill อ่าน
 
 
 @app.post("/api/skills/{skill_id}/run")
@@ -2679,6 +2680,25 @@ def run_skill(skill_id: int, req: RunSkillRequest, db: Session = Depends(get_db)
         f"ทำงานตามที่ผู้ใช้ขอ ตอบภาษาไทย"
     )
 
+    # ── แนบไฟล์: ดึงข้อความจาก PDF/Word/Excel/TXT มาต่อท้าย input ─────────────
+    user_content = req.input_text or ""
+    _max_tokens = 2048
+    if req.file_id:
+        _f = db.query(UserFile).filter(UserFile.id == req.file_id).first()
+        if not _f:
+            raise HTTPException(status_code=404, detail="ไม่พบไฟล์ที่แนบ")
+        _ftext = _extract_text(UPLOAD_DIR / _f.saved_name, _f.mime_type or "")
+        if not _ftext.strip():
+            raise HTTPException(status_code=400, detail="อ่านเนื้อหาจากไฟล์ไม่ได้ (ไฟล์ว่างหรือเป็นรูปสแกน)")
+        user_content += (
+            f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
+            f"[คำสั่ง: ใช้เนื้อหาจากไฟล์นี้เป็นข้อมูลหลัก ถ้ามี marker [หน้า N] ให้อ้างอิงเลขหน้าทุกครั้ง]"
+        )
+        _max_tokens = 4096  # ไฟล์ยาว → เผื่อ output ยาวขึ้น
+
+    if not user_content.strip():
+        raise HTTPException(status_code=400, detail="กรุณาใส่ข้อความ หรือแนบไฟล์อย่างน้อยหนึ่งอย่าง")
+
     # temperature ต่อประเภทงาน: งานที่ต้องแม่นยำ/ห้ามมั่ว (การเงิน, โค้ด, แปล, log,
     # test case) ใช้ค่าต่ำเพื่อให้ผลนิ่งและลด hallucination; งานเขียนเชิงสร้างสรรค์
     # (อีเมล, รายงานประชุม) ให้สูงขึ้นเล็กน้อยเพื่อสำนวนที่ลื่นขึ้น
@@ -2686,8 +2706,9 @@ def run_skill(skill_id: int, req: RunSkillRequest, db: Session = Depends(get_db)
     _temp = 0.2 if (skill.department or "").lower() in _DETERMINISTIC_DEPTS else 0.5
 
     output = _claude_chat(
-        [{"role": "user", "content": req.input_text}],
+        [{"role": "user", "content": user_content}],
         system,
+        max_tokens=_max_tokens,
         temperature=_temp,
         _kind="run_skill", _skill_id=skill.id, _skill_name=skill.name,
         _user_email=req.user_email,
