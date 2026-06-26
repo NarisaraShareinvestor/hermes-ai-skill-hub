@@ -812,7 +812,7 @@ def _index_document(doc_id: int, md: str):
         print(f"index_document failed: {e}", flush=True)
 
 
-def _search_chunks(doc_id: int, query: str, k: int = 10) -> list:
+def _search_chunks(doc_id: int, query: str, k: int = 12) -> list:
     """Hybrid: pgvector cosine + keyword (ILIKE) สำหรับคำอังกฤษ/ตัวเลขในคำถาม
     (เอกสารอังกฤษ + ถามไทย → vector อ่อน; keyword ช่วยจับคำอังกฤษที่ผู้ใช้พิมพ์ เช่น S&P, Assessment)"""
     if not _IS_PG or not query:
@@ -828,17 +828,20 @@ def _search_chunks(doc_id: int, query: str, k: int = 10) -> list:
             out.append({"heading": r[1], "page_start": r[2], "page_end": r[3], "content": r[4]})
 
     try:
-        # 1) keyword: token อังกฤษ/ตัวเลขที่มีนัย (>=3 ตัว) จากคำถาม
+        # 1) keyword: token อังกฤษ/ตัวเลข (>=3 ตัว) — ให้คะแนนตามจำนวนคำที่ match
+        #    (chunk ที่ตรงหลายคำมาก่อน ไม่งั้น token ทั่วไป เช่น 2026/crude จะดึง chunk มั่ว)
         toks = [t for t in re.findall(r"[A-Za-z0-9&]{3,}", query)
-                if t.lower() not in ("score", "the", "and", "for", "report", "page")][:6]
+                if t.lower() not in ("score", "the", "and", "for", "report", "page", "ปี")][:8]
         if toks:
+            score_sql = " + ".join(f"(content ILIKE :t{i})::int" for i in range(len(toks)))
             conds = " OR ".join(f"content ILIKE :t{i}" for i in range(len(toks)))
             params = {f"t{i}": f"%{toks[i]}%" for i in range(len(toks))}
             params["d"] = doc_id
             with engine.connect() as conn:
                 _add(conn.execute(_sql_text(
                     f"SELECT id,heading,page_start,page_end,content FROM document_chunks "
-                    f"WHERE document_id=:d AND ({conds}) LIMIT 5"), params).fetchall())
+                    f"WHERE document_id=:d AND ({conds}) ORDER BY ({score_sql}) DESC LIMIT 8"),
+                    params).fetchall())
         # 2) vector
         qe = _embed_texts([query])
         if qe:
@@ -847,7 +850,7 @@ def _search_chunks(doc_id: int, query: str, k: int = 10) -> list:
                     "SELECT id,heading,page_start,page_end,content FROM document_chunks "
                     "WHERE document_id=:d ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"),
                     {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall())
-        return out[:k + 5]
+        return out[:k + 6]
     except Exception as e:
         print(f"search_chunks failed: {e}", flush=True)
         return out
@@ -958,12 +961,12 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
         _prefix = _doc_object_prefix(owner, source, doc_id)
         count = 0
         for pno in range(len(doc)):
-            if count >= 30:
+            if count >= 60:
                 break
             page = doc[pno]
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
             for img in page.get_images(full=True):
-                if count >= 30:
+                if count >= 60:
                     break
                 xref = img[0]
                 try:
