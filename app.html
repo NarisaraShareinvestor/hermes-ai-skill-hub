@@ -5132,19 +5132,64 @@ function handleActionBtn(btn) {
 }
 
 function mdToHtml(text) {
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const src = (text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // inline formatting (bold/italic/code) — ใช้ทั้งในเซลล์ตารางและบรรทัดปกติ
+  const inline = (s) => s
     .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`([^`]+)`/g,'<code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:.92em">$1</code>')
-    .replace(/^(#{1,6})\s+(.+)$/gm, (_, h, t) => {
+    .replace(/`([^`]+)`/g,'<code style="background:#f1f5f9;padding:1px 5px;border-radius:3px;font-family:monospace;font-size:.92em">$1</code>');
+
+  const cells = (l) => {
+    let s = l.trim();
+    if (s.startsWith('|')) s = s.slice(1);
+    if (s.endsWith('|'))   s = s.slice(0, -1);
+    return s.split('|').map(c => c.trim());
+  };
+  const isRow = (l) => l && l.includes('|');
+  const isSep = (l) => isRow(l) && cells(l).length > 0 && cells(l).every(c => /^:?-+:?$/.test(c));
+
+  const lines = src.split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    // ── ตาราง markdown: header row + separator row + body ──
+    if (isRow(lines[i]) && isSep(lines[i + 1] || '')) {
+      const head = cells(lines[i]);
+      i += 2;
+      const body = [];
+      while (i < lines.length && isRow(lines[i]) && !isSep(lines[i]) && lines[i].trim() !== '') {
+        body.push(cells(lines[i])); i++;
+      }
+      let t = '<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:.88em;">';
+      t += '<thead><tr>' + head.map(h =>
+        `<th style="border:1px solid #e2e8f0;padding:5px 8px;background:#f8fafc;text-align:left;font-weight:600;">${inline(h)}</th>`).join('') + '</tr></thead><tbody>';
+      t += body.map(r => '<tr>' + head.map((_, ci) =>
+        `<td style="border:1px solid #e2e8f0;padding:5px 8px;vertical-align:top;">${inline(r[ci] || '')}</td>`).join('') + '</tr>').join('');
+      t += '</tbody></table>';
+      out.push(t);
+      continue;
+    }
+    // ── หัวข้อ # ──
+    const h = lines[i].match(/^(#{1,6})\s+(.+)$/);
+    if (h) {
       const sizes = ['1.25em','1.1em','1em','0.95em','0.9em','0.85em'];
-      const mt    = h.length <= 2 ? '14px' : '10px';
-      return `<strong style="font-size:${sizes[h.length-1]};display:block;margin-top:${mt};margin-bottom:3px;">${t}</strong>`;
-    })
-    .replace(/^[\-\*] (.+)$/gm,'&nbsp;&nbsp;• $1')
-    .replace(/\n/g,'<br>');
+      const mt = h[1].length <= 2 ? '14px' : '10px';
+      out.push(`<strong style="font-size:${sizes[h[1].length-1]};display:block;margin-top:${mt};margin-bottom:3px;">${inline(h[2])}</strong>`);
+      i++; continue;
+    }
+    // ── bullet ──
+    const b = lines[i].match(/^[\-\*] (.+)$/);
+    if (b) { out.push('&nbsp;&nbsp;• ' + inline(b[1])); i++; continue; }
+    // ── บรรทัดปกติ ──
+    out.push(inline(lines[i]));
+    i++;
+  }
+
+  return out.join('<br>')
+    .replace(/<br>\s*(<table)/g, '$1')      // กัน <br> เกินก่อนตาราง
+    .replace(/(<\/table>)\s*<br>/g, '$1');  // กัน <br> เกินหลังตาราง
 }
 
 function appendMsg(text, role, actionButtons = [], poweredBy = null) {
