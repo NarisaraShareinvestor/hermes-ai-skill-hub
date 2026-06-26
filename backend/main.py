@@ -908,13 +908,24 @@ def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
                 os.environ[k] = v
 
 
-def _index_document_images(doc_id: int, pdf_path: str, mime: str):
+def _doc_object_prefix(owner: str, source: str, doc_id: int) -> str:
+    """โครงสร้าง key ใน MinIO: {source}/{user}/{ปี}/{เดือน}/doc{id} — แยก user/เวลา จัดการง่าย"""
+    import re as _re
+    from datetime import datetime as _dt
+    slug = _re.sub(r"[^a-zA-Z0-9._-]", "_", (owner or "unknown").replace("@", "_at_"))
+    now = _dt.now()
+    return f"{source or 'chat'}/{slug}/{now.year}/{now.month:02d}/doc{doc_id}"
+
+
+def _index_document_images(doc_id: int, pdf_path: str, mime: str,
+                           owner: str = "", source: str = "chat"):
     """แยกรูปจาก PDF → MinIO + vision caption + embed → document_images (bg)"""
     if not _IS_PG or mime != "application/pdf":
         return
     try:
         import pymupdf
         doc = pymupdf.open(str(pdf_path))
+        _prefix = _doc_object_prefix(owner, source, doc_id)
         count = 0
         for pno in range(len(doc)):
             if count >= 30:
@@ -932,7 +943,7 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str):
                 data, ext = base.get("image"), base.get("ext", "png")
                 if not data or len(data) < 3000 or base.get("width", 0) < 100 or base.get("height", 0) < 100:
                     continue  # ข้ามไอคอน/โลโก้เล็ก
-                obj = f"doc{doc_id}/p{pno+1}_{xref}.{ext}"
+                obj = f"{_prefix}/p{pno+1}_{xref}.{ext}"
                 if not _minio_put(obj, data, f"image/{ext}"):
                     continue
                 cap = _image_bytes_to_caption(data, ext)
@@ -983,10 +994,11 @@ def _search_images(doc_id: int, query: str, k: int = 3) -> list:
         return []
 
 
-def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str):
+def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str,
+                         owner: str = "", source: str = "chat"):
     """งาน background หลังอัปไฟล์: index chunks + รูป"""
     _index_document(doc_id, md)
-    _index_document_images(doc_id, pdf_path, mime)
+    _index_document_images(doc_id, pdf_path, mime, owner, source)
 
 
 def _cleanup_old_chat_documents():
@@ -1753,7 +1765,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     # index chunks + embedding + รูป (จาก PDF) ใน background (ไม่บล็อกคำตอบ)
                     import threading as _th
                     _th.Thread(target=_process_document_bg,
-                               args=(_doc_id, _full, str(_fpath), _f.mime_type or ""),
+                               args=(_doc_id, _full, str(_fpath), _f.mime_type or "",
+                                     req.user_email, "chat"),
                                daemon=True).start()
                 except Exception:
                     db.rollback()
