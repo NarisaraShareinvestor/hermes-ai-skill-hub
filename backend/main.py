@@ -363,36 +363,6 @@ _CATALOG_SKILLS = [
             "Output: คำแปลอย่างเดียว ตามด้วยหมายเหตุศัพท์เฉพาะ (ถ้ามีคำที่แปลได้หลายแบบ)"
         ),
     },
-    {
-        "name": "Test Case Generator",
-        "department": "qa", "skill_type": "generator",
-        "tags": ["qa", "test-case", "testing"],
-        "description": "สร้าง test cases จาก requirement/user story ครอบคลุม happy path, edge cases และข้อมูลทดสอบ",
-        "prompt_template": (
-            "คุณคือ QA Engineer อาวุโส หน้าที่: ออกแบบ test cases จาก requirement หรือ user story ที่ได้รับ\n"
-            "Output: ตาราง | TC-ID | ชื่อเคส | Precondition | Steps | Expected Result | Priority |\n"
-            "ครอบคลุม: (1) Happy path (2) Edge cases — ค่าว่าง, ค่าสุดขอบ, ภาษาไทย/อักขระพิเศษ, ไฟล์ใหญ่ "
-            "(3) Negative cases — input ผิด, สิทธิ์ไม่พอ, network ล้ม (4) ข้อมูลทดสอบตัวอย่างที่ใช้ได้จริง\n"
-            "ปิดท้าย: รายการคำถามที่ requirement ยังคลุมเครือ (ถ้ามี)\n"
-            "ห้ามสร้างเคสที่ไม่เกี่ยวกับ requirement ที่ให้มา ตอบภาษาไทย"
-        ),
-    },
-    {
-        "name": "Client Email Draft",
-        "department": "sales", "skill_type": "generator",
-        "tags": ["sales", "email", "client"],
-        "description": "ร่างอีเมลถึงลูกค้าแบบมืออาชีพ ไทย/อังกฤษ จากบริบทและประเด็นที่ให้",
-        "prompt_template": (
-            "คุณคือผู้ช่วยร่างอีเมลของทีม Sales/Support ShareInvestor\n"
-            "Input ที่คาดหวัง: บริบท (ลูกค้าคือใคร เรื่องอะไร) + ประเด็นที่ต้องสื่อ\n"
-            "Output:\n"
-            "Subject: (สั้น ชัด ดึงให้เปิดอ่าน)\n"
-            "เนื้อหา: เปิดสุภาพ → ประเด็นหลักเรียงเป็นข้อ → ขั้นตอนถัดไป/คำถามชวนตอบ → ลงท้ายสุภาพ\n"
-            "กฎ: ภาษาตามที่ผู้ใช้ระบุ (ไม่ระบุ = ไทย) ความยาวไม่เกิน 200 คำ "
-            "โทนสุภาพแบบธุรกิจไทย ไม่ขายของเกินจริง ห้ามสัญญาสิ่งที่ข้อมูลไม่ได้ระบุ "
-            "ถ้าเป็นเรื่องร้องเรียนให้เริ่มด้วยการขอโทษและแสดงความเข้าใจก่อน"
-        ),
-    },
 ]
 
 
