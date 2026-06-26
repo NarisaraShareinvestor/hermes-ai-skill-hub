@@ -1220,12 +1220,13 @@ def download_document_markdown(doc_id: int, db: Session = Depends(get_db)):
         # PDF ใหญ่ยังแปลงไม่เสร็จ (bg) → แจ้งให้ลองใหม่ ไม่ใช่ 404
         raise HTTPException(409, "เอกสารกำลังประมวลผล กรุณาลองใหม่อีกสักครู่")
     _base = (doc.original_name or "document").rsplit(".", 1)[0]
-    _fname = f"{_base}.md"
+    # HTTP header ต้อง latin-1 → ถ้าชื่อมีอักขระไทย/นอก ascii ให้ fallback (กัน 500)
+    _safe = _base.encode("ascii", "ignore").decode().strip() or f"document-{doc_id}"
     return Response(
         content=doc.md_text,
         media_type="text/markdown; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="document-{doc_id}.md"',
-                 "X-Filename": _fname},
+        headers={"Content-Disposition": f'attachment; filename="{_safe}.md"',
+                 "X-Filename": f"{_safe}.md"},
     )
 
 
