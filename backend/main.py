@@ -91,6 +91,20 @@ def _run_migrations():
                 """))
                 _conn.execute(_sql_text(
                     "CREATE INDEX IF NOT EXISTS idx_chunks_doc ON document_chunks(document_id)"))
+                _conn.execute(_sql_text("""
+                    CREATE TABLE IF NOT EXISTS document_images (
+                        id           SERIAL PRIMARY KEY,
+                        document_id  INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+                        page_number  INTEGER DEFAULT 0,
+                        minio_object TEXT,
+                        content_type TEXT,
+                        caption      TEXT,
+                        surrounding  TEXT,
+                        embedding    vector(1536)
+                    )
+                """))
+                _conn.execute(_sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_images_doc ON document_images(document_id)"))
                 _conn.commit()
             # ivfflat index — best-effort (tune lists เมื่อข้อมูลโต)
             try:
@@ -810,6 +824,171 @@ def _search_chunks(doc_id: int, query: str, k: int = 6) -> list:
         return []
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MinIO + image extraction + vision caption (เฟส 3)
+# ══════════════════════════════════════════════════════════════════════════════
+_MINIO_BUCKET = os.getenv("MINIO_BUCKET", "hermes-docs")
+_minio_box = {}
+
+
+def _minio_client():
+    if "c" in _minio_box:
+        return _minio_box["c"]
+    try:
+        from minio import Minio
+        c = Minio(os.getenv("MINIO_ENDPOINT", "minio:9000"),
+                  access_key=os.getenv("MINIO_ACCESS_KEY", ""),
+                  secret_key=os.getenv("MINIO_SECRET_KEY", ""),
+                  secure=False)
+        if not c.bucket_exists(_MINIO_BUCKET):
+            c.make_bucket(_MINIO_BUCKET)
+        _minio_box["c"] = c
+        return c
+    except Exception as e:
+        print(f"minio client failed: {e}", flush=True)
+        return None
+
+
+def _minio_put(obj: str, data: bytes, content_type: str) -> bool:
+    c = _minio_client()
+    if not c:
+        return False
+    try:
+        import io
+        c.put_object(_MINIO_BUCKET, obj, io.BytesIO(data), length=len(data), content_type=content_type)
+        return True
+    except Exception as e:
+        print(f"minio put failed: {e}", flush=True)
+        return False
+
+
+def _minio_get(obj: str) -> bytes:
+    c = _minio_client()
+    if not c:
+        return b""
+    try:
+        resp = c.get_object(_MINIO_BUCKET, obj)
+        try:
+            return resp.read()
+        finally:
+            resp.close(); resp.release_conn()
+    except Exception as e:
+        print(f"minio get failed: {e}", flush=True)
+        return b""
+
+
+def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
+    """อธิบายรูปสั้นๆ ด้วย vision (กราฟ/ตาราง/แผนภาพอะไร เกี่ยวกับอะไร)"""
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or "your_openai" in api_key:
+        return ""
+    _saved = {k: os.environ.pop(k, None) for k in ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']}
+    try:
+        import base64
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        b64 = base64.b64encode(img_bytes).decode()
+        _e = ext.lower()
+        mime = "image/jpeg" if _e in ("jpg", "jpeg") else f"image/{_e}"
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=300, temperature=0.2,
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text":
+                    "อธิบายรูปนี้สั้นๆ เป็นภาษาไทย (1-3 ประโยค): เป็นกราฟ/ตาราง/แผนภาพ/รูปอะไร "
+                    "แสดงข้อมูลหรือตัวเลขสำคัญอะไร เกี่ยวข้องกับเรื่องใด"},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+            ]}])
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        print(f"caption failed: {e}", flush=True)
+        return ""
+    finally:
+        for k, v in _saved.items():
+            if v is not None:
+                os.environ[k] = v
+
+
+def _index_document_images(doc_id: int, pdf_path: str, mime: str):
+    """แยกรูปจาก PDF → MinIO + vision caption + embed → document_images (bg)"""
+    if not _IS_PG or mime != "application/pdf":
+        return
+    try:
+        import pymupdf
+        doc = pymupdf.open(str(pdf_path))
+        count = 0
+        for pno in range(len(doc)):
+            if count >= 30:
+                break
+            page = doc[pno]
+            page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
+            for img in page.get_images(full=True):
+                if count >= 30:
+                    break
+                xref = img[0]
+                try:
+                    base = doc.extract_image(xref)
+                except Exception:
+                    continue
+                data, ext = base.get("image"), base.get("ext", "png")
+                if not data or len(data) < 3000 or base.get("width", 0) < 100 or base.get("height", 0) < 100:
+                    continue  # ข้ามไอคอน/โลโก้เล็ก
+                obj = f"doc{doc_id}/p{pno+1}_{xref}.{ext}"
+                if not _minio_put(obj, data, f"image/{ext}"):
+                    continue
+                cap = _image_bytes_to_caption(data, ext)
+                emb = _embed_texts([f"{cap}\n{page_text}"[:4000]])
+                emb_val = _vec_literal(emb[0]) if emb else None
+                try:
+                    with engine.connect() as conn:
+                        if emb_val:
+                            conn.execute(_sql_text(
+                                "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding,embedding) "
+                                "VALUES (:d,:p,:o,:ct,:cap,:s,CAST(:e AS vector))"),
+                                {"d": doc_id, "p": pno + 1, "o": obj, "ct": f"image/{ext}",
+                                 "cap": cap, "s": page_text, "e": emb_val})
+                        else:
+                            conn.execute(_sql_text(
+                                "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding) "
+                                "VALUES (:d,:p,:o,:ct,:cap,:s)"),
+                                {"d": doc_id, "p": pno + 1, "o": obj, "ct": f"image/{ext}",
+                                 "cap": cap, "s": page_text})
+                        conn.commit()
+                    count += 1
+                except Exception as _ie:
+                    print(f"insert image failed: {_ie}", flush=True)
+        if count:
+            print(f"indexed {count} images for doc {doc_id}", flush=True)
+    except Exception as e:
+        print(f"index_document_images failed: {e}", flush=True)
+
+
+def _search_images(doc_id: int, query: str, k: int = 3) -> list:
+    """ค้นรูปที่เกี่ยวกับคำถาม (embedding ของ caption+surrounding) — คืนเฉพาะที่ใกล้พอ"""
+    if not _IS_PG or not query:
+        return []
+    qe = _embed_texts([query])
+    if not qe:
+        return []
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(_sql_text(
+                "SELECT id,page_number,caption, embedding <=> CAST(:q AS vector) AS dist "
+                "FROM document_images WHERE document_id=:d AND embedding IS NOT NULL "
+                "ORDER BY dist ASC LIMIT :k"),
+                {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall()
+        return [{"id": r[0], "page": r[1], "caption": r[2]}
+                for r in rows if r[3] is not None and float(r[3]) < 0.55]
+    except Exception as e:
+        print(f"search_images failed: {e}", flush=True)
+        return []
+
+
+def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str):
+    """งาน background หลังอัปไฟล์: index chunks + รูป"""
+    _index_document(doc_id, md)
+    _index_document_images(doc_id, pdf_path, mime)
+
+
 def _image_to_text(path: pathlib.Path, mime: str) -> str:
     """อ่านรูป (OCR/บรรยาย) ด้วย vision ของ OpenAI — รองรับ paste/แนบรูปในแชต
     คืนข้อความที่อ่านได้ เพื่อให้ pipeline เดิม (chat/skill/analyze) ใช้ต่อได้เหมือนไฟล์เอกสาร"""
@@ -949,6 +1128,22 @@ def download_document_markdown(doc_id: int, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/api/documents/images/{image_id}")
+def get_document_image(image_id: int, db: Session = Depends(get_db)):
+    """เสิร์ฟรูปที่ extract จากเอกสาร (proxy จาก MinIO — same-origin ผ่าน /api)"""
+    from fastapi import Response
+    row = db.execute(_sql_text(
+        "SELECT minio_object, content_type FROM document_images WHERE id=:i"),
+        {"i": image_id}).fetchone()
+    if not row:
+        raise HTTPException(404, "ไม่พบรูป")
+    data = _minio_get(row[0])
+    if not data:
+        raise HTTPException(404, "อ่านรูปจาก storage ไม่ได้")
+    return Response(content=data, media_type=row[1] or "image/png",
+                    headers={"Cache-Control": "private, max-age=3600"})
+
+
 # ── Root / Health ──────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -985,6 +1180,7 @@ class ChatResponse(BaseModel):
     skill_suggestion: Optional[dict] = None  # auto-skill ที่ Hermes คิดให้จาก behavior
     draft_email: Optional[dict] = None  # {subject, body} → frontend opens email modal popup
     document_id: Optional[int] = None  # เอกสารที่อัป → frontend แสดงปุ่มดาวน์โหลด .md
+    images: List[dict] = []  # รูปจากเอกสารที่เกี่ยวกับคำตอบ [{url, caption, page}]
 
 
 # ── Auto-run thresholds ───────────────────────────────────────────────────────
@@ -1348,6 +1544,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 
     # เอกสาร/รูปล่าสุดที่ user อัปในแชต — ให้ถาม follow-up ต่อได้แม้ไม่ได้แนบซ้ำ
     # (inject เฉพาะตอนข้อความนี้ไม่ได้แนบไฟล์ใหม่ ไม่งั้นจะซ้ำกับเนื้อหาใน effective_message)
+    _doc_images = []   # รูปจากเอกสารที่เกี่ยวกับคำถาม → ส่งกลับให้ frontend โชว์
     if not req.file_id:
         _doc_mem = UserMemoryManager.get_document_memory(db, req.user_email)
         if _doc_mem and (_doc_mem.get("text") or _doc_mem.get("document_id")):
@@ -1361,9 +1558,16 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                         f"[หน้า {h['page_start']}{'-'+str(h['page_end']) if h['page_end']!=h['page_start'] else ''}]"
                         f"{(' '+h['heading']) if h['heading'] else ''}\n{h['content']}"
                         for h in _hits)
+                # ค้นรูปที่เกี่ยว → แนบ caption เข้า context + เตรียมส่งรูปกลับ
+                for _im in _search_images(_doc_id_mem, req.message, k=3):
+                    _doc_images.append({"url": f"/api/documents/images/{_im['id']}",
+                                        "caption": _im.get("caption") or "", "page": _im.get("page")})
             # fallback: ใช้ข้อความที่เก็บไว้ (เอกสารเล็ก / ยัง index ไม่เสร็จ / ไม่ใช่ pg)
             if not _ctx:
                 _ctx = (_doc_mem.get("text") or "")[:12000]
+            if _doc_images:
+                _ctx += "\n\n[รูปที่เกี่ยวข้องในเอกสาร (ระบบจะแสดงให้ผู้ใช้):]\n" + "\n".join(
+                    f"- (หน้า {im['page']}) {im['caption']}" for im in _doc_images)
             if _ctx:
                 custom_memory_block += (
                     f"\n\n**บริบทสำคัญ: ผู้ใช้เพิ่งอัปเอกสาร/รูป \"{_doc_mem.get('filename','')}\" ไว้** "
@@ -1497,9 +1701,11 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                                     md_text=_full, page_count=_pages, source="chat", status="ready")
                     db.add(_doc); db.commit(); db.refresh(_doc)
                     _doc_id = _doc.id
-                    # index เป็น chunks + embedding ใน background (ไม่บล็อกคำตอบ)
+                    # index chunks + embedding + รูป (จาก PDF) ใน background (ไม่บล็อกคำตอบ)
                     import threading as _th
-                    _th.Thread(target=_index_document, args=(_doc_id, _full), daemon=True).start()
+                    _th.Thread(target=_process_document_bg,
+                               args=(_doc_id, _full, str(_fpath), _f.mime_type or ""),
+                               daemon=True).start()
                 except Exception:
                     db.rollback()
             # Detect if file is a meeting report → force-use Meeting Report Assistant
@@ -1874,6 +2080,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         skill_suggestion=skill_suggestion,
         draft_email=draft_email_data,
         document_id=_doc_id,
+        images=_doc_images,
     )
 
 
