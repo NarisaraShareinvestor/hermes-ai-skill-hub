@@ -639,8 +639,8 @@ MAX_AUDIO_MB = 25  # Whisper's hard limit
 # IR Document Q&A: เดิม 8,000 ตัวอักษร = Annual Report เห็นแค่ ~3 หน้าแรก
 # 30,000 = ปริมาณที่ inject เข้า prompt ต่อครั้ง (gpt-4o-mini 128k รับไหว)
 _FILE_TEXT_MAX_CHARS = 30000
-# เก็บเนื้อหาเต็มไฟล์ (เพื่อ download .md + RAG) — เผื่อเอกสารร้อยหน้า
-_DOC_MAX_CHARS = 600_000
+# เก็บเนื้อหาเต็มไฟล์ (เพื่อ download .md + RAG) — เผื่อ IR doc เกือบ 1000 หน้า (~5M ตัวอักษร)
+_DOC_MAX_CHARS = 5_000_000
 
 
 def _pdf_to_markdown(path: pathlib.Path) -> str:
@@ -725,8 +725,13 @@ def _embed_texts(texts: list) -> list:
     try:
         from openai import OpenAI
         client = OpenAI(api_key=api_key)
-        resp = client.embeddings.create(model=_EMBED_MODEL, input=texts)
-        return [d.embedding for d in resp.data]
+        # batch (OpenAI embeddings: array จำกัด ~2048/req) → เอกสารพันหน้ามี chunk เยอะ ต้องแบ่งส่ง
+        out = []
+        B = 256
+        for i in range(0, len(texts), B):
+            resp = client.embeddings.create(model=_EMBED_MODEL, input=texts[i:i + B])
+            out.extend(d.embedding for d in resp.data)
+        return out
     except Exception as e:
         print(f"embed failed: {e}", flush=True)
         return []
