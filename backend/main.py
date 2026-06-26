@@ -1230,6 +1230,16 @@ def download_document_markdown(doc_id: int, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/api/documents/{doc_id}/status")
+def document_status(doc_id: int, db: Session = Depends(get_db)):
+    """สถานะการประมวลผลเอกสาร — ให้ frontend poll ก่อนโชว์ปุ่มดาวน์โหลด"""
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "ไม่พบเอกสาร")
+    return {"id": doc.id, "status": doc.status,
+            "ready": bool(doc.md_text), "page_count": doc.page_count}
+
+
 @app.get("/api/documents/images/{image_id}")
 def get_document_image(image_id: int, db: Session = Depends(get_db)):
     """เสิร์ฟรูปที่ extract จากเอกสาร (proxy จาก MinIO — same-origin ผ่าน /api)"""
