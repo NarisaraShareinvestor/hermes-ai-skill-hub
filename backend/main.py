@@ -621,11 +621,47 @@ def _extract_text(path: pathlib.Path, mime: str) -> str:
                 for row in ws.iter_rows(values_only=True):
                     lines.append("\t".join(str(c) if c is not None else "" for c in row))
             return "\n".join(lines)[:_FILE_TEXT_MAX_CHARS]
+        if mime.startswith("image/"):
+            return _image_to_text(path, mime)
         if mime.startswith("text/"):
             return path.read_text(errors="ignore")[:_FILE_TEXT_MAX_CHARS]
     except Exception as e:
         return f"(ไม่สามารถอ่านไฟล์ได้: {e})"
     return ""
+
+
+def _image_to_text(path: pathlib.Path, mime: str) -> str:
+    """อ่านรูป (OCR/บรรยาย) ด้วย vision ของ OpenAI — รองรับ paste/แนบรูปในแชต
+    คืนข้อความที่อ่านได้ เพื่อให้ pipeline เดิม (chat/skill/analyze) ใช้ต่อได้เหมือนไฟล์เอกสาร"""
+    try:
+        import base64
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        if not api_key or "your_openai" in api_key:
+            return "(ยังไม่ได้ตั้งค่า OPENAI_API_KEY)"
+        _saved = {k: os.environ.pop(k, None) for k in ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']}
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
+            b64 = base64.b64encode(path.read_bytes()).decode()
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                max_tokens=1500, temperature=0.2,
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text":
+                        "อ่านและถอดเนื้อหาทั้งหมดในรูปนี้ออกมาเป็นข้อความ: ถ้าเป็นตาราง"
+                        "ให้คงโครงสร้างตาราง (markdown) และตัวเลขให้ครบถูกต้อง, ถ้าเป็นข้อความ"
+                        "ให้ถอดตามจริง, ถ้าเป็นกราฟ/ไดอะแกรมให้บรรยายสาระสำคัญและตัวเลขที่เห็น "
+                        "ตอบเฉพาะเนื้อหาที่อ่านได้จากรูป ไม่ต้องเดาสิ่งที่มองไม่เห็น"},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                ]}],
+            )
+            return (resp.choices[0].message.content or "")[:_FILE_TEXT_MAX_CHARS]
+        finally:
+            for k, v in _saved.items():
+                if v is not None:
+                    os.environ[k] = v
+    except Exception as e:
+        return f"(ไม่สามารถอ่านรูปได้: {e})"
 
 
 @app.post("/api/files/upload")
