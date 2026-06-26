@@ -1027,6 +1027,7 @@ def _process_document_full_bg(doc_id: int, pdf_path: str, mime: str,
     """แปลงทั้งไฟล์ (ช้า) ใน background → อัปเดต documents.md_text + status + index chunks/รูป
     ใช้กับ PDF ใหญ่เพื่อไม่ให้ chat request ค้าง/timeout"""
     try:
+        from database import SessionLocal
         full = _extract_markdown_full(pathlib.Path(pdf_path), mime)
         readable = bool(full) and not full.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่"))
         db = SessionLocal()
