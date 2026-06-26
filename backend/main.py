@@ -1004,6 +1004,50 @@ def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str,
     _index_document_images(doc_id, pdf_path, mime, owner, source)
 
 
+def _pdf_quick_text(path: pathlib.Path, max_pages: int = 12):
+    """ข้อความเร็วจาก PDF หน้าแรกๆ (pymupdf get_text) — ตอบทันทีไม่ต้องแปลงทั้งไฟล์
+    คืน (text, page_count)"""
+    try:
+        import pymupdf
+        doc = pymupdf.open(str(path))
+        n = len(doc)
+        parts = []
+        for i in range(min(n, max_pages)):
+            t = (doc[i].get_text() or "").strip()
+            if t:
+                parts.append(f"[หน้า {i+1}]\n{t}")
+        return "\n\n".join(parts)[:_FILE_TEXT_MAX_CHARS], n
+    except Exception as e:
+        print(f"pdf_quick_text failed: {e}", flush=True)
+        return "", 0
+
+
+def _process_document_full_bg(doc_id: int, pdf_path: str, mime: str,
+                              owner: str = "", source: str = "chat"):
+    """แปลงทั้งไฟล์ (ช้า) ใน background → อัปเดต documents.md_text + status + index chunks/รูป
+    ใช้กับ PDF ใหญ่เพื่อไม่ให้ chat request ค้าง/timeout"""
+    try:
+        full = _extract_markdown_full(pathlib.Path(pdf_path), mime)
+        readable = bool(full) and not full.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่"))
+        db = SessionLocal()
+        try:
+            doc = db.query(Document).filter(Document.id == doc_id).first()
+            if doc:
+                if readable:
+                    doc.md_text = full
+                    doc.page_count = full.count("[หน้า ")
+                doc.status = "ready" if readable else "failed"
+                db.commit()
+        finally:
+            db.close()
+        if readable:
+            _index_document(doc_id, full)
+            _index_document_images(doc_id, pdf_path, mime, owner, source)
+            print(f"full-processed doc {doc_id} ({full.count('[หน้า ')} pages)", flush=True)
+    except Exception as e:
+        print(f"process_document_full_bg failed: {e}", flush=True)
+
+
 def _cleanup_old_chat_documents():
     """ลบเอกสารจากแชต (source='chat') ที่เก่ากว่า DOC_RETENTION_DAYS วัน + รูปใน MinIO
     (กัน DB/MinIO บวม) — chunks/images rows ถูกลบอัตโนมัติด้วย FK CASCADE"""
@@ -1747,32 +1791,51 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     if req.file_id:
         _f = db.query(UserFile).filter(UserFile.id == req.file_id).first()
         if _f:
+            import threading as _th
             _fpath = UPLOAD_DIR / _f.saved_name
-            _full = _extract_markdown_full(_fpath, _f.mime_type or "")   # เนื้อหาเต็มไฟล์
-            _ftext = _full[:_FILE_TEXT_MAX_CHARS]                        # ส่วนที่ inject เข้า prompt
-            _readable = bool(_full) and not _full.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่"))
-            file_context = (
-                f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
-                f"[คำสั่ง: ตอบจากเนื้อหาไฟล์นี้เท่านั้น ถ้าเนื้อหามี marker [หน้า N] "
-                f"ให้อ้างเลขหน้าตาม marker ที่พบจริงในแต่ละจุดเท่านั้น "
-                f"(ห้ามใส่เลขหน้าเดิมซ้ำทุกข้อ ห้ามเดาเลขหน้าที่ไม่มี marker) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
-            )
-            # เก็บเอกสารเต็ม (ที่อ่านได้) ลงตาราง documents → ดาวน์โหลด .md + RAG
-            if _readable:
-                try:
-                    _pages = _full.count("[หน้า ")
-                    _doc = Document(owner_email=req.user_email, original_name=_f.original_name,
-                                    md_text=_full, page_count=_pages, source="chat", status="ready")
-                    db.add(_doc); db.commit(); db.refresh(_doc)
-                    _doc_id = _doc.id
-                    # index chunks + embedding + รูป (จาก PDF) ใน background (ไม่บล็อกคำตอบ)
-                    import threading as _th
-                    _th.Thread(target=_process_document_bg,
-                               args=(_doc_id, _full, str(_fpath), _f.mime_type or "",
-                                     req.user_email, "chat"),
-                               daemon=True).start()
-                except Exception:
-                    db.rollback()
+            _mime = _f.mime_type or ""
+            if _mime == "application/pdf":
+                # PDF: ตอบเร็วจาก preview หน้าแรกๆ + แปลงทั้งไฟล์/index ใน background (กัน timeout ไฟล์ใหญ่)
+                _ftext, _npages = _pdf_quick_text(_fpath)
+                _readable = bool(_ftext)
+                if _readable:
+                    try:
+                        _doc = Document(owner_email=req.user_email, original_name=_f.original_name,
+                                        md_text="", page_count=_npages, source="chat", status="processing")
+                        db.add(_doc); db.commit(); db.refresh(_doc)
+                        _doc_id = _doc.id
+                        _th.Thread(target=_process_document_full_bg,
+                                   args=(_doc_id, str(_fpath), _mime, req.user_email, "chat"),
+                                   daemon=True).start()
+                    except Exception:
+                        db.rollback()
+                file_context = (
+                    f"\n\n[ตัวอย่างเนื้อหาหน้าแรกๆ จากไฟล์: {_f.original_name} ({_npages} หน้า)]\n{_ftext}\n"
+                    f"[คำสั่ง: นี่คือเฉพาะหน้าแรกๆ ระบบกำลัง index ทั้งเอกสารอยู่เบื้องหลัง "
+                    f"ตอบจากเนื้อหาที่เห็นนี้ ถ้าผู้ใช้ถามส่วนที่ยังไม่ปรากฏ ให้บอกว่ากำลังประมวลผลทั้งเอกสาร "
+                    f"ขอให้ถามซ้ำอีกครู่ อ้างเลขหน้าตาม marker [หน้า N] ที่พบจริงเท่านั้น]"
+                )
+            else:
+                # ไฟล์อื่น (Word/Excel/รูป/TXT) เร็วพอ → ประมวลผล inline
+                _full = _extract_markdown_full(_fpath, _mime)
+                _ftext = _full[:_FILE_TEXT_MAX_CHARS]
+                _readable = bool(_full) and not _full.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่"))
+                file_context = (
+                    f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
+                    f"[คำสั่ง: ตอบจากเนื้อหาไฟล์นี้เท่านั้น ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
+                )
+                if _readable:
+                    try:
+                        _doc = Document(owner_email=req.user_email, original_name=_f.original_name,
+                                        md_text=_full, page_count=_full.count("[หน้า "),
+                                        source="chat", status="ready")
+                        db.add(_doc); db.commit(); db.refresh(_doc)
+                        _doc_id = _doc.id
+                        _th.Thread(target=_process_document_bg,
+                                   args=(_doc_id, _full, str(_fpath), _mime, req.user_email, "chat"),
+                                   daemon=True).start()
+                    except Exception:
+                        db.rollback()
             # Detect if file is a meeting report → force-use Meeting Report Assistant
             if _is_meeting_report(_ftext):
                 _file_is_meeting = True

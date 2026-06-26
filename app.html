@@ -3876,6 +3876,7 @@ async function sendChat() {
           file_id: ud.id,
         })
       });
+      if (!r.ok) throw new Error(`เซิร์ฟเวอร์ตอบกลับผิดพลาด (HTTP ${r.status}) — ไฟล์อาจใหญ่เกินหรือใช้เวลานาน ลองใหม่อีกครั้ง`);
       const d = await r.json();
       const reply = d.reply || 'ไม่ได้รับคำตอบ';
 
