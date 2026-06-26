@@ -5290,6 +5290,27 @@ function appendDocImages(images) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+// ดาวน์โหลด .md ผ่าน JS — เช็คสถานะก่อน (กันเซฟ JSON error ตอนยังประมวลผลไม่เสร็จ)
+async function downloadMd(docId, base, btn) {
+  const old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียม...'; }
+  try {
+    const r = await fetch(`${API}/api/documents/${docId}/markdown`);
+    if (r.status === 409) { alert('เอกสารกำลังประมวลผลอยู่ กรุณาลองดาวน์โหลดใหม่อีกสักครู่'); return; }
+    if (!r.ok) { alert('ดาวน์โหลดไม่สำเร็จ (HTTP ' + r.status + ')'); return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${base}.md`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('ดาวน์โหลดไม่สำเร็จ: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
+}
+
 // การ์ดดาวน์โหลด Markdown ของเอกสารที่อัป (แปลง PDF→.md)
 function appendDownloadMd(docId, name) {
   const base = (name || 'document').replace(/\.[^.]+$/, '');
@@ -5298,11 +5319,11 @@ function appendDownloadMd(docId, name) {
   div.innerHTML = `
     <div class="msg-bubble" style="display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span style="font-size:12px;color:#475569;">📄 แปลงเป็น Markdown แล้ว</span>
-      <a href="${API}/api/documents/${docId}/markdown" download="${base}.md"
-         style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;background:#1d4ed8;color:#fff;font-size:12px;font-weight:600;text-decoration:none;">
+      <button onclick="downloadMd(${docId}, ${JSON.stringify(base)}, this)"
+         style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;background:#1d4ed8;color:#fff;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         ดาวน์โหลด .md
-      </a>
+      </button>
     </div>`;
   const msgs = $('chatMessages');
   msgs.appendChild(div);

@@ -1213,8 +1213,11 @@ def download_document_markdown(doc_id: int, db: Session = Depends(get_db)):
     """ดาวน์โหลดเอกสารที่แปลงเป็น Markdown (.md)"""
     from fastapi import Response
     doc = db.query(Document).filter(Document.id == doc_id).first()
-    if not doc or not doc.md_text:
+    if not doc:
         raise HTTPException(404, "ไม่พบเอกสาร")
+    if not doc.md_text:
+        # PDF ใหญ่ยังแปลงไม่เสร็จ (bg) → แจ้งให้ลองใหม่ ไม่ใช่ 404
+        raise HTTPException(409, "เอกสารกำลังประมวลผล กรุณาลองใหม่อีกสักครู่")
     _base = (doc.original_name or "document").rsplit(".", 1)[0]
     _fname = f"{_base}.md"
     return Response(
