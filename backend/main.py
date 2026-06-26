@@ -72,6 +72,39 @@ def _run_migrations():
             except Exception as _e:
                 print(f"Migration skip memorytype.{_val}: {_e}")
 
+    # pgvector: extension + ตาราง document_chunks (RAG) — Postgres เท่านั้น
+    if _is_pg:
+        try:
+            with engine.connect() as _conn:
+                _conn.execute(_sql_text("CREATE EXTENSION IF NOT EXISTS vector"))
+                _conn.execute(_sql_text("""
+                    CREATE TABLE IF NOT EXISTS document_chunks (
+                        id           SERIAL PRIMARY KEY,
+                        document_id  INTEGER REFERENCES documents(id) ON DELETE CASCADE,
+                        heading      TEXT,
+                        level        INTEGER DEFAULT 0,
+                        page_start   INTEGER DEFAULT 0,
+                        page_end     INTEGER DEFAULT 0,
+                        content      TEXT,
+                        embedding    vector(1536)
+                    )
+                """))
+                _conn.execute(_sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_chunks_doc ON document_chunks(document_id)"))
+                _conn.commit()
+            # ivfflat index — best-effort (tune lists เมื่อข้อมูลโต)
+            try:
+                with engine.connect() as _conn:
+                    _conn.execute(_sql_text(
+                        "CREATE INDEX IF NOT EXISTS idx_chunks_vec ON document_chunks "
+                        "USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"))
+                    _conn.commit()
+            except Exception as _e2:
+                print(f"Migration skip ivfflat index: {_e2}")
+            print("Migration: pgvector + document_chunks ready")
+        except Exception as _e:
+            print(f"Migration skip pgvector: {_e}")
+
 _run_migrations()
 
 app = FastAPI(title="Hermes AI Skill Hub", version="1.0.0")
@@ -657,6 +690,126 @@ def _extract_text(path: pathlib.Path, mime: str) -> str:
     return _extract_markdown_full(path, mime)[:_FILE_TEXT_MAX_CHARS]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# RAG: chunk + embedding + pgvector search (เฟส 2)
+# ══════════════════════════════════════════════════════════════════════════════
+_IS_PG       = "postgresql" in os.getenv("DATABASE_URL", "")
+_EMBED_MODEL = "text-embedding-3-small"
+
+
+def _embed_texts(texts: list) -> list:
+    """คืน list ของ embedding (1536 มิติ) จาก OpenAI; คืน [] ถ้าพลาด"""
+    if not texts:
+        return []
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    if not api_key or "your_openai" in api_key:
+        return []
+    _saved = {k: os.environ.pop(k, None) for k in ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']}
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        resp = client.embeddings.create(model=_EMBED_MODEL, input=texts)
+        return [d.embedding for d in resp.data]
+    except Exception as e:
+        print(f"embed failed: {e}", flush=True)
+        return []
+    finally:
+        for k, v in _saved.items():
+            if v is not None:
+                os.environ[k] = v
+
+
+def _vec_literal(v: list) -> str:
+    return "[" + ",".join(f"{x:.6f}" for x in v) + "]"
+
+
+def _chunk_markdown(md: str, max_chars: int = 2000) -> list:
+    """ตัด markdown ตามหัวข้อ (# / ##) + เก็บ heading และช่วงหน้า; ท่อนยาวเกินจะ split ย่อย"""
+    import re
+    chunks, cur, cur_page = [], {"heading": "", "level": 0, "page_start": 0, "lines": []}, 0
+
+    def _flush(end_page):
+        txt = "\n".join(cur["lines"]).strip()
+        if txt:
+            chunks.append({"heading": cur["heading"], "level": cur["level"],
+                           "page_start": cur["page_start"] or end_page or 1,
+                           "page_end": end_page or cur["page_start"] or 1, "content": txt})
+
+    for ln in md.split("\n"):
+        mpage = re.match(r"^\[หน้า (\d+)\]", ln.strip())
+        if mpage:
+            cur_page = int(mpage.group(1))
+            if not cur["page_start"]:
+                cur["page_start"] = cur_page
+            continue
+        mh = re.match(r"^(#{1,2})\s+(.+)", ln)
+        if mh:
+            _flush(cur_page)
+            cur = {"heading": mh.group(2).strip(), "level": len(mh.group(1)),
+                   "page_start": cur_page, "lines": [ln]}
+        else:
+            cur["lines"].append(ln)
+    _flush(cur_page)
+
+    out = []
+    for c in chunks:
+        if len(c["content"]) <= max_chars:
+            out.append(c)
+        else:
+            for i in range(0, len(c["content"]), max_chars):
+                d = dict(c); d["content"] = c["content"][i:i + max_chars]; out.append(d)
+    if not out and md.strip():
+        out = [{"heading": "", "level": 0, "page_start": 1, "page_end": 1, "content": md[:max_chars]}]
+    return out
+
+
+def _index_document(doc_id: int, md: str):
+    """chunk + embed เอกสาร → เก็บใน document_chunks (รันใน background thread)"""
+    if not _IS_PG or not md:
+        return
+    try:
+        chunks = _chunk_markdown(md)
+        if not chunks:
+            return
+        embs = _embed_texts([f"{c['heading']}\n{c['content']}"[:6000] for c in chunks])
+        if len(embs) != len(chunks):
+            print(f"index doc {doc_id}: embed count mismatch", flush=True)
+            return
+        with engine.connect() as conn:
+            conn.execute(_sql_text("DELETE FROM document_chunks WHERE document_id=:d"), {"d": doc_id})
+            for c, e in zip(chunks, embs):
+                conn.execute(_sql_text(
+                    "INSERT INTO document_chunks (document_id,heading,level,page_start,page_end,content,embedding) "
+                    "VALUES (:d,:h,:l,:ps,:pe,:c, CAST(:emb AS vector))"),
+                    {"d": doc_id, "h": c["heading"][:500], "l": c["level"],
+                     "ps": c["page_start"], "pe": c["page_end"], "c": c["content"],
+                     "emb": _vec_literal(e)})
+            conn.commit()
+        print(f"indexed doc {doc_id}: {len(chunks)} chunks", flush=True)
+    except Exception as e:
+        print(f"index_document failed: {e}", flush=True)
+
+
+def _search_chunks(doc_id: int, query: str, k: int = 6) -> list:
+    """ค้น chunk ที่ใกล้คำถามที่สุดด้วย pgvector cosine — คืน list ของ dict"""
+    if not _IS_PG or not query:
+        return []
+    qe = _embed_texts([query])
+    if not qe:
+        return []
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(_sql_text(
+                "SELECT heading,page_start,page_end,content "
+                "FROM document_chunks WHERE document_id=:d "
+                "ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"),
+                {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall()
+        return [{"heading": r[0], "page_start": r[1], "page_end": r[2], "content": r[3]} for r in rows]
+    except Exception as e:
+        print(f"search_chunks failed: {e}", flush=True)
+        return []
+
+
 def _image_to_text(path: pathlib.Path, mime: str) -> str:
     """อ่านรูป (OCR/บรรยาย) ด้วย vision ของ OpenAI — รองรับ paste/แนบรูปในแชต
     คืนข้อความที่อ่านได้ เพื่อให้ pipeline เดิม (chat/skill/analyze) ใช้ต่อได้เหมือนไฟล์เอกสาร"""
@@ -1197,16 +1350,29 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     # (inject เฉพาะตอนข้อความนี้ไม่ได้แนบไฟล์ใหม่ ไม่งั้นจะซ้ำกับเนื้อหาใน effective_message)
     if not req.file_id:
         _doc_mem = UserMemoryManager.get_document_memory(db, req.user_email)
-        if _doc_mem and _doc_mem.get("text"):
-            _doc_text = _doc_mem["text"][:12000]
-            custom_memory_block += (
-                f"\n\n**บริบทสำคัญ: ผู้ใช้เพิ่งอัปเอกสาร/รูป \"{_doc_mem.get('filename','')}\" ไว้** "
-                f"(เมื่อ {_doc_mem.get('saved_at','')[:16]}) เนื้อหาคือ:\n"
-                f"--- เริ่มเอกสาร ---\n{_doc_text}\n--- จบเอกสาร ---\n"
-                f"กฎ: ถ้าผู้ใช้ถามต่อเกี่ยวกับเอกสาร/รูปนี้ (รายละเอียด ตัวเลข หน้าใดหน้าหนึ่ง ฯลฯ) "
-                f"ให้ตอบจากเนื้อหาข้างบนนี้ **ห้ามตอบว่าเข้าถึงไฟล์ไม่ได้** ถ้ามี marker [หน้า N] "
-                f"ให้อ้างเลขหน้าตามจริง ถ้าข้อมูลไม่มีในเอกสารจึงบอกว่าไม่พบ"
-            )
+        if _doc_mem and (_doc_mem.get("text") or _doc_mem.get("document_id")):
+            _doc_id_mem = _doc_mem.get("document_id")
+            _ctx = ""
+            # RAG: ถ้ามี doc_id + index แล้ว → ดึงเฉพาะท่อนที่เกี่ยวกับคำถาม (รองรับไฟล์ใหญ่)
+            if _doc_id_mem and req.message:
+                _hits = _search_chunks(_doc_id_mem, req.message, k=6)
+                if _hits:
+                    _ctx = "\n\n".join(
+                        f"[หน้า {h['page_start']}{'-'+str(h['page_end']) if h['page_end']!=h['page_start'] else ''}]"
+                        f"{(' '+h['heading']) if h['heading'] else ''}\n{h['content']}"
+                        for h in _hits)
+            # fallback: ใช้ข้อความที่เก็บไว้ (เอกสารเล็ก / ยัง index ไม่เสร็จ / ไม่ใช่ pg)
+            if not _ctx:
+                _ctx = (_doc_mem.get("text") or "")[:12000]
+            if _ctx:
+                custom_memory_block += (
+                    f"\n\n**บริบทสำคัญ: ผู้ใช้เพิ่งอัปเอกสาร/รูป \"{_doc_mem.get('filename','')}\" ไว้** "
+                    f"(เมื่อ {_doc_mem.get('saved_at','')[:16]}) เนื้อหาที่เกี่ยวข้อง:\n"
+                    f"--- เริ่มเอกสาร ---\n{_ctx}\n--- จบเอกสาร ---\n"
+                    f"กฎ: ถ้าผู้ใช้ถามต่อเกี่ยวกับเอกสาร/รูปนี้ (รายละเอียด ตัวเลข หน้าใดหน้าหนึ่ง ฯลฯ) "
+                    f"ให้ตอบจากเนื้อหาข้างบนนี้ **ห้ามตอบว่าเข้าถึงไฟล์ไม่ได้** ถ้ามี marker [หน้า N] "
+                    f"ให้อ้างเลขหน้าตามจริง ถ้าข้อมูลไม่มีในเอกสารจึงบอกว่าไม่พบ"
+                )
 
     # ── Skill ที่ user สร้างเอง ──────────────────────────────────────────────
     owned_skills = db.query(Skill).filter(
@@ -1323,7 +1489,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                 f"ให้อ้างเลขหน้าตาม marker ที่พบจริงในแต่ละจุดเท่านั้น "
                 f"(ห้ามใส่เลขหน้าเดิมซ้ำทุกข้อ ห้ามเดาเลขหน้าที่ไม่มี marker) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
             )
-            # เก็บเอกสารเต็ม (ที่อ่านได้) ลงตาราง documents → ดาวน์โหลด .md + RAG ภายหลัง
+            # เก็บเอกสารเต็ม (ที่อ่านได้) ลงตาราง documents → ดาวน์โหลด .md + RAG
             if _readable:
                 try:
                     _pages = _full.count("[หน้า ")
@@ -1331,6 +1497,9 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                                     md_text=_full, page_count=_pages, source="chat", status="ready")
                     db.add(_doc); db.commit(); db.refresh(_doc)
                     _doc_id = _doc.id
+                    # index เป็น chunks + embedding ใน background (ไม่บล็อกคำตอบ)
+                    import threading as _th
+                    _th.Thread(target=_index_document, args=(_doc_id, _full), daemon=True).start()
                 except Exception:
                     db.rollback()
             # Detect if file is a meeting report → force-use Meeting Report Assistant
@@ -1341,9 +1510,10 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     Skill.status.notin_([SkillStatus.DEPRECATED, SkillStatus.BLOCKED])
                 ).first()
             elif _readable:
-                # เก็บเอกสาร/รูป (ไม่ใช่ meeting) ไว้ให้ถาม follow-up ต่อได้
+                # เก็บเอกสาร/รูป (ไม่ใช่ meeting) ไว้ให้ถาม follow-up ต่อได้ (ผูก doc_id เพื่อ RAG)
                 try:
-                    UserMemoryManager.save_document_memory(db, req.user_email, _f.original_name, _ftext)
+                    UserMemoryManager.save_document_memory(
+                        db, req.user_email, _f.original_name, _ftext, document_id=_doc_id)
                 except Exception:
                     pass
 

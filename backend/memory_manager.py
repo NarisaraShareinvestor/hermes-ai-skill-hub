@@ -219,10 +219,12 @@ class UserMemoryManager:
 
     # ── DOCUMENT — เอกสาร/รูปล่าสุดที่อัปในแชต ให้ถาม-ตอบ follow-up ต่อได้ ──────
     @staticmethod
-    def save_document_memory(db: Session, user_email: str, filename: str, text: str) -> UserMemory:
+    def save_document_memory(db: Session, user_email: str, filename: str, text: str,
+                            document_id: Optional[int] = None) -> UserMemory:
         content = {
             "filename": filename or "",
             "text": (text or "")[:UserMemoryManager.TRANSCRIPT_MAX_CHARS],
+            "document_id": document_id,     # ชี้ documents.id เพื่อ RAG retrieve ตอน follow-up
             "saved_at": datetime.now().isoformat(),
         }
         return UserMemoryManager._upsert(db, user_email, MemoryType.DOCUMENT, content)

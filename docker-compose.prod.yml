@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database - Production
+  # PostgreSQL Database - Production (pgvector = PG15 + vector extension)
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: hermes_postgres
     environment:
       POSTGRES_USER: ${DB_USER:-hermes_user}
