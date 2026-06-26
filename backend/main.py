@@ -1052,6 +1052,7 @@ _INTENT_MAP = [
     (["meeting", "minutes", "ประชุม", "บันทึก", "action items", "transcript", "มีติ้ง", "สรุปประชุม"], ["generator", "sales", "meeting"]),
     (["annual report", "รายงานประจำปี", "financial", "การเงิน", "profit", "revenue", "กำไร", "งบการเงิน", "ir"], ["summarizer", "ir"]),
     (["email", "อีเมล", "draft", "reply", "เขียน email"], ["generator", "email", "content"]),
+    (["แปล", "translate", "translation", "เป็นภาษาอังกฤษ", "เป็นภาษาไทย", "ฉบับอังกฤษ", "ฉบับภาษาอังกฤษ"], ["translator", "translate", "content"]),
 ]
 
 
@@ -1330,6 +1331,25 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     _chat_wants_email = any(kw in msg_lower for kw in _EMAIL_DRAFT_KWS)
     draft_email_data = None
 
+    # ── Translate follow-up → ใช้ EN-TH IR Translator พร้อมแนบคำตอบก่อนหน้าเป็นเนื้อหา ──
+    # ทริกเกอร์เฉพาะเมื่อ "ขอแปล" + "อ้างถึงของเดิม" (เช่น "ขอ eng ทั้งตาราง") เพื่อไม่ไป
+    # แย่งงานแปลคำเดี่ยวๆ ของ general agent
+    _TRANSLATE_KWS = ["แปล", "translate", "translation", "english", "อังกฤษ", " eng", "เป็นไทย", "เป็นภาษาไทย"]
+    _PRIOR_REFS    = ["ตาราง", "ข้อความนี้", "ข้อความข้างต้น", "อันนี้", "ด้านบน", "ข้างบน",
+                      "ทั้งหมด", "ที่แล้ว", "เมื่อกี้", "ที่ตอบ", "อันเดิม", "this", "above", "it"]
+    _prior_assistant = ""
+    for _m in reversed(req.conversation_history or []):
+        if _m.get("role") == "assistant" and (_m.get("content") or "").strip():
+            _prior_assistant = _m["content"]; break
+    _translator_skill = next(
+        (s for s in user_skills
+         if (s.skill_type or "").lower() == "translator"
+         or "translate" in [str(t).lower() for t in (s.tags or [])]), None)
+    _chat_wants_translate = bool(
+        _translator_skill and _prior_assistant
+        and any(kw in msg_lower for kw in _TRANSLATE_KWS)
+        and any(r in msg_lower for r in _PRIOR_REFS))
+
     if _chat_wants_email:
         _tm = UserMemoryManager.get_transcript_memory(db, req.user_email)
         _transcript_ctx = (_tm.get("transcript", "") if _tm else "").strip()
@@ -1354,6 +1374,19 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         _email_body = re.sub(r'^#+\s*', '', _email_body, flags=re.MULTILINE)
         draft_email_data = {"subject": "รายงานการประชุม", "body": _email_body.strip()}
         reply = "เปิด Draft Email ครับ กรุณาตรวจสอบผู้รับและเนื้อหาก่อนส่ง"
+    elif _chat_wants_translate:
+        # ขอแปลคำตอบก่อนหน้า → ส่งเนื้อหาเดิม + คำสั่งเข้า EN-TH IR Translator
+        _tcontent = f"{effective_message}\n\n[ข้อความที่ต้องการแปล]\n{_prior_assistant}"
+        reply = _claude_chat(
+            [{"role": "user", "content": _tcontent}],
+            _skill_system_prompt(_translator_skill),
+            _kind="run_skill", _skill_id=_translator_skill.id,
+            _skill_name=_translator_skill.name, _user_email=req.user_email,
+        )
+        _translator_skill.usage_count = (_translator_skill.usage_count or 0) + 1
+        _translator_skill.last_used_at = datetime.now()
+        new_last_skill_id = _translator_skill.id
+        powered_by_skill_info = {"id": _translator_skill.id, "name": _translator_skill.name}
     elif _file_is_meeting and _forced_meeting_skill:
         # File is a meeting report → always use Meeting Report Assistant
         reply = _claude_chat(
