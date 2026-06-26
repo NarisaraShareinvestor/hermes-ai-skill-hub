@@ -989,6 +989,44 @@ def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str):
     _index_document_images(doc_id, pdf_path, mime)
 
 
+def _cleanup_old_chat_documents():
+    """ลบเอกสารจากแชต (source='chat') ที่เก่ากว่า DOC_RETENTION_DAYS วัน + รูปใน MinIO
+    (กัน DB/MinIO บวม) — chunks/images rows ถูกลบอัตโนมัติด้วย FK CASCADE"""
+    if not _IS_PG:
+        return
+    days = int(os.getenv("DOC_RETENTION_DAYS", "30"))
+    try:
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(days=days)
+        with engine.connect() as conn:
+            doc_ids = [r[0] for r in conn.execute(_sql_text(
+                "SELECT id FROM documents WHERE source='chat' AND created_at < :c"),
+                {"c": cutoff}).fetchall()]
+            if not doc_ids:
+                print("[cleanup] ไม่มีเอกสารแชตเก่าให้ลบ", flush=True)
+                return
+            ids_csv = ",".join(str(int(i)) for i in doc_ids)   # int ล้วน ปลอดภัยจาก injection
+            objs = [r[0] for r in conn.execute(_sql_text(
+                f"SELECT minio_object FROM document_images WHERE document_id IN ({ids_csv})"
+            )).fetchall() if r[0]]
+        # ลบ object รูปใน MinIO ก่อน (นอก transaction) แล้วค่อยลบ DB (cascade)
+        c = _minio_client()
+        deleted_obj = 0
+        if c:
+            for o in objs:
+                try:
+                    c.remove_object(_MINIO_BUCKET, o); deleted_obj += 1
+                except Exception:
+                    pass
+        with engine.connect() as conn:
+            conn.execute(_sql_text(f"DELETE FROM documents WHERE id IN ({ids_csv})"))
+            conn.commit()
+        print(f"[cleanup] ลบ {len(doc_ids)} เอกสารแชต, {deleted_obj}/{len(objs)} รูป "
+              f"(retention {days} วัน)", flush=True)
+    except Exception as e:
+        print(f"[cleanup] failed: {e}", flush=True)
+
+
 def _image_to_text(path: pathlib.Path, mime: str) -> str:
     """อ่านรูป (OCR/บรรยาย) ด้วย vision ของ OpenAI — รองรับ paste/แนบรูปในแชต
     คืนข้อความที่อ่านได้ เพื่อให้ pipeline เดิม (chat/skill/analyze) ใช้ต่อได้เหมือนไฟล์เอกสาร"""
@@ -1142,6 +1180,17 @@ def get_document_image(image_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "อ่านรูปจาก storage ไม่ได้")
     return Response(content=data, media_type=row[1] or "image/png",
                     headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.post("/api/documents/{doc_id}/pin")
+def pin_document(doc_id: int, db: Session = Depends(get_db)):
+    """ปักหมุดเอกสารให้เก็บถาวร (source='kb') → ไม่โดน cleanup รายเดือน"""
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "ไม่พบเอกสาร")
+    doc.source = "kb"
+    db.commit()
+    return {"ok": True, "source": doc.source}
 
 
 # ── Root / Health ──────────────────────────────────────────────────────────────

@@ -671,6 +671,15 @@ def start_scheduler() -> bool:
                       id="nightly_improvement", replace_existing=True)
         sched.add_job(lambda: run_monitor(), "interval",
                       minutes=_MONITOR_INTERVAL_MIN, id="monitor", replace_existing=True)
+        # cleanup เอกสารจากแชตที่เก่าเกิน retention (กัน DB/MinIO บวม) — ทุกวัน 03:30
+        def _doc_cleanup():
+            try:
+                from main import _cleanup_old_chat_documents
+                _cleanup_old_chat_documents()
+            except Exception as _e:
+                print(f"[scheduler] doc_cleanup failed: {_e}")
+        sched.add_job(_doc_cleanup, CronTrigger(hour=3, minute=30),
+                      id="doc_cleanup", replace_existing=True)
         sched.start()
         _scheduler = sched
         print(f"[scheduler] started — nightly 00:00 Asia/Bangkok, monitor ทุก {_MONITOR_INTERVAL_MIN} นาที")
