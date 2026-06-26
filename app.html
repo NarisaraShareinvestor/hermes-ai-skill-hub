@@ -417,9 +417,12 @@
   /* ── Chat ── */
   .chat-layout {
     display: grid;
-    grid-template-columns: 1fr 240px;
+    grid-template-columns: 1fr;
     gap: 16px;
     height: calc(100vh - 100px);
+  }
+  .chat-layout.has-sidebar {
+    grid-template-columns: 1fr 240px;
   }
   .chat-panel {
     background: var(--surface);
@@ -2134,7 +2137,7 @@
             </div>
           </div>
         </div>
-        <div class="skills-side" id="chatSidebar">
+        <div class="skills-side" id="chatSidebar" style="display:none;">
           <!-- Post-Meeting Actions (shown when meeting report detected) -->
           <div id="meetingActionsPanel" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
             <div class="skills-side-header" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;">
@@ -2145,13 +2148,6 @@
               <button onclick="hideMeetingActions()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);line-height:1;">&times;</button>
             </div>
             <div id="meetingActionsContent" style="flex:1;overflow-y:auto;"></div>
-          </div>
-          <!-- Suggested Skills (default) -->
-          <div id="suggestedSkillsPanel" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
-            <div class="skills-side-header">Suggested Skills</div>
-            <div id="suggestedSkills" style="flex:1;overflow-y:auto;">
-              <div style="padding:14px;font-size:12px;color:var(--muted);">Skills will appear as you type...</div>
-            </div>
           </div>
         </div>
       </div>
@@ -3864,22 +3860,6 @@ async function sendChat() {
       appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
       chatHistory.push({ role:'user', content: `[ไฟล์: ${fileToUpload.name}] ${msg || 'สรุปเนื้อหา'}` });
       chatHistory.push({ role:'assistant', content: reply });
-
-      if (d.suggested_skills?.length) {
-        $('suggestedSkills').innerHTML = d.suggested_skills.map(s => `
-          <div class="skill-item">
-            <div class="skill-item-name">${s.name}</div>
-            <div class="skill-item-desc">${(s.description||'').slice(0,55)}${(s.description||'').length>55?'...':''}</div>
-            <div style="display:flex;gap:5px;margin-top:7px;">
-              <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;"
-                onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
-              ${s.is_installed
-                ? `<button class="btn btn-sm" disabled style="background:#f1f5f9;color:var(--muted);border:1px solid var(--border);font-size:10px;">ติดตั้งแล้ว</button>`
-                : `<button class="btn btn-success btn-sm" style="font-size:10px;"
-                    onclick="installSkill(${s.id})">+ Install</button>`}
-            </div>
-          </div>`).join('');
-      }
     } catch(e) {
       appendMsg(`❌ ไม่สามารถประมวลผลไฟล์ได้: ${e.message}`, 'bot');
     } finally {
@@ -3933,24 +3913,6 @@ async function sendChat() {
       openModal('draftEmailModal');
     }
 
-    // Suggested Skills panel
-    if (d.suggested_skills?.length) {
-      $('suggestedSkills').innerHTML = d.suggested_skills.map(s => `
-        <div class="skill-item">
-          <div class="skill-item-name">${s.name}</div>
-          <div class="skill-item-desc">${(s.description||'').slice(0,55)}${(s.description||'').length>55?'...':''}</div>
-          <div style="display:flex;gap:5px;margin-top:7px;">
-            <button class="btn btn-primary btn-sm" style="flex:1;font-size:10px;"
-              onclick="openRunModal(${s.id},'${s.name.replace(/'/g,"\\'")}')">Run</button>
-            ${s.is_installed
-              ? `<button class="btn btn-sm" disabled style="background:#f1f5f9;color:var(--muted);border:1px solid var(--border);font-size:10px;">ติดตั้งแล้ว</button>`
-              : `<button class="btn btn-success btn-sm" style="font-size:10px;"
-                  onclick="installSkill(${s.id})">+ Install</button>`}
-          </div>
-        </div>`).join('');
-    } else if (!d.suggested_skills?.length) {
-      $('suggestedSkills').innerHTML = '<div style="padding:14px;font-size:12px;color:var(--muted);">พิมพ์เพื่อรับ Skill แนะนำ...</div>';
-    }
   } catch {
     appendMsg('Unable to connect to the backend server. Please ensure it is running.', 'bot');
   } finally {
@@ -4680,19 +4642,15 @@ function showMeetingActions(reportText, skipExtract) {
 
   // If called from audio path (_lastMeetingData already set), render directly
   if (skipExtract && _lastMeetingData) {
-    const mp = $('meetingActionsPanel');
-    const sp = $('suggestedSkillsPanel');
-    mp.style.display = 'flex';
-    sp.style.display = 'none';
+    _showChatSidebar(true);
+    $('meetingActionsPanel').style.display = 'flex';
     renderMeetingPanel(_lastMeetingData);
     return;
   }
 
-  // Switch panels
-  const mp = $('meetingActionsPanel');
-  const sp = $('suggestedSkillsPanel');
-  mp.style.display = 'flex';
-  sp.style.display = 'none';
+  // Show the meeting actions sidebar
+  _showChatSidebar(true);
+  $('meetingActionsPanel').style.display = 'flex';
 
   // Show skeleton immediately
   $('meetingActionsContent').innerHTML = `
@@ -4721,7 +4679,15 @@ function showMeetingActions(reportText, skipExtract) {
 
 function hideMeetingActions() {
   $('meetingActionsPanel').style.display = 'none';
-  $('suggestedSkillsPanel').style.display = 'flex';
+  _showChatSidebar(false);
+}
+
+// Show/hide the chat right sidebar (Post-Meeting Actions) and collapse the grid when empty
+function _showChatSidebar(show) {
+  const sidebar = $('chatSidebar');
+  const layout  = document.querySelector('.chat-layout');
+  if (sidebar) sidebar.style.display = show ? 'flex' : 'none';
+  if (layout)  layout.classList.toggle('has-sidebar', show);
 }
 
 function renderMeetingPanel(d) {
