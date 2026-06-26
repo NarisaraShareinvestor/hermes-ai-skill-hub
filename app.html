@@ -3808,7 +3808,7 @@ async function sendChat() {
   const hasFile = !!_chatFile;
   if (!msg && !hasFile) return;
 
-  const displayMsg = msg || `📎 ${_chatFile.name}`;
+  const displayMsg = hasFile ? `${msg ? msg + '\n' : ''}📎 ${_chatFile.name}` : msg;
   input.value = '';
   input.style.height = 'auto';
 

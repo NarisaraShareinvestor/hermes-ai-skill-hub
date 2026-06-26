@@ -1331,9 +1331,31 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     _chat_wants_email = any(kw in msg_lower for kw in _EMAIL_DRAFT_KWS)
     draft_email_data = None
 
+    # ข้อความจริงที่ผู้ใช้พิมพ์ (ไม่รวมเนื้อหาไฟล์ที่ถูกต่อเข้า effective_message) —
+    # ใช้สำหรับตัดสิน "ผู้ใช้ตั้งใจเรียก skill ไหน" ไม่ให้เนื้อหาไฟล์มากลบเจตนา
+    _user_msg_lower = (req.message or "").lower()
+
+    # ── ระบุชื่อ skill ตรงๆ ในข้อความ → ใช้ skill นั้นทันที (priority สูงสุด) ──
+    # เช่น "ทำ Annual Report Summarizer มา" ต้องเข้า Annual Report ไม่ใช่ให้ scoring เนื้อหาไฟล์ตัดสิน
+    _explicit_skill = None
+    _best_ov = 0
+    for s in user_skills:
+        nm = (s.name or "").lower()
+        if not nm:
+            continue
+        if nm in _user_msg_lower:           # ชื่อเต็มอยู่ในข้อความ
+            _explicit_skill = s
+            break
+        words = [w for w in nm.split() if len(w) > 3]
+        if len(words) >= 2:                 # หรือคำในชื่อ match เกือบครบ
+            ov = sum(1 for w in words if w in _user_msg_lower)
+            if ov >= max(2, len(words) - 1) and ov > _best_ov:
+                _best_ov = ov
+                _explicit_skill = s
+
     # ── Translate follow-up → ใช้ EN-TH IR Translator พร้อมแนบคำตอบก่อนหน้าเป็นเนื้อหา ──
     # ทริกเกอร์เฉพาะเมื่อ "ขอแปล" + "อ้างถึงของเดิม" (เช่น "ขอ eng ทั้งตาราง") เพื่อไม่ไป
-    # แย่งงานแปลคำเดี่ยวๆ ของ general agent
+    # แย่งงานแปลคำเดี่ยวๆ ของ general agent — เช็คจาก req.message เท่านั้น (ไม่เอาเนื้อไฟล์)
     _TRANSLATE_KWS = ["แปล", "translate", "translation", "english", "อังกฤษ", " eng", "เป็นไทย", "เป็นภาษาไทย"]
     _PRIOR_REFS    = ["ตาราง", "ข้อความนี้", "ข้อความข้างต้น", "อันนี้", "ด้านบน", "ข้างบน",
                       "ทั้งหมด", "ที่แล้ว", "เมื่อกี้", "ที่ตอบ", "อันเดิม", "this", "above", "it"]
@@ -1347,8 +1369,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
          or "translate" in [str(t).lower() for t in (s.tags or [])]), None)
     _chat_wants_translate = bool(
         _translator_skill and _prior_assistant
-        and any(kw in msg_lower for kw in _TRANSLATE_KWS)
-        and any(r in msg_lower for r in _PRIOR_REFS))
+        and any(kw in _user_msg_lower for kw in _TRANSLATE_KWS)
+        and any(r in _user_msg_lower for r in _PRIOR_REFS))
 
     if _chat_wants_email:
         _tm = UserMemoryManager.get_transcript_memory(db, req.user_email)
@@ -1387,6 +1409,18 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         _translator_skill.last_used_at = datetime.now()
         new_last_skill_id = _translator_skill.id
         powered_by_skill_info = {"id": _translator_skill.id, "name": _translator_skill.name}
+    elif _explicit_skill:
+        # ผู้ใช้ระบุชื่อ skill ตรงๆ → ใช้ skill นั้น (แนบเนื้อหาไฟล์มากับ effective_message อยู่แล้ว)
+        reply = _claude_chat(
+            [{"role": "user", "content": effective_message}],
+            _skill_system_prompt(_explicit_skill),
+            _kind="run_skill", _skill_id=_explicit_skill.id,
+            _skill_name=_explicit_skill.name, _user_email=req.user_email,
+        )
+        _explicit_skill.usage_count = (_explicit_skill.usage_count or 0) + 1
+        _explicit_skill.last_used_at = datetime.now()
+        new_last_skill_id = _explicit_skill.id
+        powered_by_skill_info = {"id": _explicit_skill.id, "name": _explicit_skill.name}
     elif _file_is_meeting and _forced_meeting_skill:
         # File is a meeting report → always use Meeting Report Assistant
         reply = _claude_chat(
