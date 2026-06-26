@@ -75,10 +75,10 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change_me_minio_secret}
     volumes:
       - minio_data:/data
-    # bind เฉพาะ localhost ของ host → เข้า console ผ่าน SSH tunnel (ไม่เปิดสู่อินเทอร์เน็ต)
+    # console เปิด public (มีรหัส root กัน) เข้าตรง http://<ip>:9001 — API เก็บ localhost
     ports:
-      - "127.0.0.1:9001:9001"   # web console
-      - "127.0.0.1:9000:9000"   # S3 API (เผื่อใช้ mc)
+      - "9001:9001"             # web console (public)
+      - "127.0.0.1:9000:9000"   # S3 API (ภายในเท่านั้น)
     networks:
       - hermes_network
     restart: always
