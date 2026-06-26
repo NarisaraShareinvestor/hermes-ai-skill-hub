@@ -217,6 +217,21 @@ class UserMemoryManager:
         record = UserMemoryManager.get_active_memory(db, user_email, MemoryType.TRANSCRIPT)
         return dict(record.content) if record else None
 
+    # ── DOCUMENT — เอกสาร/รูปล่าสุดที่อัปในแชต ให้ถาม-ตอบ follow-up ต่อได้ ──────
+    @staticmethod
+    def save_document_memory(db: Session, user_email: str, filename: str, text: str) -> UserMemory:
+        content = {
+            "filename": filename or "",
+            "text": (text or "")[:UserMemoryManager.TRANSCRIPT_MAX_CHARS],
+            "saved_at": datetime.now().isoformat(),
+        }
+        return UserMemoryManager._upsert(db, user_email, MemoryType.DOCUMENT, content)
+
+    @staticmethod
+    def get_document_memory(db: Session, user_email: str) -> Optional[Dict[str, Any]]:
+        record = UserMemoryManager.get_active_memory(db, user_email, MemoryType.DOCUMENT)
+        return dict(record.content) if record else None
+
     # ── BEHAVIOR — repeated-intent tracking for auto-skill suggestion ─────────
     @staticmethod
     def record_behavior(db: Session, user_email: str, intent_label: str,

@@ -63,7 +63,7 @@ def _run_migrations():
     # to the type or inserts with FACT/BEHAVIOR will fail. SQLite stores enums
     # as VARCHAR, so nothing to do there.
     if _is_pg:
-        for _val in ("FACT", "BEHAVIOR", "TRANSCRIPT"):
+        for _val in ("FACT", "BEHAVIOR", "TRANSCRIPT", "DOCUMENT"):
             try:
                 # ADD VALUE can't run inside a transaction block → autocommit
                 with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as _conn:
@@ -1148,6 +1148,21 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             f"ห้ามตอบว่าไม่มีข้อมูล และห้ามตอบกลับเป็นเนื้อหา transcript ดิบทั้งก้อน"
         )
 
+    # เอกสาร/รูปล่าสุดที่ user อัปในแชต — ให้ถาม follow-up ต่อได้แม้ไม่ได้แนบซ้ำ
+    # (inject เฉพาะตอนข้อความนี้ไม่ได้แนบไฟล์ใหม่ ไม่งั้นจะซ้ำกับเนื้อหาใน effective_message)
+    if not req.file_id:
+        _doc_mem = UserMemoryManager.get_document_memory(db, req.user_email)
+        if _doc_mem and _doc_mem.get("text"):
+            _doc_text = _doc_mem["text"][:12000]
+            custom_memory_block += (
+                f"\n\n**บริบทสำคัญ: ผู้ใช้เพิ่งอัปเอกสาร/รูป \"{_doc_mem.get('filename','')}\" ไว้** "
+                f"(เมื่อ {_doc_mem.get('saved_at','')[:16]}) เนื้อหาคือ:\n"
+                f"--- เริ่มเอกสาร ---\n{_doc_text}\n--- จบเอกสาร ---\n"
+                f"กฎ: ถ้าผู้ใช้ถามต่อเกี่ยวกับเอกสาร/รูปนี้ (รายละเอียด ตัวเลข หน้าใดหน้าหนึ่ง ฯลฯ) "
+                f"ให้ตอบจากเนื้อหาข้างบนนี้ **ห้ามตอบว่าเข้าถึงไฟล์ไม่ได้** ถ้ามี marker [หน้า N] "
+                f"ให้อ้างเลขหน้าตามจริง ถ้าข้อมูลไม่มีในเอกสารจึงบอกว่าไม่พบ"
+            )
+
     # ── Skill ที่ user สร้างเอง ──────────────────────────────────────────────
     owned_skills = db.query(Skill).filter(
         Skill.owner == req.user_email,
@@ -1257,7 +1272,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             file_context = (
                 f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
                 f"[คำสั่ง: ตอบจากเนื้อหาไฟล์นี้เท่านั้น ถ้าเนื้อหามี marker [หน้า N] "
-                f"ให้อ้างอิงเลขหน้าทุกครั้งที่ตอบ เช่น (หน้า 12) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
+                f"ให้อ้างเลขหน้าตาม marker ที่พบจริงในแต่ละจุดเท่านั้น "
+                f"(ห้ามใส่เลขหน้าเดิมซ้ำทุกข้อ ห้ามเดาเลขหน้าที่ไม่มี marker) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
             )
             # Detect if file is a meeting report → force-use Meeting Report Assistant
             if _is_meeting_report(_ftext):
@@ -1266,6 +1282,12 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     Skill.skill_type == "meet",
                     Skill.status.notin_([SkillStatus.DEPRECATED, SkillStatus.BLOCKED])
                 ).first()
+            elif _ftext and not _ftext.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่")):
+                # เก็บเอกสาร/รูป (ที่อ่านได้ และไม่ใช่ meeting) ไว้ให้ถาม follow-up ต่อได้
+                try:
+                    UserMemoryManager.save_document_memory(db, req.user_email, _f.original_name, _ftext)
+                except Exception:
+                    pass
 
     effective_message = (req.message or "สรุปเนื้อหาหลักของไฟล์นี้") + file_context
 
