@@ -18,7 +18,7 @@ import asyncio
 import threading
 
 from database import engine, get_db, Base
-from models import Skill, SkillInstallation, AuditLog, ApprovalQueue, User, UserContact, UserMemory, SkillStatus, SkillVisibility, UserRole, MemoryType, Team, ContactGroup, UserFile
+from models import Skill, SkillInstallation, AuditLog, ApprovalQueue, User, UserContact, UserMemory, SkillStatus, SkillVisibility, UserRole, MemoryType, Team, ContactGroup, UserFile, Document
 from schemas import (
     SkillCreate, SkillUpdate, SkillResponse, SkillDetailResponse,
     SkillApprovalRequest, SkillApprovalAction, SkillInstallationCreate,
@@ -587,30 +587,52 @@ MAX_AUDIO_MB = 25  # Whisper's hard limit
 
 
 # IR Document Q&A: เดิม 8,000 ตัวอักษร = Annual Report เห็นแค่ ~3 หน้าแรก
-# 30,000 ครอบคลุมเอกสารส่วนใหญ่ และ gpt-4o-mini (128k context) รับไหวสบาย
+# 30,000 = ปริมาณที่ inject เข้า prompt ต่อครั้ง (gpt-4o-mini 128k รับไหว)
 _FILE_TEXT_MAX_CHARS = 30000
+# เก็บเนื้อหาเต็มไฟล์ (เพื่อ download .md + RAG) — เผื่อเอกสารร้อยหน้า
+_DOC_MAX_CHARS = 600_000
 
 
-def _extract_text(path: pathlib.Path, mime: str) -> str:
-    """Extract readable text from uploaded file.
+def _pdf_to_markdown(path: pathlib.Path) -> str:
+    """PDF → Markdown มีโครงสร้าง (หัวข้อ/ตาราง/bullet) + marker [หน้า N] ทุกหน้า
+    ใช้ pymupdf4llm; ถ้าพังให้ fallback เป็น pypdf (text เปล่า)"""
+    try:
+        import pymupdf, pymupdf4llm
+        doc = pymupdf.open(str(path))
+        pages = pymupdf4llm.to_markdown(doc, page_chunks=True, show_progress=False)
+        parts = []
+        for i, pg in enumerate(pages):
+            txt = (pg.get("text") if isinstance(pg, dict) else str(pg)) or ""
+            txt = txt.strip()
+            if txt:
+                parts.append(f"[หน้า {i+1}]\n{txt}")
+        md = "\n\n".join(parts).strip()
+        if md:
+            return md
+    except Exception as _e:
+        print(f"pymupdf4llm failed, fallback to pypdf: {_e}", flush=True)
+    # fallback
+    import pypdf
+    reader = pypdf.PdfReader(str(path))
+    pages = []
+    for i, p in enumerate(reader.pages):
+        t = (p.extract_text() or "").strip()
+        if t:
+            pages.append(f"[หน้า {i+1}]\n{t}")
+    return "\n\n".join(pages)
 
-    PDF ใส่ marker [หน้า N] ทุกหน้า → ตอบคำถามพร้อมอ้างอิงเลขหน้าได้ (IR Document Q&A)
-    """
+
+def _extract_markdown_full(path: pathlib.Path, mime: str) -> str:
+    """ดึงเนื้อหา 'เต็มไฟล์' เป็น markdown/text (cap _DOC_MAX_CHARS) — ใช้เก็บลง documents + RAG
+    เป็น core extractor; _extract_text เป็น wrapper ที่ตัดสั้นลงสำหรับ inject เข้า prompt"""
     try:
         if mime == "application/pdf":
-            import pypdf
-            reader = pypdf.PdfReader(str(path))
-            pages = []
-            for i, p in enumerate(reader.pages):
-                txt = (p.extract_text() or "").strip()
-                if txt:
-                    pages.append(f"[หน้า {i+1}]\n{txt}")
-            return "\n\n".join(pages)[:_FILE_TEXT_MAX_CHARS]
+            return _pdf_to_markdown(path)[:_DOC_MAX_CHARS]
         if mime in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "application/msword"):
             import docx as _docx
             doc = _docx.Document(str(path))
-            return "\n".join(p.text for p in doc.paragraphs)[:_FILE_TEXT_MAX_CHARS]
+            return "\n".join(p.text for p in doc.paragraphs)[:_DOC_MAX_CHARS]
         if mime in ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     "application/vnd.ms-excel"):
             import openpyxl
@@ -620,14 +642,19 @@ def _extract_text(path: pathlib.Path, mime: str) -> str:
                 lines.append(f"[ชีต: {ws.title}]")
                 for row in ws.iter_rows(values_only=True):
                     lines.append("\t".join(str(c) if c is not None else "" for c in row))
-            return "\n".join(lines)[:_FILE_TEXT_MAX_CHARS]
+            return "\n".join(lines)[:_DOC_MAX_CHARS]
         if mime.startswith("image/"):
             return _image_to_text(path, mime)
         if mime.startswith("text/"):
-            return path.read_text(errors="ignore")[:_FILE_TEXT_MAX_CHARS]
+            return path.read_text(errors="ignore")[:_DOC_MAX_CHARS]
     except Exception as e:
         return f"(ไม่สามารถอ่านไฟล์ได้: {e})"
     return ""
+
+
+def _extract_text(path: pathlib.Path, mime: str) -> str:
+    """เนื้อหาไฟล์แบบตัดสั้น (สำหรับ inject เข้า prompt) — wrapper ของ _extract_markdown_full"""
+    return _extract_markdown_full(path, mime)[:_FILE_TEXT_MAX_CHARS]
 
 
 def _image_to_text(path: pathlib.Path, mime: str) -> str:
@@ -752,6 +779,23 @@ def analyze_file(file_id: int, body: dict, db: Session = Depends(get_db)):
     return {"result": result, "filename": f.original_name}
 
 
+@app.get("/api/documents/{doc_id}/markdown")
+def download_document_markdown(doc_id: int, db: Session = Depends(get_db)):
+    """ดาวน์โหลดเอกสารที่แปลงเป็น Markdown (.md)"""
+    from fastapi import Response
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc or not doc.md_text:
+        raise HTTPException(404, "ไม่พบเอกสาร")
+    _base = (doc.original_name or "document").rsplit(".", 1)[0]
+    _fname = f"{_base}.md"
+    return Response(
+        content=doc.md_text,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="document-{doc_id}.md"',
+                 "X-Filename": _fname},
+    )
+
+
 # ── Root / Health ──────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -787,6 +831,7 @@ class ChatResponse(BaseModel):
     powered_by_skill: Optional[dict] = None  # {"id": int, "name": str}
     skill_suggestion: Optional[dict] = None  # auto-skill ที่ Hermes คิดให้จาก behavior
     draft_email: Optional[dict] = None  # {subject, body} → frontend opens email modal popup
+    document_id: Optional[int] = None  # เอกสารที่อัป → frontend แสดงปุ่มดาวน์โหลด .md
 
 
 # ── Auto-run thresholds ───────────────────────────────────────────────────────
@@ -1264,17 +1309,30 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     file_context = ""
     _file_is_meeting = False
     _forced_meeting_skill = None
+    _doc_id = None              # documents.id ของไฟล์ที่อัป (ให้ frontend ดาวน์โหลด .md)
     if req.file_id:
         _f = db.query(UserFile).filter(UserFile.id == req.file_id).first()
         if _f:
             _fpath = UPLOAD_DIR / _f.saved_name
-            _ftext = _extract_text(_fpath, _f.mime_type or "")
+            _full = _extract_markdown_full(_fpath, _f.mime_type or "")   # เนื้อหาเต็มไฟล์
+            _ftext = _full[:_FILE_TEXT_MAX_CHARS]                        # ส่วนที่ inject เข้า prompt
+            _readable = bool(_full) and not _full.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่"))
             file_context = (
                 f"\n\n[เนื้อหาจากไฟล์: {_f.original_name}]\n{_ftext}\n"
                 f"[คำสั่ง: ตอบจากเนื้อหาไฟล์นี้เท่านั้น ถ้าเนื้อหามี marker [หน้า N] "
                 f"ให้อ้างเลขหน้าตาม marker ที่พบจริงในแต่ละจุดเท่านั้น "
                 f"(ห้ามใส่เลขหน้าเดิมซ้ำทุกข้อ ห้ามเดาเลขหน้าที่ไม่มี marker) ถ้าหาคำตอบไม่พบให้บอกตรงๆ]"
             )
+            # เก็บเอกสารเต็ม (ที่อ่านได้) ลงตาราง documents → ดาวน์โหลด .md + RAG ภายหลัง
+            if _readable:
+                try:
+                    _pages = _full.count("[หน้า ")
+                    _doc = Document(owner_email=req.user_email, original_name=_f.original_name,
+                                    md_text=_full, page_count=_pages, source="chat", status="ready")
+                    db.add(_doc); db.commit(); db.refresh(_doc)
+                    _doc_id = _doc.id
+                except Exception:
+                    db.rollback()
             # Detect if file is a meeting report → force-use Meeting Report Assistant
             if _is_meeting_report(_ftext):
                 _file_is_meeting = True
@@ -1282,8 +1340,8 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     Skill.skill_type == "meet",
                     Skill.status.notin_([SkillStatus.DEPRECATED, SkillStatus.BLOCKED])
                 ).first()
-            elif _ftext and not _ftext.lstrip().startswith(("(ไม่สามารถ", "(ยังไม่")):
-                # เก็บเอกสาร/รูป (ที่อ่านได้ และไม่ใช่ meeting) ไว้ให้ถาม follow-up ต่อได้
+            elif _readable:
+                # เก็บเอกสาร/รูป (ไม่ใช่ meeting) ไว้ให้ถาม follow-up ต่อได้
                 try:
                     UserMemoryManager.save_document_memory(db, req.user_email, _f.original_name, _ftext)
                 except Exception:
@@ -1645,6 +1703,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         powered_by_skill=powered_by_skill_info,
         skill_suggestion=skill_suggestion,
         draft_email=draft_email_data,
+        document_id=_doc_id,
     )
 
 

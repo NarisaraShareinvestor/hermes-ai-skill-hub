@@ -3881,6 +3881,7 @@ async function sendChat() {
 
       if (d.last_skill_id) lastSkillId = d.last_skill_id;
       appendMsg(reply, 'bot', d.action_buttons || [], d.powered_by_skill || null);
+      if (d.document_id) appendDownloadMd(d.document_id, fileToUpload.name);
       chatHistory.push({ role:'user', content: `[ไฟล์: ${fileToUpload.name}] ${msg || 'สรุปเนื้อหา'}` });
       chatHistory.push({ role:'assistant', content: reply });
     } catch(e) {
@@ -5258,6 +5259,25 @@ function appendMsg(text, role, actionButtons = [], poweredBy = null) {
       ${role === 'bot' ? mdToHtml(text) : text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
       ${btnHtml}
       ${fbHtml}
+    </div>`;
+  const msgs = $('chatMessages');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// การ์ดดาวน์โหลด Markdown ของเอกสารที่อัป (แปลง PDF→.md)
+function appendDownloadMd(docId, name) {
+  const base = (name || 'document').replace(/\.[^.]+$/, '');
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot';
+  div.innerHTML = `
+    <div class="msg-bubble" style="display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:12px;color:#475569;">📄 แปลงเป็น Markdown แล้ว</span>
+      <a href="${API}/api/documents/${docId}/markdown" download="${base}.md"
+         style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;background:#1d4ed8;color:#fff;font-size:12px;font-weight:600;text-decoration:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        ดาวน์โหลด .md
+      </a>
     </div>`;
   const msgs = $('chatMessages');
   msgs.appendChild(div);

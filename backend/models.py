@@ -180,6 +180,20 @@ class UserFile(Base):
     created_at   = Column(DateTime, default=func.now())
 
 
+class Document(Base):
+    """เอกสารที่แปลงเป็น Markdown แล้ว (PDF→MD) — รองรับ download + RAG (เฟสถัดไป)"""
+    __tablename__ = "documents"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    owner_email   = Column(String(255), index=True, nullable=False)
+    original_name = Column(String(512), nullable=False)
+    md_text       = Column(Text, nullable=True)              # Markdown เต็มไฟล์ (เฟส 3 ย้ายไป MinIO)
+    page_count    = Column(Integer, default=0)
+    source        = Column(String(20), default="chat")      # chat | skill | kb
+    status        = Column(String(20), default="ready")     # processing | ready | failed
+    created_at    = Column(DateTime, default=func.now())
+
+
 class UserContact(Base):
     """จำ alias → email ของคนในทีม เช่น คุณเอ → chamai@gmail.com"""
     __tablename__ = "user_contacts"
