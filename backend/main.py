@@ -807,24 +807,45 @@ def _index_document(doc_id: int, md: str):
         print(f"index_document failed: {e}", flush=True)
 
 
-def _search_chunks(doc_id: int, query: str, k: int = 6) -> list:
-    """ค้น chunk ที่ใกล้คำถามที่สุดด้วย pgvector cosine — คืน list ของ dict"""
+def _search_chunks(doc_id: int, query: str, k: int = 10) -> list:
+    """Hybrid: pgvector cosine + keyword (ILIKE) สำหรับคำอังกฤษ/ตัวเลขในคำถาม
+    (เอกสารอังกฤษ + ถามไทย → vector อ่อน; keyword ช่วยจับคำอังกฤษที่ผู้ใช้พิมพ์ เช่น S&P, Assessment)"""
     if not _IS_PG or not query:
         return []
-    qe = _embed_texts([query])
-    if not qe:
-        return []
+    import re
+    out, seen = [], set()
+
+    def _add(rows):
+        for r in rows:
+            if r[0] in seen:
+                continue
+            seen.add(r[0])
+            out.append({"heading": r[1], "page_start": r[2], "page_end": r[3], "content": r[4]})
+
     try:
-        with engine.connect() as conn:
-            rows = conn.execute(_sql_text(
-                "SELECT heading,page_start,page_end,content "
-                "FROM document_chunks WHERE document_id=:d "
-                "ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"),
-                {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall()
-        return [{"heading": r[0], "page_start": r[1], "page_end": r[2], "content": r[3]} for r in rows]
+        # 1) keyword: token อังกฤษ/ตัวเลขที่มีนัย (>=3 ตัว) จากคำถาม
+        toks = [t for t in re.findall(r"[A-Za-z0-9&]{3,}", query)
+                if t.lower() not in ("score", "the", "and", "for", "report", "page")][:6]
+        if toks:
+            conds = " OR ".join(f"content ILIKE :t{i}" for i in range(len(toks)))
+            params = {f"t{i}": f"%{toks[i]}%" for i in range(len(toks))}
+            params["d"] = doc_id
+            with engine.connect() as conn:
+                _add(conn.execute(_sql_text(
+                    f"SELECT id,heading,page_start,page_end,content FROM document_chunks "
+                    f"WHERE document_id=:d AND ({conds}) LIMIT 5"), params).fetchall())
+        # 2) vector
+        qe = _embed_texts([query])
+        if qe:
+            with engine.connect() as conn:
+                _add(conn.execute(_sql_text(
+                    "SELECT id,heading,page_start,page_end,content FROM document_chunks "
+                    "WHERE document_id=:d ORDER BY embedding <=> CAST(:q AS vector) ASC LIMIT :k"),
+                    {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall())
+        return out[:k + 5]
     except Exception as e:
         print(f"search_chunks failed: {e}", flush=True)
-        return []
+        return out
 
 
 # ══════════════════════════════════════════════════════════════════════════════
