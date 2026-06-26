@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes — Daily Learning & Self-Improvement Plan (IR × Meeting)</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#16213a; --line:#23304f;
+    --txt:#e8eefc; --muted:#93a4c8; --blue:#4f8cff; --cyan:#2dd4bf;
+    --amber:#fbbf24; --rose:#fb7185; --violet:#a78bfa; --green:#34d399;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font-family:-apple-system,"Segoe UI","Sukhumvit Set","Noto Sans Thai",sans-serif;
+       background:var(--bg); color:var(--txt); line-height:1.65}
+  .wrap{max-width:1100px; margin:0 auto; padding:32px 20px 80px}
+  a{color:var(--blue)}
+
+  .hero{padding:48px 0 28px; border-bottom:1px solid var(--line); margin-bottom:36px}
+  .hero .tag{display:inline-block; font-size:13px; color:var(--cyan); border:1px solid var(--cyan);
+             border-radius:999px; padding:3px 14px; margin-bottom:14px; letter-spacing:.5px}
+  .hero h1{font-size:34px; line-height:1.3; font-weight:800}
+  .hero h1 span{color:var(--blue)}
+  .hero p{color:var(--muted); margin-top:10px; max-width:820px; font-size:15.5px}
+
+  h2{font-size:22px; margin:50px 0 6px; display:flex; align-items:center; gap:10px}
+  h2 .n{font-size:13px; color:var(--bg); background:var(--blue); border-radius:8px;
+        width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; font-weight:800}
+  h3.sec{font-size:16.5px; margin:26px 0 4px; color:#cdd9f5}
+  .sub{color:var(--muted); font-size:14.5px; margin-bottom:18px}
+
+  .chips{display:flex; flex-wrap:wrap; gap:10px; margin:18px 0 4px}
+  .chip{background:var(--panel); border:1px solid var(--line); border-radius:12px;
+        padding:10px 16px; font-size:13.5px; color:var(--txt)}
+  .chip b{color:var(--cyan)}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:16px; margin-top:18px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:20px}
+  .card h3{font-size:16px; margin-bottom:8px; display:flex; align-items:center; gap:8px}
+  .card p{font-size:13.3px; color:var(--muted)}
+  .card ul{list-style:none; margin-top:10px}
+  .card li{font-size:12.8px; color:var(--muted); padding:4px 0 4px 18px; position:relative}
+  .card li::before{content:"◆"; position:absolute; left:0; color:var(--blue); font-size:9px; top:9px}
+  .card li b{color:#cdd9f5; font-weight:600}
+
+  .lane{background:linear-gradient(160deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+        border-radius:16px; padding:22px; position:relative; overflow:hidden; margin-top:16px}
+  .lane::before{content:""; position:absolute; inset:0 0 auto 0; height:3px}
+  .lane.a::before{background:linear-gradient(90deg,var(--cyan),var(--green))}
+  .lane.b::before{background:linear-gradient(90deg,var(--violet),var(--blue))}
+  .lane.c::before{background:linear-gradient(90deg,var(--amber),var(--rose))}
+  .lane h3{font-size:18px; margin-bottom:4px; display:flex; align-items:center; gap:10px}
+  .lane .tagline{font-size:12.5px; color:var(--muted); margin-bottom:14px}
+
+  .flow{display:flex; align-items:stretch; gap:0; margin:16px 0 4px; flex-wrap:wrap}
+  .step{flex:1; min-width:140px; background:var(--panel); border:1px solid var(--line);
+        border-radius:14px; padding:14px 12px; text-align:center; position:relative; margin-right:26px; margin-bottom:10px}
+  .step:last-child{margin-right:0}
+  .step::after{content:"→"; position:absolute; right:-22px; top:50%; transform:translateY(-50%);
+               color:var(--blue); font-size:18px; font-weight:800}
+  .step:last-child::after{display:none}
+  .step .ic{font-size:22px; margin-bottom:6px}
+  .step .t{font-size:13px; font-weight:700}
+  .step .d{font-size:11px; color:var(--muted); margin-top:4px}
+
+  table{width:100%; border-collapse:collapse; margin-top:16px; font-size:13.3px}
+  th{text-align:left; color:var(--muted); font-weight:600; font-size:12px; letter-spacing:.5px;
+     text-transform:uppercase; padding:10px 12px; border-bottom:1px solid var(--line)}
+  td{padding:11px 12px; border-bottom:1px solid rgba(35,48,79,.6); vertical-align:top}
+  td b{color:#cdd9f5}
+  code{background:var(--panel2); border:1px solid var(--line); border-radius:6px;
+       padding:1px 7px; font-size:11.8px; color:#c8d6f5}
+  .mt{font-weight:800; font-size:12.5px; padding:2px 10px; border-radius:8px; display:inline-block; white-space:nowrap}
+  .mt1{background:rgba(79,140,255,.15); color:var(--blue)}
+  .mt2{background:rgba(45,212,191,.13); color:var(--cyan)}
+  .mt3{background:rgba(167,139,250,.15); color:var(--violet)}
+  .mt4{background:rgba(251,191,36,.13); color:var(--amber)}
+  .mt5{background:rgba(52,211,153,.13); color:var(--green)}
+  .new{font-size:10px; background:rgba(52,211,153,.16); color:var(--green);
+       border:1px solid rgba(52,211,153,.4); border-radius:999px; padding:1px 8px; font-weight:700; margin-left:6px}
+  .exist{font-size:10px; background:rgba(147,164,200,.13); color:var(--muted);
+       border:1px solid var(--line); border-radius:999px; padding:1px 8px; font-weight:700; margin-left:6px}
+
+  .demo{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px; margin-top:18px}
+  .demo .row{display:flex; gap:10px; margin-bottom:14px}
+  .demo .b{border-radius:14px; padding:10px 16px; font-size:13.3px; max-width:80%}
+  .demo .u{margin-left:auto}
+  .demo .u .b{background:var(--blue); color:#fff; border-bottom-right-radius:4px}
+  .demo .a .b{background:var(--panel2); border:1px solid var(--line); border-bottom-left-radius:4px}
+  .demo .a .b .hl{color:var(--cyan); font-weight:600}
+  .demo .note{font-size:11.5px; color:var(--muted); text-align:center; margin:6px 0 14px}
+
+  .road{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; margin-top:18px}
+  .ph{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px}
+  .ph .when{font-size:11.5px; font-weight:800; letter-spacing:1px; color:var(--cyan); margin-bottom:8px}
+  .ph h4{font-size:15px; margin-bottom:8px}
+  .ph ul{list-style:none}
+  .ph li{font-size:12.6px; color:var(--muted); padding:4px 0 4px 18px; position:relative}
+  .ph li::before{content:"◆"; position:absolute; left:0; color:var(--blue); font-size:9px; top:9px}
+  .ph li.ok::before{content:"✓"; color:var(--green); font-size:12px; top:5px}
+  .ph li.ok{color:var(--green)}
+
+  .callout{border:1px solid var(--line); border-left:3px solid var(--amber); background:rgba(251,191,36,.06);
+           border-radius:10px; padding:14px 16px; margin-top:16px; font-size:13.2px; color:#dbe4f7}
+  .callout b{color:var(--amber)}
+  .callout.safe{border-left-color:var(--green); background:rgba(52,211,153,.06)}
+  .callout.safe b{color:var(--green)}
+
+  footer{margin-top:56px; padding-top:20px; border-top:1px solid var(--line);
+         color:var(--muted); font-size:12.5px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+  @media print{ body{background:#fff;color:#111} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <span class="tag">PLANNING · v1 · 17 มิ.ย. 2026</span>
+    <h1>Hermes <span>Daily Learning</span> & Self-Improvement<br>สำหรับ Skill ด้าน IR และการประชุม</h1>
+    <p>เป้าหมาย: ให้ Hermes "เก่งขึ้นทุกวันเอง" ใน 2 มิติ — (1) <b>เรียนรู้พฤติกรรมรายคน</b> เพื่อปรับวิธีตอบให้เข้ากับแต่ละบุคคล
+       และ (2) <b>ดูดความรู้ภายนอกรายวันตาม Skill Store</b> — แต่ละ skill ที่ publish เป็นตัวกำหนดว่าจะไปเรียนเรื่องอะไร (ไม่เรียนมั่ว) เพื่อให้ skill ตัวนั้นเก่งขึ้น
+       ทุกอย่างวิ่งบนสถาปัตยกรรม self-improvement ที่มีอยู่แล้ว (<code>observability.py</code> + APScheduler + <code>UserMemory</code>)
+       และยึดหลักเดิม: <b>ระบบไม่แก้ production เอง — เสนอเป็น draft รอคนกดอนุมัติ</b></p>
+  </div>
+
+  <!-- 0. PRINCIPLES -->
+  <h2><span class="n">0</span> หลักการ</h2>
+  <div class="chips">
+    <div class="chip">🔭 <b>Observe</b> → Analyze → Improve → <b>Human Review</b> → Apply</div>
+    <div class="chip">🧍 เรียนรู้รายคน <b>แยกขาดต่อ user</b> (ไม่ปนกัน)</div>
+    <div class="chip">🌐 ความรู้ภายนอก <b>มีแหล่งอ้างอิงเสมอ</b> (ห้าม hallucinate)</div>
+    <div class="chip">🛡️ ของใหม่ทั้งหมดเป็น <b>draft</b> จนกว่าจะอนุมัติ</div>
+    <div class="chip">♻️ ต่อยอดของเดิม <b>ไม่รื้อ</b></div>
+  </div>
+
+  <!-- 1. THREE LAYERS -->
+  <h2><span class="n">1</span> ภาพรวม — 3 ชั้นการเรียนรู้</h2>
+  <p class="sub">ชั้น C มีอยู่แล้วในระบบ เราจะ "เสียบ" ชั้น A และ B เพิ่มเข้าไปในรอบ nightly เดิม</p>
+  <div class="grid">
+    <div class="card">
+      <h3>🧍 A · Per-User Learning <span class="new">ใหม่</span></h3>
+      <p>เรียนรู้ "วิธีทำงานของแต่ละคน" แล้วปรับ system prompt เฉพาะคนนั้น</p>
+      <ul>
+        <li>สไตล์/ฟอร์แมตคำตอบที่ชอบ</li>
+        <li>ศัพท์ & บริบทงานเฉพาะตัว</li>
+        <li>คำถาม/งานที่ทำซ้ำ → shortcut</li>
+        <li>คุณภาพจาก 👍/👎 feedback</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🎯 B · Skill-Driven Knowledge <span class="new">ใหม่</span></h3>
+      <p><b>ทุก skill เป็นตัวขับ</b> (รวม skill ส่วนตัว) — แต่ละตัวบอกเองว่าต้องเรียนอะไร ไม่เรียนมั่ว</p>
+      <ul>
+        <li>tags/description ของ skill = ขอบเขตการเรียน</li>
+        <li>publish → คลังองค์กร · ส่วนตัว → คลังเจ้าของ</li>
+        <li>คัดกรอง: เกี่ยวกับ skill นี้จริงไหม</li>
+        <li>เก็บผูก <code>skill_id</code> → ใช้ตอนรัน skill</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🏢 C · Org Self-Improvement <span class="exist">มีแล้ว</span></h3>
+      <p>วิเคราะห์สุขภาพระบบ + เสนอ skill กลาง (โค้ดเดิมใน <code>observability.py</code>)</p>
+      <ul>
+        <li>Telemetry + Feedback + Alert</li>
+        <li>Nightly RCA → <code>ImprovementReport</code></li>
+        <li><code>detect_opportunities</code> รวม behavior ข้าม user</li>
+        <li>Ticket + <code>LearnedGuidance</code> draft</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout safe">
+    <b>เชื่อมกันยังไง:</b> ทั้ง A และ B จะถูกเรียกใน <code>run_nightly()</code> ที่มีอยู่ (cron 00:00 Asia/Bangkok) เป็น 2 ขั้นเพิ่ม
+    แล้วสรุปผลลัพธ์ของทั้งคู่ฝังลงใน <code>ImprovementReport</code> รายวัน — ดูได้จาก AI Engineer dashboard เดิม
+  </div>
+
+  <!-- 2. LANE A -->
+  <h2><span class="n">2</span> ชั้น A — เรียนรู้พฤติกรรมรายคน</h2>
+  <div class="lane a">
+    <h3>🧍 Per-User Daily Profile Builder</h3>
+    <div class="tagline">ทุกคืน: อ่านร่องรอยการใช้งานของ user แต่ละคน → กลั่นเป็น "โปรไฟล์การทำงาน" → ใช้ปรับคำตอบเฉพาะคน</div>
+    <div class="flow">
+      <div class="step"><div class="ic">📥</div><div class="t">รวบรวมราย user</div><div class="d">chat, telemetry, feedback, transcript, skill ที่ใช้ (24 ชม.)</div></div>
+      <div class="step"><div class="ic">🧪</div><div class="t">กลั่นด้วย LLM</div><div class="d">สรุปเป็น 4 มิติ (สไตล์/ศัพท์/งานซ้ำ/บทเรียนจาก feedback)</div></div>
+      <div class="step"><div class="ic">💾</div><div class="t">เก็บเป็น memory</div><div class="d">อัปเดต PREFERENCE/FACT/BEHAVIOR + <code>USER_PLAYBOOK</code> ใหม่</div></div>
+      <div class="step"><div class="ic">💬</div><div class="t">ใช้งานพรุ่งนี้</div><div class="d">ฉีดเข้า system prompt ของ user คนนั้นใน <code>/api/chat</code></div></div>
+    </div>
+
+    <h3 class="sec">4 มิติที่เรียน (ตรงกับที่เลือกไว้)</h3>
+    <table>
+      <tr><th style="width:160px">มิติ</th><th>เรียนจากอะไร</th><th>เก็บที่ไหน</th><th>นำไปใช้ยังไง</th></tr>
+      <tr>
+        <td><b>🎨 สไตล์/ฟอร์แมต</b></td>
+        <td>ความยาวคำตอบที่ผู้ใช้ตอบรับดี, ขอ bullet/ตาราง/ย่อหน้า, EN vs TH, โทนทางการ/กันเอง</td>
+        <td><span class="mt mt1">PREFERENCE</span></td>
+        <td>prompt: "ผู้ใช้ชอบคำตอบ <i>สั้น เป็น bullet ภาษาไทย</i>"</td>
+      </tr>
+      <tr>
+        <td><b>🔤 ศัพท์/บริบทงาน</b></td>
+        <td>ชื่อบริษัท/โปรเจค/ทีมที่พูดถึงบ่อย, ตัวย่อเฉพาะ, แผนกของผู้ใช้</td>
+        <td><span class="mt mt2">FACT</span></td>
+        <td>prompt: รายการศัพท์ + ความหมาย → ตอบโดยไม่ต้องถามซ้ำ</td>
+      </tr>
+      <tr>
+        <td><b>🔁 งานที่ทำซ้ำ</b></td>
+        <td>intent ที่เกิดซ้ำ (เช่น "สรุปประชุมเป็น MOM", "ร่างอีเมลแจ้งมติ")</td>
+        <td><span class="mt mt3">BEHAVIOR</span></td>
+        <td>เสนอ shortcut/skill ส่วนตัว (ต่อจาก auto-skill v6 เดิม)</td>
+      </tr>
+      <tr>
+        <td><b>👍 คุณภาพจาก feedback</b></td>
+        <td><code>FeedbackEvent</code> 👍/👎 + comment ของ user คนนั้น</td>
+        <td><span class="mt mt5">USER_PLAYBOOK</span><span class="new">ใหม่</span></td>
+        <td>"do/don't" รายคน เช่น "อย่าใส่ disclaimer ยาว — เคยโดน 👎"</td>
+      </tr>
+    </table>
+
+    <div class="callout">
+      <b>USER_PLAYBOOK = MemoryType ใหม่ 1 ตัว</b> — เก็บ "กติกาการตอบเฉพาะคน" ที่กลั่นแล้ว (JSON: <code>{style, glossary, recurring, dos, donts, updated}</code>)
+      เพิ่มผ่าน <code>_run_migrations</code> (ALTER TYPE) เหมือนตอนเพิ่ม FACT/BEHAVIOR — ความเสี่ยงต่ำ มี pattern แล้ว
+    </div>
+
+    <div class="demo">
+      <div class="note">ตัวอย่างผล — Hermes ของ "คุณนริศรา" หลังเรียน 1 สัปดาห์</div>
+      <div class="row u"><div class="b">สรุปประชุมเมื่อกี้ให้หน่อย</div></div>
+      <div class="row a"><div class="b"><span class="hl">[จำได้ว่าชอบ MOM สั้น เป็น bullet + ใส่ action item พร้อมผู้รับผิดชอบ ไม่ต้องมีคำนำ]</span><br>
+        • มติ: อนุมัติงบ Q3 …<br>• Action: คุณสมชาย ส่งร่างศุกร์นี้ …</div></div>
+      <div class="note">ไม่ต้องสั่งฟอร์แมตซ้ำทุกครั้ง — เพราะ playbook รายคนถูกฉีดเข้า prompt</div>
+    </div>
+  </div>
+
+  <!-- 3. LANE B -->
+  <h2><span class="n">3</span> ชั้น B — ดูดความรู้ภายนอก <u>ตามทุก Skill</u></h2>
+  <p class="sub">หลักสำคัญ: <b>ไม่เรียนมั่ว</b> — ทุก skill (publish + <b>ส่วนตัว</b>) เป็นตัว "สั่งงาน" ว่าจะไปเรียนเรื่องอะไร ความรู้ผูกกับ skill ตัวนั้นโดยตรง เพื่อให้ <b>skill นั้นเก่งขึ้น</b> — ใครสร้าง skill ส่วนตัว ระบบก็เรียนให้ด้วย</p>
+  <div class="lane b">
+    <h3>🎯 Skill-Driven Knowledge Ingestion</h3>
+    <div class="tagline">แต่ละ skill มี <code>tags</code> + <code>description</code> + <code>department</code> อยู่แล้ว → ระบบแปลงเป็น "หัวข้อที่ต้องไปเรียน" → ดึงมาเฉพาะเรื่องนั้น → ผูกกลับเป็นความรู้ของ skill (scope ตาม visibility ของ skill)</div>
+    <div class="flow">
+      <div class="step"><div class="ic">🗂️</div><div class="t">วนทุก skill</div><div class="d">published + private + team → tags/description = ขอบเขต</div></div>
+      <div class="step"><div class="ic">🔎</div><div class="t">Fetch ตามหัวข้อ</div><div class="d"><code>WebSearch</code> ด้วยคำค้นที่กลั่นจาก skill นั้น</div></div>
+      <div class="step"><div class="ic">🧹</div><div class="t">Curate</div><div class="d">กรองว่า "เกี่ยวกับ skill นี้จริงไหม" + ย่อ + แหล่ง+วันที่</div></div>
+      <div class="step"><div class="ic">🔗</div><div class="t">ผูก + คุม scope</div><div class="d"><code>skill_id</code> + visibility (private = เห็นเฉพาะเจ้าของ)</div></div>
+    </div>
+
+    <div class="callout">
+      <b>กลไกกัน "เรียนมั่ว":</b> ก่อนเก็บทุก doc ต้องผ่านด่านคัดกรองด้วย LLM ว่า <i>"เนื้อหานี้ทำให้ skill ‹X› ตอบได้ดีขึ้นจริงไหม"</i>
+      ถ้าไม่เกี่ยว = ทิ้ง. คำค้นทุกคำมาจาก <code>tags</code>/<code>description</code> ของ skill ไม่ใช่หัวข้อสุ่ม
+    </div>
+    <div class="callout">
+      <b>skill ส่วนตัว:</b> ความรู้ที่เรียนมา <code>visibility=private</code> ผูกกับ <code>owner</code> — <b>เห็นเฉพาะเจ้าของ ไม่รั่วให้คนอื่น</b>
+      ถ้าเจ้าของ publish ภายหลัง คลังของ skill จะถูกยกเป็นระดับองค์กรตาม visibility ใหม่ พร้อม skill
+    </div>
+
+    <h3 class="sec">ตัวอย่าง: skill ใน Store → เรียนอะไร (อิง <code>_CATALOG_SKILLS</code> จริง)</h3>
+    <table>
+      <tr><th style="width:200px">Skill (tags)</th><th>หัวข้อที่ไปเรียนทุกวัน</th><th>ทำให้ skill เก่งขึ้นยังไง</th></tr>
+      <tr>
+        <td><b>📑 Annual Report Summarizer</b><br><code>ir·56-1·financial</code></td>
+        <td>การเปลี่ยนแปลงแบบฟอร์ม 56-1 One Report, เกณฑ์เปิดเผยข้อมูล ตลท./ก.ล.ต. ล่าสุด</td>
+        <td>สรุปได้ตรงเทมเพลตปีปัจจุบัน + เตือนหัวข้อใหม่ที่ต้องมี</td>
+      </tr>
+      <tr>
+        <td><b>📊 Financial Highlight Extractor</b><br><code>ir·งบการเงิน·quarterly</code></td>
+        <td>มาตรฐานบัญชี/นิยามตัวเลขที่อัปเดต (EBITDA, margin), รูปแบบรายงานไตรมาส</td>
+        <td>ดึงตัวเลข + อธิบายตามนิยามล่าสุด ไม่ใช้ของเก่า</td>
+      </tr>
+      <tr>
+        <td><b>🌐 EN-TH IR Translator</b><br><code>ir·translate·en-th</code></td>
+        <td>ศัพท์ IR/ประกาศตลาดหลักทรัพย์ใหม่ๆ, คำที่ ตลท. ใช้เป็นทางการ</td>
+        <td>glossary IR สดเสมอ → แปลตรงศัพท์ทางการ</td>
+      </tr>
+      <tr>
+        <td><b>📋 (skill ประชุม/MOM)</b><br><code>meeting·mom</code></td>
+        <td>เทคนิคจับ action items, รูปแบบ MOM, แนวทาง facilitation</td>
+        <td>สรุปประชุม + จัด action ได้ตามแนวปฏิบัติที่ดีขึ้น</td>
+      </tr>
+    </table>
+    <p class="sub" style="margin-top:10px">เอกสาร <b>ภายในองค์กร</b> ก็เข้าระบบเดียวกัน — แต่ผู้ใช้/แอดมินเลือก "เอกสารนี้เป็นความรู้ของ skill ไหน" ตอน push เข้าคลัง (ผูก <code>skill_id</code> เหมือนกัน)</p>
+
+    <div class="demo">
+      <div class="note">ตัวอย่างผล — รัน skill "Annual Report Summarizer" หลัง ingestion เรียนเรื่อง 56-1</div>
+      <div class="row u"><div class="b">สรุป 56-1 ไฟล์นี้ให้หน่อย</div></div>
+      <div class="row a"><div class="b">## Executive Summary …<br>⚠️ ปีนี้แบบ 56-1 เพิ่มหัวข้อ <span class="hl">การเปิดเผยข้อมูลความยั่งยืน (ESG)</span> ซึ่งเอกสารยังไม่มี
+        <span class="hl">[อ้างอิง: ประกาศ ตลท. 10 มิ.ย. 2569 — เรียนเข้าคลังของ skill นี้]</span></div></div>
+      <div class="note">skill หยิบเฉพาะความรู้ที่ผูกกับตัวเอง (skill_id) ไม่ปนความรู้ของ skill อื่น</div>
+    </div>
+  </div>
+
+  <!-- 4. DATA MODEL -->
+  <h2><span class="n">4</span> สิ่งที่ต้องเพิ่มในระบบ (data model)</h2>
+  <p class="sub">น้อยที่สุดเท่าที่จำเป็น — เสริมของเดิม ไม่รื้อ</p>
+  <table>
+    <tr><th style="width:230px">รายการ</th><th>ชนิด</th><th>หน้าที่</th></tr>
+    <tr><td><code>MemoryType.USER_PLAYBOOK</code></td><td><span class="new">ใหม่</span> (enum + migration)</td><td>กติกาการตอบเฉพาะคนที่กลั่นแล้ว (ชั้น A)</td></tr>
+    <tr><td><code>KnowledgeDoc</code></td><td><span class="new">ใหม่</span> (ตารางใน observability)</td><td>1 ก้อนความรู้ — <b>ผูก <code>skill_id</code> + <code>owner</code> + <code>visibility</code></b> (private/company) + url, summary, fetched_date, status</td></tr>
+    <tr><td><code>Skill</code> (เพิ่ม field)</td><td><span class="exist">มีแล้ว</span> + <code>learning_topics</code></td><td>หัวข้อที่ skill นี้ต้องไปเรียน (กลั่นจาก tags/description ครั้งแรก แอดมินปรับได้)</td></tr>
+    <tr><td><code>run_user_learning()</code></td><td><span class="new">ใหม่</span> (ฟังก์ชัน)</td><td>ลูปชั้น A รายคน — เรียกใน nightly</td></tr>
+    <tr><td><code>run_knowledge_ingestion()</code></td><td><span class="new">ใหม่</span> (ฟังก์ชัน)</td><td>ลูปชั้น B — cron เช้า + รวมผลใน report</td></tr>
+    <tr><td><code>ImprovementReport</code></td><td><span class="exist">มีแล้ว</span> (เพิ่ม field)</td><td>เพิ่ม <code>user_learning_summary</code> + <code>knowledge_summary</code> ลง JSON</td></tr>
+    <tr><td>APScheduler jobs</td><td><span class="exist">มีแล้ว</span> (เพิ่ม job)</td><td>เพิ่ม cron "ingestion เช้า" + เรียก user-learning ใน nightly เดิม</td></tr>
+    <tr><td>AI Engineer dashboard</td><td><span class="exist">มีแล้ว</span> (เพิ่มแท็บ)</td><td>แท็บ "คลังความรู้" + "การเรียนรู้รายคน" (อนุมัติ/ปฏิเสธ doc)</td></tr>
+  </table>
+
+  <!-- 5. SCHEDULE -->
+  <h2><span class="n">5</span> ตารางเวลา (ต่อยอด APScheduler เดิม)</h2>
+  <div class="grid">
+    <div class="card"><h3>🌅 07:00 — Skill Ingestion</h3><p><code>run_knowledge_ingestion()</code> วน <b>ทุก skill</b> (publish + ส่วนตัว) → เรียนตามหัวข้อของแต่ละตัว → draft doc รอตรวจ</p></div>
+    <div class="card"><h3>🌙 00:00 — Nightly (เดิม + ใหม่)</h3><p>RCA เดิม → <b>+ <code>run_user_learning()</code></b> ทุก user → รวมสรุปลง report เดียว</p></div>
+    <div class="card"><h3>⏱️ ทุก 10 นาที — Monitor</h3><p><code>run_monitor()</code> เดิม ไม่แตะ</p></div>
+    <div class="card"><h3>🔁 มี skill ใหม่ published</h3><p>กลั่น <code>learning_topics</code> ให้ skill นั้นทันที → เข้าคิว ingestion รอบถัดไป</p></div>
+  </div>
+  <div class="callout safe">
+    คุมด้วย env เหมือนเดิม: <code>ENABLE_SCHEDULER</code>, เพิ่ม <code>ENABLE_INGESTION</code>, <code>INGEST_HOUR</code>, <code>KNOWLEDGE_DAILY_BUDGET_USD</code>
+    — เปิด/ปิดและจำกัดงบได้โดยไม่แตะโค้ด
+  </div>
+
+  <!-- 6. SAFETY -->
+  <h2><span class="n">6</span> ความปลอดภัย & ธรรมาภิบาล</h2>
+  <div class="grid">
+    <div class="card"><h3>🛡️ Human-in-the-loop</h3><p>ความรู้ภายนอกเข้ามาเป็น <code>status=draft</code> — ตอบผู้ใช้เฉพาะ doc ที่ <b>approved</b> (ตามแพทเทิร์น <code>LearnedGuidance</code> เดิม)</p></div>
+    <div class="card"><h3>🔒 แยก visibility</h3><p>ความรู้ส่วนตัว (transcript รายคน) ห้ามรั่วเข้าคลังองค์กร — playbook รายคนเห็นเฉพาะเจ้าของ</p></div>
+    <div class="card"><h3>📎 อ้างอิงเสมอ</h3><p>ทุกคำตอบจากคลังต้องแนบ source + วันที่ ถ้าไม่มีแหล่ง = ไม่ตอบว่าเป็นข้อเท็จจริงสด</p></div>
+    <div class="card"><h3>💸 คุมงบ + เรียงลำดับ</h3><p>เรียน skill ที่<b>ถูกใช้จริง</b>ก่อน (skill ส่วนตัวที่ไม่มีใครแตะ → เรียนถี่น้อยลง), budget/วัน, เกินงบ → ข้ามรอบ + alert</p></div>
+    <div class="card"><h3>⚖️ ToS / ลิขสิทธิ์</h3><p>เก็บ "สรุป + ลิงก์" ไม่ก็อปเนื้อหาเต็ม, เคารพ robots.txt, เลี่ยง scraping ที่ผิดเงื่อนไข</p></div>
+    <div class="card"><h3>🗑️ Retention</h3><p>doc เก่า/ถูกแทนที่ → archive; user playbook แก้/ลบได้ผ่าน memory API เดิม</p></div>
+  </div>
+
+  <!-- 7. ROADMAP -->
+  <h2><span class="n">7</span> Roadmap (เสนอ — ยังไม่ลงมือ)</h2>
+  <div class="road">
+    <div class="ph">
+      <div class="when">PHASE 1 · สัปดาห์ 1</div>
+      <h4>🧍 Per-User Learning</h4>
+      <ul>
+        <li>เพิ่ม <code>USER_PLAYBOOK</code> + migration</li>
+        <li><code>run_user_learning()</code> เสียบใน nightly</li>
+        <li>ฉีด playbook เข้า <code>/api/chat</code></li>
+        <li>เทสต์: คนเดียวเรียน 3 วันเห็นผล</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <div class="when">PHASE 2 · สัปดาห์ 2</div>
+      <h4>🎯 Skill Ingestion (MVP)</h4>
+      <ul>
+        <li><code>KnowledgeDoc</code> ผูก <code>skill_id</code> + cron เช้า</li>
+        <li>เริ่มจาก 1 skill IR (Annual Report)</li>
+        <li>กลั่น <code>learning_topics</code> + คัดกรอง "เกี่ยวกับ skill ไหม"</li>
+        <li>รัน skill นั้นแล้วเห็นความรู้สด + อ้างอิง</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <div class="when">PHASE 3 · สัปดาห์ 3</div>
+      <h4>📚 ครบทุก skill + ภายใน</h4>
+      <ul>
+        <li>ขยายให้ skill IR/ประชุมทุกตัวมีคลังของตัวเอง</li>
+        <li>push เอกสารภายใน → ผูก <code>skill_id</code></li>
+        <li>auto-gen <code>learning_topics</code> ตอน publish skill</li>
+      </ul>
+    </div>
+    <div class="ph">
+      <div class="when">PHASE 4 · เมื่อข้อมูลโต</div>
+      <h4>⚡ ยกระดับ</h4>
+      <ul>
+        <li><code>pgvector</code> แทน ILIKE</li>
+        <li>วัดผล: คำตอบดีขึ้นจริงไหม (A/B)</li>
+        <li>auto-skill ส่วนตัวจากงานซ้ำ</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 8. OPEN QUESTIONS -->
+  <h2><span class="n">8</span> คำถามที่ต้องเคาะก่อน implement</h2>
+  <table>
+    <tr><th style="width:240px">ประเด็น</th><th>ทางเลือก / สิ่งที่ต้องตัดสิน</th></tr>
+    <tr><td><b>learning_topics ใครคุม</b></td><td>ให้ LLM กลั่นจาก tags/description อัตโนมัติ แล้วแอดมินแก้ได้ หรือแอดมินกรอกเองทุก skill?</td></tr>
+    <tr><td><b>เริ่มจาก skill ไหน</b></td><td>นำร่อง skill ตัวไหนก่อน (เสนอ: Annual Report Summarizer — ขอบเขตชัด ผลเห็นง่าย)?</td></tr>
+    <tr><td><b>แหล่งดึงเจาะจง</b></td><td>มีเว็บ/RSS official (ตลท./ก.ล.ต.) ที่อยากล็อกไว้ไหม หรือให้ <code>WebSearch</code> หาเองในขอบเขตหัวข้อ?</td></tr>
+    <tr><td><b>ใครกดอนุมัติ doc</b></td><td>AI Engineer คนเดียว หรือเจ้าของ skill (owner) ช่วยรีวิวความรู้ของ skill ตัวเอง?</td></tr>
+    <tr><td><b>skill ส่วนตัวเยอะ → คุมงบ</b></td><td>ถ้ามี skill ส่วนตัวหลายร้อยตัว เรียนทุกตัวทุกวันแพง — เรียนเฉพาะ skill ที่<b>ถูกใช้จริงช่วง N วันล่าสุด</b>? / จำกัด topic ต่อ skill? / เพดานงบ/วัน (เช่น $0.50)?</td></tr>
+    <tr><td><b>เห็น playbook ของตัวเองไหม</b></td><td>ให้ user ดู/แก้ "สิ่งที่ Hermes จำเกี่ยวกับฉัน" ได้หรือไม่ (โปร่งใส vs เรียบง่าย)?</td></tr>
+  </table>
+
+  <footer>
+    <span>Hermes AI Skill Hub · Daily Learning Plan</span>
+    <span>สถานะ: ฉบับร่างเพื่อพิจารณา · ยังไม่เริ่ม implement</span>
+  </footer>
+
+</div>
+</body>
+</html>

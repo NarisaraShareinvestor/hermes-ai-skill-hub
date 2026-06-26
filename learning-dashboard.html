@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes — Learning Observability Dashboard (mockup)</title>
+<style>
+  :root{
+    --bg:#f5f7fb; --panel:#ffffff; --line:#e7ecf5; --line2:#eef2f9;
+    --txt:#1e2a44; --muted:#6b7a99; --soft:#90a0bf;
+    --blue:#2563eb; --cyan:#0ea5b7; --green:#16a34a; --amber:#d97706;
+    --violet:#7c3aed; --rose:#e11d48;
+    --blue-s:#e8f0ff; --green-s:#e7f7ee; --amber-s:#fdf3e3; --violet-s:#f1eafe; --rose-s:#fdeaf0; --cyan-s:#e4f6f8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{font-family:-apple-system,"Segoe UI","Sukhumvit Set","Noto Sans Thai",sans-serif;
+       background:var(--bg); color:var(--txt); line-height:1.6; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px; margin:0 auto; padding:26px 22px 70px}
+
+  /* topbar */
+  .top{display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:14px;
+       padding-bottom:18px; border-bottom:1px solid var(--line); margin-bottom:24px}
+  .top h1{font-size:23px; font-weight:800; letter-spacing:-.2px}
+  .top h1 .dot{color:var(--blue)}
+  .top .sub{color:var(--muted); font-size:13.5px; margin-top:3px}
+  .seg{display:flex; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:4px}
+  .seg button{border:0; background:transparent; color:var(--muted); font-size:12.5px; font-weight:600;
+              padding:6px 13px; border-radius:7px; cursor:pointer; font-family:inherit}
+  .seg button.on{background:var(--blue); color:#fff}
+  .mockflag{font-size:11.5px; color:var(--amber); background:var(--amber-s);
+            border:1px solid #f3dcb4; border-radius:999px; padding:3px 11px; font-weight:700}
+
+  /* KPI row */
+  .kpis{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:8px}
+  .kpi{background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:16px 17px;
+       box-shadow:0 1px 2px rgba(16,30,60,.04)}
+  .kpi .lab{font-size:12px; color:var(--muted); font-weight:600; display:flex; align-items:center; gap:6px}
+  .kpi .val{font-size:27px; font-weight:800; margin-top:7px; letter-spacing:-.5px}
+  .kpi .val small{font-size:14px; color:var(--soft); font-weight:600}
+  .kpi .delta{font-size:11.5px; font-weight:700; margin-top:5px; display:inline-flex; align-items:center; gap:4px}
+  .up{color:var(--green)} .down{color:var(--rose)} .flat{color:var(--soft)}
+  .kpi .spark{margin-top:8px}
+
+  /* section */
+  h2{font-size:16px; font-weight:800; margin:34px 0 4px; display:flex; align-items:center; gap:9px}
+  h2 .tg{font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px}
+  .tgA{background:var(--green-s); color:var(--green)}
+  .tgB{background:var(--violet-s); color:var(--violet)}
+  .tgO{background:var(--blue-s); color:var(--blue)}
+  .secsub{color:var(--muted); font-size:13px; margin-bottom:14px}
+
+  .row{display:grid; gap:14px}
+  .r-2{grid-template-columns:1.4fr 1fr}
+  .r-2b{grid-template-columns:1fr 1.4fr}
+  .r-3{grid-template-columns:repeat(3,1fr)}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:18px 18px 14px;
+        box-shadow:0 1px 2px rgba(16,30,60,.04)}
+  .card h3{font-size:14px; font-weight:700; display:flex; align-items:center; justify-content:space-between; gap:8px}
+  .card h3 .hint{font-size:11.5px; color:var(--soft); font-weight:600}
+  .card .cap{font-size:11.8px; color:var(--muted); margin-top:2px}
+  .legend{display:flex; gap:16px; margin-top:10px; flex-wrap:wrap}
+  .legend span{font-size:11.5px; color:var(--muted); display:inline-flex; align-items:center; gap:6px}
+  .legend i{width:10px; height:10px; border-radius:3px; display:inline-block}
+
+  /* svg chart base */
+  .chart{width:100%; height:auto; display:block; margin-top:8px}
+  .grid-l{stroke:var(--line2); stroke-width:1}
+  .axis-t{fill:var(--soft); font-size:11px}
+  .line{fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round}
+  .dot{stroke:#fff; stroke-width:2}
+  .marker{stroke:var(--amber); stroke-width:1.5; stroke-dasharray:4 4}
+
+  /* css bar chart */
+  .bars{display:flex; align-items:flex-end; gap:10px; height:150px; margin-top:14px; padding:0 4px}
+  .bar{flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:6px; height:100%}
+  .bar .stack{width:62%; max-width:34px; border-radius:6px 6px 0 0; display:flex; flex-direction:column-reverse}
+  .bar .seg-ok{background:var(--violet); border-radius:6px 6px 0 0}
+  .bar .seg-no{background:#dcd2f4}
+  .bar .single{width:62%; max-width:34px; background:var(--green); border-radius:6px 6px 0 0}
+  .bar .xl{font-size:10.5px; color:var(--soft)}
+  .bar .vtop{font-size:10.5px; color:var(--muted); font-weight:700}
+
+  /* donut */
+  .donutwrap{display:flex; align-items:center; gap:18px}
+  .donut-c{font-size:12px; color:var(--muted)}
+  .donut-c b{display:block; font-size:13px; color:var(--txt)}
+
+  /* table */
+  table{width:100%; border-collapse:collapse; margin-top:8px; font-size:12.8px}
+  th{text-align:left; color:var(--soft); font-weight:600; font-size:11px; letter-spacing:.4px; text-transform:uppercase;
+     padding:8px 10px; border-bottom:1px solid var(--line)}
+  td{padding:9px 10px; border-bottom:1px solid var(--line2); vertical-align:middle}
+  td b{font-weight:700}
+  .pill{font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; white-space:nowrap}
+  .pp{background:var(--violet-s); color:var(--violet)}
+  .pc{background:var(--cyan-s); color:var(--cyan)}
+  .pg{background:var(--green-s); color:var(--green)}
+  .pa{background:var(--amber-s); color:var(--amber)}
+  .mini{height:7px; background:var(--line2); border-radius:99px; overflow:hidden; min-width:70px}
+  .mini i{display:block; height:100%; border-radius:99px; background:var(--blue)}
+  .tag-priv{font-size:10px; color:var(--soft); border:1px solid var(--line); border-radius:6px; padding:1px 6px; margin-left:6px}
+
+  /* learning log */
+  .log{list-style:none; margin-top:6px}
+  .log li{display:flex; gap:11px; padding:10px 0; border-bottom:1px solid var(--line2); font-size:12.8px}
+  .log li:last-child{border-bottom:0}
+  .log .ic{width:30px; height:30px; flex:0 0 30px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:14px}
+  .i-a{background:var(--green-s)} .i-b{background:var(--violet-s)} .i-o{background:var(--blue-s)}
+  .log .tm{color:var(--soft); font-size:11.5px}
+  .log .who{color:var(--muted)}
+
+  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--line); color:var(--soft);
+         font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+
+  @media(max-width:880px){
+    .kpis{grid-template-columns:repeat(2,1fr)} .r-2,.r-2b,.r-3{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- TOP -->
+  <div class="top">
+    <div>
+      <h1>Hermes <span class="dot">Learning</span> Observability</h1>
+      <div class="sub">ระบบเรียนรู้จริงไหม · เรียนอะไร · เอาไปใช้แล้วดีขึ้นหรือเปล่า</div>
+    </div>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap">
+      <span class="mockflag">● ตัวเลขตัวอย่าง (mockup)</span>
+      <div class="seg">
+        <button>วันนี้</button><button class="on">7 วัน</button><button>30 วัน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lab">🧠 คะแนน 👍 (outcome)</div>
+      <div class="val">88<small>%</small></div>
+      <div class="delta up">▲ +6 จากก่อนเปิด learning</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">🔁 ถามซ้ำ / คน / วัน</div>
+      <div class="val">0.9</div>
+      <div class="delta up">▼ ลดจาก 3.1 (จำได้ดีขึ้น)</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">🧍 ผู้เรียนวันนี้</div>
+      <div class="val">12 <small>คน</small></div>
+      <div class="delta flat">playbook อัปเดต 11 ตัว</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">📚 ความรู้ใหม่ (อนุมัติ)</div>
+      <div class="val">13</div>
+      <div class="delta up">▲ +4 · อนุมัติ 82%</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">📎 อ้างอิงในคำตอบ</div>
+      <div class="val">27 <small>ครั้ง</small></div>
+      <div class="delta up">▲ +23% (ถูกใช้จริง)</div>
+    </div>
+  </div>
+
+  <!-- ============ OUTCOME ============ -->
+  <h2><span class="tg tgO">OUTCOME</span> เรียนแล้วดีขึ้นจริงไหม</h2>
+  <div class="secsub">หัวใจของ dashboard — ถ้า 2 กราฟนี้ไม่ขยับ แปลว่าเรียนแล้วไม่เกิดผล</div>
+  <div class="row r-2">
+    <div class="card">
+      <h3>คะแนน 👍 ต่อสัปดาห์ <span class="hint">เส้นประ = วันเปิด learning</span></h3>
+      <div class="cap">feedback ดีขึ้นต่อเนื่องหลังระบบเริ่มจำสไตล์ + ดูดความรู้</div>
+      <svg class="chart" viewBox="0 0 620 200" preserveAspectRatio="xMidYMid meet">
+        <line class="grid-l" x1="40" y1="20"  x2="610" y2="20"/>
+        <line class="grid-l" x1="40" y1="58"  x2="610" y2="58"/>
+        <line class="grid-l" x1="40" y1="96"  x2="610" y2="96"/>
+        <line class="grid-l" x1="40" y1="134" x2="610" y2="134"/>
+        <line class="grid-l" x1="40" y1="170" x2="610" y2="170"/>
+        <text class="axis-t" x="10" y="24">100</text>
+        <text class="axis-t" x="14" y="100">75</text>
+        <text class="axis-t" x="14" y="174">50</text>
+        <!-- learning enabled marker at wk3 (x=233) -->
+        <line class="marker" x1="233" y1="20" x2="233" y2="170"/>
+        <text class="axis-t" x="200" y="15" fill="#d97706">เปิด learning</text>
+        <polyline class="line" stroke="#2563eb"
+          points="50,134 142,125 233,128 325,107 417,86 508,71 600,56"/>
+        <g fill="#2563eb" class="dot">
+          <circle cx="50" cy="134" r="4"/><circle cx="142" cy="125" r="4"/><circle cx="233" cy="128" r="4"/>
+          <circle cx="325" cy="107" r="4"/><circle cx="417" cy="86" r="4"/><circle cx="508" cy="71" r="4"/>
+          <circle cx="600" cy="56" r="4.5"/>
+        </g>
+        <g class="axis-t" text-anchor="middle">
+          <text x="50" y="190">wk1</text><text x="142" y="190">wk2</text><text x="233" y="190">wk3</text>
+          <text x="325" y="190">wk4</text><text x="417" y="190">wk5</text><text x="508" y="190">wk6</text>
+          <text x="600" y="190">wk7</text>
+        </g>
+      </svg>
+    </div>
+    <div class="card">
+      <h3>อัตราการถามซ้ำ <span class="hint">ยิ่งต่ำยิ่งดี</span></h3>
+      <div class="cap">คำถามเดิมๆ ต่อคนต่อวัน — ลดลง = Hermes จำบริบทรายคนได้</div>
+      <svg class="chart" viewBox="0 0 620 200" preserveAspectRatio="xMidYMid meet">
+        <line class="grid-l" x1="40" y1="20"  x2="610" y2="20"/>
+        <line class="grid-l" x1="40" y1="95"  x2="610" y2="95"/>
+        <line class="grid-l" x1="40" y1="170" x2="610" y2="170"/>
+        <text class="axis-t" x="18" y="24">3.5</text>
+        <text class="axis-t" x="24" y="99">2</text>
+        <text class="axis-t" x="24" y="174">0</text>
+        <polyline class="line" stroke="#16a34a"
+          points="50,37 142,41 233,50 325,76 417,101 508,119 600,131"/>
+        <g fill="#16a34a" class="dot">
+          <circle cx="50" cy="37" r="4"/><circle cx="142" cy="41" r="4"/><circle cx="233" cy="50" r="4"/>
+          <circle cx="325" cy="76" r="4"/><circle cx="417" cy="101" r="4"/><circle cx="508" cy="119" r="4"/>
+          <circle cx="600" cy="131" r="4.5"/>
+        </g>
+        <g class="axis-t" text-anchor="middle">
+          <text x="50" y="190">wk1</text><text x="142" y="190">wk2</text><text x="233" y="190">wk3</text>
+          <text x="325" y="190">wk4</text><text x="417" y="190">wk5</text><text x="508" y="190">wk6</text>
+          <text x="600" y="190">wk7</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ============ LANE A ============ -->
+  <h2><span class="tg tgA">ชั้น A</span> เรียนรู้พฤติกรรมรายคน</h2>
+  <div class="secsub">นับการอัปเดต playbook รายคน + ดูว่าแต่ละคนถูกเรียนอะไรไป</div>
+  <div class="row r-2b">
+    <div class="card">
+      <h3>Playbook อัปเดต / วัน</h3>
+      <div class="cap">จำนวน user ที่มี profile การทำงานถูกกลั่นใหม่</div>
+      <div class="bars">
+        <div class="bar"><span class="vtop">4</span><div class="single" style="height:36%"></div><span class="xl">จ</span></div>
+        <div class="bar"><span class="vtop">6</span><div class="single" style="height:54%"></div><span class="xl">อ</span></div>
+        <div class="bar"><span class="vtop">5</span><div class="single" style="height:45%"></div><span class="xl">พ</span></div>
+        <div class="bar"><span class="vtop">8</span><div class="single" style="height:72%"></div><span class="xl">พฤ</span></div>
+        <div class="bar"><span class="vtop">7</span><div class="single" style="height:63%"></div><span class="xl">ศ</span></div>
+        <div class="bar"><span class="vtop">9</span><div class="single" style="height:81%"></div><span class="xl">ส</span></div>
+        <div class="bar"><span class="vtop">11</span><div class="single" style="height:100%"></div><span class="xl">อา</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>เรียนอะไรไปบ้าง (ราย user) <span class="hint">7 วันล่าสุด</span></h3>
+      <table>
+        <tr><th>ผู้ใช้</th><th>สิ่งที่เพิ่งเรียน</th><th>มิติ</th><th>👍</th></tr>
+        <tr><td><b>นริศรา</b></td><td>ชอบ MOM สั้น เป็น bullet ไม่มีคำนำ</td><td><span class="pill pp">สไตล์</span></td><td>92%</td></tr>
+        <tr><td><b>สมชาย</b></td><td>ศัพท์: "QH" = บมจ.ควอลิตี้เฮ้าส์</td><td><span class="pill pc">ศัพท์</span></td><td>85%</td></tr>
+        <tr><td><b>ปรียา</b></td><td>ทำซ้ำ: ร่างอีเมลแจ้งมติบอร์ด → เสนอ shortcut</td><td><span class="pill pg">งานซ้ำ</span></td><td>78%</td></tr>
+        <tr><td><b>ธนา</b></td><td>อย่าใส่ disclaimer ยาว (เคยโดน 👎)</td><td><span class="pill pa">feedback</span></td><td>81%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ LANE B ============ -->
+  <h2><span class="tg tgB">ชั้น B</span> ความรู้ตาม Skill (รวม skill ส่วนตัว)</h2>
+  <div class="secsub">ดูว่าเรียนเข้าคลังจริงไหม · คัดกรองดีแค่ไหน · skill ไหนเก่งขึ้น · ถูกหยิบไปใช้จริงหรือเปล่า</div>
+  <div class="row r-3">
+    <div class="card">
+      <h3>ความรู้เข้าคลัง / วัน</h3>
+      <div class="cap">เขียว = อนุมัติ · เทา = ถูกคัดทิ้ง (ไม่เกี่ยว skill)</div>
+      <div class="bars">
+        <div class="bar"><div class="stack" style="height:42%"><div class="seg-ok" style="height:73%"></div><div class="seg-no" style="height:27%"></div></div><span class="xl">จ</span></div>
+        <div class="bar"><div class="stack" style="height:50%"><div class="seg-ok" style="height:83%"></div><div class="seg-no" style="height:17%"></div></div><span class="xl">อ</span></div>
+        <div class="bar"><div class="stack" style="height:42%"><div class="seg-ok" style="height:64%"></div><div class="seg-no" style="height:36%"></div></div><span class="xl">พ</span></div>
+        <div class="bar"><div class="stack" style="height:65%"><div class="seg-ok" style="height:80%"></div><div class="seg-no" style="height:20%"></div></div><span class="xl">พฤ</span></div>
+        <div class="bar"><div class="stack" style="height:48%"><div class="seg-ok" style="height:82%"></div><div class="seg-no" style="height:18%"></div></div><span class="xl">ศ</span></div>
+        <div class="bar"><div class="stack" style="height:74%"><div class="seg-ok" style="height:82%"></div><div class="seg-no" style="height:18%"></div></div><span class="xl">ส</span></div>
+        <div class="bar"><div class="stack" style="height:70%"><div class="seg-ok" style="height:87%"></div><div class="seg-no" style="height:13%"></div></div><span class="xl">อา</span></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--violet)"></i>อนุมัติ</span><span><i style="background:#dcd2f4"></i>คัดทิ้ง</span></div>
+    </div>
+
+    <div class="card">
+      <h3>คุณภาพการคัดกรอง</h3>
+      <div class="cap">สัดส่วนที่ผ่านด่าน "เกี่ยวกับ skill จริงไหม"</div>
+      <div class="donutwrap" style="margin-top:14px">
+        <svg width="130" height="130" viewBox="0 0 130 130">
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#eef2f9" stroke-width="16"/>
+          <circle cx="65" cy="65" r="54" fill="none" stroke="#7c3aed" stroke-width="16"
+            stroke-dasharray="278 339" stroke-linecap="round" transform="rotate(-90 65 65)"/>
+          <text x="65" y="62" text-anchor="middle" font-size="26" font-weight="800" fill="#1e2a44">82%</text>
+          <text x="65" y="82" text-anchor="middle" font-size="11" fill="#6b7a99">อนุมัติ</text>
+        </svg>
+        <div class="donut-c">
+          <b>อนุมัติ 142 ก้อน</b> ผ่านด่านคัดกรอง<br><br>
+          <b style="color:var(--soft)">คัดทิ้ง 31 ก้อน</b> ไม่เกี่ยว skill<br>
+          <span style="font-size:11.5px">= ระบบไม่เก็บความรู้มั่ว</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📎 อ้างอิงความรู้ในคำตอบ / วัน <span class="hint">ขึ้น = ใช้จริง</span></h3>
+      <div class="cap">เก็บมาแล้วถูกหยิบไปตอบจริงกี่ครั้ง</div>
+      <svg class="chart" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid meet">
+        <line class="grid-l" x1="22" y1="20"  x2="350" y2="20"/>
+        <line class="grid-l" x1="22" y1="95"  x2="350" y2="95"/>
+        <line class="grid-l" x1="22" y1="160" x2="350" y2="160"/>
+        <text class="axis-t" x="2" y="24">30</text>
+        <text class="axis-t" x="6" y="99">15</text>
+        <text class="axis-t" x="10" y="164">0</text>
+        <polyline class="line" stroke="#0ea5b7"
+          points="40,145 90,125 140,130 190,100 240,80 290,60 340,35"/>
+        <g fill="#0ea5b7" class="dot">
+          <circle cx="40" cy="145" r="3.5"/><circle cx="90" cy="125" r="3.5"/><circle cx="140" cy="130" r="3.5"/>
+          <circle cx="190" cy="100" r="3.5"/><circle cx="240" cy="80" r="3.5"/><circle cx="290" cy="60" r="3.5"/>
+          <circle cx="340" cy="35" r="4"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="row r-2" style="margin-top:14px">
+    <div class="card">
+      <h3>Skill ที่เก่งขึ้น (ความรู้สะสม) <span class="hint">top 5</span></h3>
+      <table>
+        <tr><th>Skill</th><th>ก้อนความรู้</th><th></th><th>อ้างอิง/สัปดาห์</th></tr>
+        <tr><td><b>Annual Report Summarizer</b></td><td>24</td><td style="width:130px"><div class="mini"><i style="width:100%"></i></div></td><td>41</td></tr>
+        <tr><td><b>Financial Highlight Extractor</b></td><td>18</td><td><div class="mini"><i style="width:75%"></i></div></td><td>33</td></tr>
+        <tr><td><b>EN-TH IR Translator</b></td><td>15</td><td><div class="mini"><i style="width:62%"></i></div></td><td>28</td></tr>
+        <tr><td><b>Meeting MOM Builder</b></td><td>11</td><td><div class="mini"><i style="width:46%"></i></div></td><td>19</td></tr>
+        <tr><td><b>my-ir-helper</b><span class="tag-priv">ส่วนตัว · ธนา</span></td><td>7</td><td><div class="mini"><i style="width:29%; background:var(--violet)"></i></div></td><td>6</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>บันทึกการเรียนล่าสุด</h3>
+      <ul class="log">
+        <li><div class="ic i-b">📚</div><div><b>Annual Report Summarizer</b> เรียน "แบบ 56-1 เพิ่มหัวข้อ ESG" <div class="tm">07:02 · อนุมัติแล้ว · อ้างอิง ตลท.</div></div></li>
+        <li><div class="ic i-b">🔒</div><div><b>my-ir-helper</b> <span class="who">(ส่วนตัว)</span> เรียน glossary หุ้นกลุ่มอสังหา <div class="tm">07:03 · เห็นเฉพาะ ธนา</div></div></li>
+        <li><div class="ic i-a">🧍</div><div><b>นริศรา</b> playbook อัปเดต: ชอบ MOM bullet สั้น <div class="tm">00:14 · จาก feedback 5 ครั้ง</div></div></li>
+        <li><div class="ic i-b">🗑️</div><div>คัดทิ้ง 2 ก้อน — ข่าวทั่วไปไม่เกี่ยว skill ไหน <div class="tm">07:05 · ด่านคัดกรอง</div></div></li>
+        <li><div class="ic i-o">📎</div><div>คำตอบ IR Q&A อ้างอิงความรู้สด 6 ครั้ง <div class="tm">วันนี้</div></div></li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Hermes AI Skill Hub · Learning Observability (mockup ออกแบบ)</span>
+    <span>โทนขาว · ตัวเลขเป็นตัวอย่าง · ผูกกับ observability.py + KnowledgeDoc + UserMemory</span>
+  </footer>
+
+</div>
+</body>
+</html>
