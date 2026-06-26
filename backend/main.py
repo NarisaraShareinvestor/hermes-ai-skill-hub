@@ -1470,8 +1470,11 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
         new_last_skill_id = _forced_meeting_skill.id
         powered_by_skill_info = {"id": _forced_meeting_skill.id, "name": _forced_meeting_skill.name}
     elif not is_question:
+        # คิดคะแนนจาก "ข้อความที่ผู้ใช้พิมพ์" เท่านั้น (ไม่เอาเนื้อหาไฟล์/OCR รูปมาตัดสิน
+        # ไม่งั้นเนื้อในไฟล์จะดึงไป skill ผิด) — แต่ตอนรัน skill ยังส่ง effective_message ที่มีไฟล์ไปด้วย
+        _score_basis = req.message or ""
         scored = sorted(
-            [(s, _score_skill_for_autorun(effective_message, s)) for s in user_skills],
+            [(s, _score_skill_for_autorun(_score_basis, s)) for s in user_skills],
             key=lambda x: x[1], reverse=True
         )
         if scored and scored[0][1] >= _AUTO_RUN_THRESHOLD:
