@@ -950,58 +950,83 @@ def _doc_object_prefix(owner: str, source: str, doc_id: int) -> str:
     return f"{source or 'chat'}/{slug}/{now.year}/{now.month:02d}/doc{doc_id}"
 
 
+def _store_doc_image(doc_id: int, page: int, obj: str, ct: str, caption: str, surrounding: str) -> bool:
+    """embed caption+surrounding แล้ว insert document_images (1 record)"""
+    emb = _embed_texts([f"{caption}\n{surrounding}"[:4000]])
+    emb_val = _vec_literal(emb[0]) if emb else None
+    try:
+        with engine.connect() as conn:
+            if emb_val:
+                conn.execute(_sql_text(
+                    "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding,embedding) "
+                    "VALUES (:d,:p,:o,:ct,:cap,:s,CAST(:e AS vector))"),
+                    {"d": doc_id, "p": page, "o": obj, "ct": ct, "cap": caption, "s": surrounding, "e": emb_val})
+            else:
+                conn.execute(_sql_text(
+                    "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding) "
+                    "VALUES (:d,:p,:o,:ct,:cap,:s)"),
+                    {"d": doc_id, "p": page, "o": obj, "ct": ct, "cap": caption, "s": surrounding})
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"store_doc_image failed: {e}", flush=True)
+        return False
+
+
 def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                            owner: str = "", source: str = "chat"):
-    """แยกรูปจาก PDF → MinIO + vision caption + embed → document_images (bg)"""
+    """จับภาพจาก PDF → MinIO + vision caption + embed:
+    (A) รูปฝัง raster ที่ใหญ่จริง (ภาพถ่าย/ใบรับรอง — ข้าม decorative)
+    (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ เช่น Figure flow) → render หน้าเป็นรูปแล้ว vision ถอดตัวเลข"""
     if not _IS_PG or mime != "application/pdf":
         return
     try:
         import pymupdf
         doc = pymupdf.open(str(pdf_path))
         _prefix = _doc_object_prefix(owner, source, doc_id)
-        count = 0
+        n_raster, n_page = 0, 0
+        RASTER_CAP, PAGE_CAP = 25, 35     # งบ vision รวม ~60
         for pno in range(len(doc)):
-            if count >= 60:
+            if n_raster >= RASTER_CAP and n_page >= PAGE_CAP:
                 break
             page = doc[pno]
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
-            for img in page.get_images(full=True):
-                if count >= 60:
-                    break
-                xref = img[0]
+            # (A) รูปฝัง raster ใหญ่จริง (>=20KB, >=250px) → ข้ามโลโก้/ไอคอน/ภาพประดับ
+            if n_raster < RASTER_CAP:
+                for img in page.get_images(full=True):
+                    if n_raster >= RASTER_CAP:
+                        break
+                    xref = img[0]
+                    try:
+                        base = doc.extract_image(xref)
+                    except Exception:
+                        continue
+                    data, ext = base.get("image"), base.get("ext", "png")
+                    if not data or len(data) < 20000 or base.get("width", 0) < 250 or base.get("height", 0) < 250:
+                        continue
+                    obj = f"{_prefix}/p{pno+1}_{xref}.{ext}"
+                    if _minio_put(obj, data, f"image/{ext}"):
+                        cap = _image_bytes_to_caption(data, ext)
+                        if _store_doc_image(doc_id, pno + 1, obj, f"image/{ext}", cap, page_text):
+                            n_raster += 1
+            # (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ) → render ทั้งหน้าแล้ว vision
+            if n_page < PAGE_CAP:
                 try:
-                    base = doc.extract_image(xref)
+                    ndraw = len(page.get_drawings())
                 except Exception:
-                    continue
-                data, ext = base.get("image"), base.get("ext", "png")
-                if not data or len(data) < 3000 or base.get("width", 0) < 100 or base.get("height", 0) < 100:
-                    continue  # ข้ามไอคอน/โลโก้เล็ก
-                obj = f"{_prefix}/p{pno+1}_{xref}.{ext}"
-                if not _minio_put(obj, data, f"image/{ext}"):
-                    continue
-                cap = _image_bytes_to_caption(data, ext)
-                emb = _embed_texts([f"{cap}\n{page_text}"[:4000]])
-                emb_val = _vec_literal(emb[0]) if emb else None
-                try:
-                    with engine.connect() as conn:
-                        if emb_val:
-                            conn.execute(_sql_text(
-                                "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding,embedding) "
-                                "VALUES (:d,:p,:o,:ct,:cap,:s,CAST(:e AS vector))"),
-                                {"d": doc_id, "p": pno + 1, "o": obj, "ct": f"image/{ext}",
-                                 "cap": cap, "s": page_text, "e": emb_val})
-                        else:
-                            conn.execute(_sql_text(
-                                "INSERT INTO document_images (document_id,page_number,minio_object,content_type,caption,surrounding) "
-                                "VALUES (:d,:p,:o,:ct,:cap,:s)"),
-                                {"d": doc_id, "p": pno + 1, "o": obj, "ct": f"image/{ext}",
-                                 "cap": cap, "s": page_text})
-                        conn.commit()
-                    count += 1
-                except Exception as _ie:
-                    print(f"insert image failed: {_ie}", flush=True)
-        if count:
-            print(f"indexed {count} images for doc {doc_id}", flush=True)
+                    ndraw = 0
+                if ndraw >= 60:   # หน้ากราฟ/แผนภาพ มักมีเส้น/กล่องเยอะ (หน้า text ปกติน้อย)
+                    try:
+                        pix = page.get_pixmap(dpi=130)
+                        data = pix.tobytes("png")
+                        obj = f"{_prefix}/page{pno+1}.png"
+                        if _minio_put(obj, data, "image/png"):
+                            cap = _image_bytes_to_caption(data, "png")
+                            if _store_doc_image(doc_id, pno + 1, obj, "image/png", cap, page_text):
+                                n_page += 1
+                    except Exception as _pe:
+                        print(f"render page {pno+1} failed: {_pe}", flush=True)
+        print(f"indexed images doc {doc_id}: {n_raster} raster + {n_page} diagram pages", flush=True)
     except Exception as e:
         print(f"index_document_images failed: {e}", flush=True)
 
