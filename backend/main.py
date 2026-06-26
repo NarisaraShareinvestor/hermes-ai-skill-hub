@@ -923,7 +923,7 @@ def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
         _e = ext.lower()
         mime = "image/jpeg" if _e in ("jpg", "jpeg") else f"image/{_e}"
         resp = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=300, temperature=0.2,
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=1200, temperature=0.2,
             messages=[{"role": "user", "content": [
                 {"type": "text", "text":
                     "อธิบายรูปนี้เป็นภาษาไทยสั้นๆ และ**ถอดตัวเลข/คะแนน/ป้าย/ชื่อที่ปรากฏในรูปออกมาให้ครบและเป๊ะ** "
@@ -1017,7 +1017,7 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                     ndraw = 0
                 if ndraw >= 60:   # หน้ากราฟ/แผนภาพ มักมีเส้น/กล่องเยอะ (หน้า text ปกติน้อย)
                     try:
-                        pix = page.get_pixmap(dpi=130)
+                        pix = page.get_pixmap(dpi=160)
                         data = pix.tobytes("png")
                         obj = f"{_prefix}/page{pno+1}.png"
                         if _minio_put(obj, data, "image/png"):
@@ -1046,7 +1046,7 @@ def _search_images(doc_id: int, query: str, k: int = 3) -> list:
                 "ORDER BY dist ASC LIMIT :k"),
                 {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall()
         return [{"id": r[0], "page": r[1], "caption": r[2]}
-                for r in rows if r[3] is not None and float(r[3]) < 0.55]
+                for r in rows if r[3] is not None and float(r[3]) < 0.72]
     except Exception as e:
         print(f"search_images failed: {e}", flush=True)
         return []
