@@ -642,20 +642,167 @@ _FILE_TEXT_MAX_CHARS = 30000
 # เก็บเนื้อหาเต็มไฟล์ (เพื่อ download .md + RAG) — เผื่อ IR doc เกือบ 1000 หน้า (~5M ตัวอักษร)
 _DOC_MAX_CHARS = 5_000_000
 
+# ── PDF → Markdown แบบ hybrid (ฟรีเป็นหลัก + vision เฉพาะหน้าที่พัง) ────────────
+# pymupdf4llm ฟรีแต่กับ PDF ดีไซน์/สไลด์ จะได้ markdown พัง (หัวข้อแตก ประโยคขาด ตารางแบน
+# ตัวเลขติดกัน) — เราจึง (1) cleanup ในเครื่องทุกหน้า (ฟรี) แล้ว (2) ส่งเฉพาะหน้าที่ตรวจว่า
+# "พัง" ไป vision LLM แปลงใหม่ → ได้คุณภาพสูงโดยจ่ายเฉพาะหน้าที่จำเป็น (คุม cost)
+_PDF_VISION_MD        = os.getenv("PDF_VISION_MD", "1") != "0"      # ปิดด้วย PDF_VISION_MD=0
+_PDF_VISION_MAX_PAGES = int(os.getenv("PDF_VISION_MAX_PAGES", "40"))  # เพดานจำนวนหน้า vision/เอกสาร
+_PDF_VISION_DPI       = int(os.getenv("PDF_VISION_DPI", "130"))     # render ปานกลางพอให้ vision อ่านออก
+# หน้าที่ถูกแปลงด้วย vision แล้ว (path → set(page_no)) ให้ image indexer ข้าม ไม่ caption ซ้ำ
+_VISION_MD_PAGES: dict = {}
 
-def _pdf_to_markdown(path: pathlib.Path) -> str:
-    """PDF → Markdown มีโครงสร้าง (หัวข้อ/ตาราง/bullet) + marker [หน้า N] ทุกหน้า
-    ใช้ pymupdf4llm; ถ้าพังให้ fallback เป็น pypdf (text เปล่า)"""
+
+def _has_openai_key() -> bool:
+    k = os.getenv("OPENAI_API_KEY", "")
+    return bool(k) and "your_openai" not in k
+
+
+def _clean_page_md(txt: str) -> str:
+    """ทำความสะอาด markdown ต่อหน้าจาก pymupdf4llm (ฟรี ในเครื่อง):
+    - ทิ้งเส้นคั่น ----- ที่ไม่มีความหมาย
+    - ยุบ heading level ที่ pymupdf เดาจาก font (เละ ##→######) ให้เหลือ 3 ระดับ
+    - ต่อ 'เศษบรรทัด' ที่ถูกตัด (pymupdf ใส่ช่องว่างนำหน้า) กลับเข้าบรรทัดเดิม
+    - ยุบบรรทัดว่างซ้อน"""
+    import re
+    out = []
+    for raw in txt.split("\n"):
+        s = raw.strip()
+        if not s:
+            out.append("")
+            continue
+        if re.fullmatch(r"-{3,}", s):           # เส้นคั่นหน้า/horizontal rule → ทิ้ง
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*)$", s)
+        if m:
+            lvl = len(m.group(1))
+            new = 2 if lvl <= 3 else (3 if lvl == 4 else 4)   # 1-3→## 4→### 5-6→####
+            out.append(f'{"#" * new} {m.group(2).strip()}')
+            continue
+        # เศษต่อบรรทัด: pymupdf4llm ขึ้นบรรทัดใหม่ + เว้นวรรคนำ เมื่อข้อความ wrap → ต่อกลับ
+        if raw[:1] == " " and out:
+            j = len(out) - 1
+            while j >= 0 and out[j] == "":
+                j -= 1
+            if j >= 0 and not out[j].startswith("#"):
+                out[j] = out[j].rstrip() + " " + s
+                continue
+        out.append(s)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
+def _page_md_is_damaged(md: str) -> bool:
+    """ตรวจว่า markdown ของหน้านี้ 'พัง' พอที่จะคุ้มส่ง vision แปลงใหม่หรือไม่
+    (ออกแบบให้ conservative: หน้า prose ปกติจะไม่ติด → ไม่เสีย cost)"""
+    import re
+    nb = [l.strip() for l in md.split("\n") if l.strip()]
+    if len(nb) < 3:
+        return False
+    # (1) ขยะจากข้อความกราฟิก: บรรทัดที่เต็มไปด้วย token ตัวเดียว เช่น "l S (S h i th)"
+    for l in nb:
+        t = l.split()
+        if len(t) >= 6 and sum(1 for x in t if len(x) == 1) / len(t) > 0.5:
+            return True
+    # (2) ตารางถูกแบน: หลายบรรทัดลงท้ายด้วยตัวเลข เช่น "Indexability 38"
+    if sum(1 for l in nb if not l.startswith("#") and re.search(r"\S\s+\d{1,4}$", l)) >= 4:
+        return True
+    # (3) หัวข้อขาดกลาง: heading ที่วงเล็บไม่ปิด/ลงท้ายด้วย "("
+    for l in nb:
+        if l.startswith("#") and (l.rstrip().endswith("(") or l.count("(") > l.count(")")):
+            return True
+    # (4) หัวข้อแตกเป็นเศษ: สัดส่วน heading ต่อบรรทัดสูงผิดปกติ
+    heads = sum(1 for l in nb if l.startswith("#"))
+    if len(nb) >= 6 and heads / len(nb) > 0.5:
+        return True
+    return False
+
+
+def _page_is_visual_only(page) -> bool:
+    """หน้าที่แทบไม่มี text แต่มีรูป/เส้นเยอะ (สแกน/หน้ากราฟิกล้วน) → ต้องพึ่ง vision"""
+    try:
+        if len((page.get_text() or "").strip()) > 40:
+            return False
+        return bool(page.get_images(full=True)) or len(page.get_drawings()) > 20
+    except Exception:
+        return False
+
+
+def _vision_page_to_markdown(png_bytes: bytes) -> str:
+    """ส่งภาพ render ของหน้า PDF ไป vision LLM แล้วถอดเป็น markdown สะอาด (faithful)"""
+    if not _has_openai_key():
+        return ""
+    _saved = {k: os.environ.pop(k, None) for k in ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']}
+    try:
+        import base64, re
+        from openai import OpenAI
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+        b64 = base64.b64encode(png_bytes).decode()
+        resp = client.chat.completions.create(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=2000, temperature=0,
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text":
+                    "ถอดเนื้อหาในหน้าเอกสารนี้เป็น GitHub-flavored Markdown ที่สะอาด ตามกติกา:\n"
+                    "- คงภาษาเดิม (ไทย/อังกฤษ) ตามต้นฉบับเป๊ะ ห้ามแปล\n"
+                    "- เก็บตัวเลข คะแนน ป้าย ชื่อ ทุกตัวให้ครบและถูกต้อง\n"
+                    "- ข้อมูลที่เป็นตาราง ให้ทำเป็นตาราง Markdown\n"
+                    "- ใช้ # ## ### เฉพาะหัวข้อจริง รวมข้อความที่ถูกตัดข้ามบรรทัดให้เป็นย่อหน้าเดียว\n"
+                    "- ห้ามเพิ่ม สรุป หรือแต่งเนื้อหาที่ไม่มีในหน้า\n"
+                    "- ตอบเป็น markdown ล้วน ไม่ต้องมี code fence หรือคำอธิบายใดๆ ถ้าหน้านี้ว่าง/เป็นภาพประดับล้วนให้ตอบว่าง"},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+            ]}])
+        md = (resp.choices[0].message.content or "").strip()
+        # กัน LLM ห่อ code fence มา
+        md = re.sub(r"^```(?:markdown)?\s*|\s*```$", "", md).strip() if md else md
+        return md
+    except Exception as e:
+        print(f"vision page->md failed: {e}", flush=True)
+        return ""
+    finally:
+        for k, v in _saved.items():
+            if v is not None:
+                os.environ[k] = v
+
+
+def _pdf_to_markdown(path: pathlib.Path, allow_vision: bool = True) -> str:
+    """PDF → Markdown แบบ hybrid + marker [หน้า N] ทุกหน้า:
+    1) pymupdf4llm ต่อหน้า (ฟรี) → cleanup ในเครื่อง (ต่อบรรทัด/ยุบ heading/ทิ้งเส้นคั่น)
+    2) หน้าไหน 'พัง' (ตาราง/หัวข้อขาด/ขยะ) หรือเป็นภาพล้วน → ส่ง vision LLM แปลงใหม่ (คุมเพดาน)
+    ถ้าทั้งหมดพังให้ fallback เป็น pypdf (text เปล่า)
+    allow_vision: เปิด vision ได้เฉพาะ background (bg index/RAG); path แบบ sync (inject เข้า prompt)
+    ต้องปิด ไม่งั้น vision หลายหน้า = ช้าเกิน Cloudflare timeout 524 (ดู _extract_text)"""
     try:
         import pymupdf, pymupdf4llm
         doc = pymupdf.open(str(path))
         pages = pymupdf4llm.to_markdown(doc, page_chunks=True, show_progress=False)
-        parts = []
+        vision_ok = allow_vision and _PDF_VISION_MD and _has_openai_key()
+        n_vision, vision_pages, parts = 0, [], []
         for i, pg in enumerate(pages):
             txt = (pg.get("text") if isinstance(pg, dict) else str(pg)) or ""
-            txt = txt.strip()
-            if txt:
-                parts.append(f"[หน้า {i+1}]\n{txt}")
+            cleaned = _clean_page_md(txt)
+            need_vision = vision_ok and n_vision < _PDF_VISION_MAX_PAGES and (
+                _page_md_is_damaged(cleaned) or
+                (not cleaned.strip() and _page_is_visual_only(doc[i])))
+            if need_vision:
+                try:
+                    pix = doc[i].get_pixmap(dpi=_PDF_VISION_DPI)
+                    # คุมขนาดภาพ: vision จะ scale ลงเหลือ longest ~2048 อยู่แล้ว ส่งใหญ่กว่านั้น = เปลือง
+                    if max(pix.width, pix.height) > 2048:
+                        sc = 2048 / max(pix.width, pix.height)
+                        pix = doc[i].get_pixmap(matrix=pymupdf.Matrix(_PDF_VISION_DPI / 72 * sc,
+                                                                      _PDF_VISION_DPI / 72 * sc))
+                    vmd = _vision_page_to_markdown(pix.tobytes("png"))
+                except Exception as _ve:
+                    print(f"vision render page {i+1} failed: {_ve}", flush=True)
+                    vmd = ""
+                if vmd.strip():
+                    cleaned = vmd.strip()
+                    n_vision += 1
+                    vision_pages.append(i + 1)
+            if cleaned.strip():
+                parts.append(f"[หน้า {i+1}]\n{cleaned}")
+        if vision_pages:
+            _VISION_MD_PAGES[str(path)] = set(vision_pages)
+            print(f"pdf vision-md: {n_vision} page(s) re-extracted via vision: {vision_pages}", flush=True)
         md = "\n\n".join(parts).strip()
         if md:
             return md
@@ -672,12 +819,13 @@ def _pdf_to_markdown(path: pathlib.Path) -> str:
     return "\n\n".join(pages)
 
 
-def _extract_markdown_full(path: pathlib.Path, mime: str) -> str:
+def _extract_markdown_full(path: pathlib.Path, mime: str, allow_vision: bool = True) -> str:
     """ดึงเนื้อหา 'เต็มไฟล์' เป็น markdown/text (cap _DOC_MAX_CHARS) — ใช้เก็บลง documents + RAG
-    เป็น core extractor; _extract_text เป็น wrapper ที่ตัดสั้นลงสำหรับ inject เข้า prompt"""
+    เป็น core extractor; _extract_text เป็น wrapper ที่ตัดสั้นลงสำหรับ inject เข้า prompt
+    allow_vision: ส่งต่อให้ _pdf_to_markdown (default True = bg; sync path ต้องส่ง False)"""
     try:
         if mime == "application/pdf":
-            return _pdf_to_markdown(path)[:_DOC_MAX_CHARS]
+            return _pdf_to_markdown(path, allow_vision=allow_vision)[:_DOC_MAX_CHARS]
         if mime in ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     "application/msword"):
             import docx as _docx
@@ -703,8 +851,10 @@ def _extract_markdown_full(path: pathlib.Path, mime: str) -> str:
 
 
 def _extract_text(path: pathlib.Path, mime: str) -> str:
-    """เนื้อหาไฟล์แบบตัดสั้น (สำหรับ inject เข้า prompt) — wrapper ของ _extract_markdown_full"""
-    return _extract_markdown_full(path, mime)[:_FILE_TEXT_MAX_CHARS]
+    """เนื้อหาไฟล์แบบตัดสั้น (สำหรับ inject เข้า prompt) — wrapper ของ _extract_markdown_full
+    ปิด vision (allow_vision=False): path นี้ sync ใน request (skill run/analyze/meeting) +
+    ตัดเหลือ 30k อยู่แล้ว → ไม่คุ้มเสี่ยง vision หลายหน้าทำ request timeout"""
+    return _extract_markdown_full(path, mime, allow_vision=False)[:_FILE_TEXT_MAX_CHARS]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -764,7 +914,7 @@ def _chunk_markdown(md: str, max_chars: int = 2000) -> list:
             if not cur["page_start"]:
                 cur["page_start"] = cur_page
             continue
-        mh = re.match(r"^(#{1,2})\s+(.+)", ln)
+        mh = re.match(r"^(#{1,3})\s+(.+)", ln)  # cleanup ยุบ heading เหลือ ##/###/#### → ตัด chunk ที่ #-### (รวม ## หัวข้อหลัก, ### หัวข้อย่อย/ประเด็น)
         if mh:
             _flush(cur_page)
             cur = {"heading": mh.group(2).strip(), "level": len(mh.group(1)),
@@ -985,11 +1135,17 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
         doc = pymupdf.open(str(pdf_path))
         _prefix = _doc_object_prefix(owner, source, doc_id)
         n_raster, n_page = 0, 0
-        RASTER_CAP, PAGE_CAP = 25, 35     # งบ vision รวม ~60
+        # ลด cap (เดิม 25/35 ~60 vision/เอกสาร) ตั้งผ่าน env ได้
+        RASTER_CAP = int(os.getenv("DOC_IMG_RASTER_CAP", "10"))
+        PAGE_CAP   = int(os.getenv("DOC_IMG_PAGE_CAP", "12"))
+        # หน้าที่ _pdf_to_markdown ถอดด้วย vision ไปแล้ว → ไม่ต้อง caption ซ้ำ (กันจ่าย vision 2 รอบ)
+        _vpages = _VISION_MD_PAGES.pop(str(pdf_path), set())
         for pno in range(len(doc)):
             if n_raster >= RASTER_CAP and n_page >= PAGE_CAP:
                 break
             page = doc[pno]
+            if (pno + 1) in _vpages:          # หน้านี้ถูก vision แปลงเป็น markdown ครบแล้ว
+                continue
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
             # (A) รูปฝัง raster ใหญ่จริง (>=20KB, >=250px) → ข้ามโลโก้/ไอคอน/ภาพประดับ
             if n_raster < RASTER_CAP:

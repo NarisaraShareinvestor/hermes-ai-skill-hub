@@ -96,3 +96,9 @@ secrets/
 pass.md/
 ssl/
 *.bak
+
+# heavy/local artifacts (added 2026-06-28)
+result/
+tools/docling/.venv/
+tools/docling/*.log
+tools/docling/hf_cache/
