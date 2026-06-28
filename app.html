@@ -5335,8 +5335,8 @@ async function _pollDocReady(docId, tries) {
       if (s.status === 'failed') { _renderDocBox(docId, '❌ ประมวลผลเอกสารไม่สำเร็จ'); return; }
     }
   } catch (e) { /* retry */ }
-  if (tries < 80) setTimeout(() => _pollDocReady(docId, tries + 1), 3000);  // ~4 นาที
-  else _renderDownloadBtn(docId);  // timeout → โชว์ปุ่มไว้ (กดแล้วเช็คอีกที)
+  if (tries < 160) setTimeout(() => _pollDocReady(docId, tries + 1), 3000);  // ~8 นาที (เอกสาร 200+ หน้า embedding/vision นาน)
+  else _renderDownloadBtn(docId);  // timeout → โชว์ปุ่มไว้ (กดแล้วเช็คอีกที, downloadMd กัน 409 อยู่แล้ว)
 }
 
 function _renderDocBox(docId, html) {

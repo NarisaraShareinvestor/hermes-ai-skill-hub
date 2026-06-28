@@ -1269,9 +1269,22 @@ def _search_images(doc_id: int, query: str, k: int = 3) -> list:
 
 def _process_document_bg(doc_id: int, md: str, pdf_path: str, mime: str,
                          owner: str = "", source: str = "chat"):
-    """งาน background หลังอัปไฟล์: index chunks + รูป"""
+    """งาน background หลังอัปไฟล์ (ไฟล์เล็ก non-PDF): index chunks + รูป แล้วค่อย mark ready
+    → ปุ่มดาวน์โหลด/RAG โผล่หลัง embedding เสร็จ (เหมือน path PDF)"""
     _index_document(doc_id, md)
     _index_document_images(doc_id, pdf_path, mime, owner, source)
+    try:
+        from database import SessionLocal
+        db = SessionLocal()
+        try:
+            doc = db.query(Document).filter(Document.id == doc_id).first()
+            if doc and doc.status != "failed":
+                doc.status = "ready"
+                db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"process_document_bg mark-ready failed: {e}", flush=True)
 
 
 def _pdf_quick_text(path: pathlib.Path, max_pages: int = 12):
@@ -1307,14 +1320,26 @@ def _process_document_full_bg(doc_id: int, pdf_path: str, mime: str,
                 if readable:
                     doc.md_text = full
                     doc.page_count = full.count("[หน้า ")
-                doc.status = "ready" if readable else "failed"
+                    doc.status = "indexing"   # md เสร็จแล้วแต่ embedding/รูปยังไม่เสร็จ → ยังไม่โชว์ปุ่ม
+                else:
+                    doc.status = "failed"
                 db.commit()
         finally:
             db.close()
         if readable:
+            # ต้องทำ embedding (RAG) + index รูป ให้ 'เสร็จก่อน' แล้วค่อย mark ready
+            # ไม่งั้นปุ่มดาวน์โหลด/ตอบ follow-up โผล่ทั้งที่ค้นยังไม่ได้
             _index_document(doc_id, full)
             _index_document_images(doc_id, pdf_path, mime, owner, source)
-            print(f"full-processed doc {doc_id} ({full.count('[หน้า ')} pages)", flush=True)
+            db2 = SessionLocal()
+            try:
+                doc = db2.query(Document).filter(Document.id == doc_id).first()
+                if doc:
+                    doc.status = "ready"      # ครบทุกอย่าง (md + embedding + รูป) → frontend โชว์ปุ่มได้
+                    db2.commit()
+            finally:
+                db2.close()
+            print(f"full-processed doc {doc_id} ({full.count('[หน้า ')} pages) — md+index+images ready", flush=True)
     except Exception as e:
         print(f"process_document_full_bg failed: {e}", flush=True)
 
@@ -1506,8 +1531,9 @@ def document_status(doc_id: int, db: Session = Depends(get_db)):
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(404, "ไม่พบเอกสาร")
+    # ready = ผ่านครบ md+embedding+รูป (status='ready') เท่านั้น → frontend โชว์ปุ่มดาวน์โหลด
     return {"id": doc.id, "status": doc.status,
-            "ready": bool(doc.md_text), "page_count": doc.page_count}
+            "ready": doc.status == "ready", "page_count": doc.page_count}
 
 
 @app.get("/api/documents/images/{image_id}")
@@ -2120,7 +2146,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                     try:
                         _doc = Document(owner_email=req.user_email, original_name=_f.original_name,
                                         md_text=_full, page_count=_full.count("[หน้า "),
-                                        source="chat", status="ready")
+                                        source="chat", status="processing")  # → 'ready' หลัง embedding ใน bg
                         db.add(_doc); db.commit(); db.refresh(_doc)
                         _doc_id = _doc.id
                         _th.Thread(target=_process_document_bg,
