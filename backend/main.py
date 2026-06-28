@@ -962,6 +962,56 @@ def _index_document(doc_id: int, md: str):
         print(f"index_document failed: {e}", flush=True)
 
 
+# ── Query expansion: เติมศัพท์ค้นหา (โดยเฉพาะข้ามภาษา ไทย→อังกฤษ) ──────────────
+# วัดจริง: คำถามไทยล้วน "สรุปข้อมูลทางการเงิน" บนเอกสารอังกฤษ → recall@k=6 เพียง 71%
+# (chunk งบการเงินอยู่ rank 7 = พลาด). เติมศัพท์อังกฤษ → recall 100% เพราะช่วยทั้ง
+# keyword branch (เดิมว่างเพราะไม่มี token อังกฤษ) + vector (cross-lingual match ดีขึ้น)
+_RAG_LLM_EXPAND = os.getenv("RAG_LLM_EXPAND", "1") != "0"   # ปิด LLM expansion = 0 (เหลือ map ฟรี)
+# map ฟรี: ศัพท์ไทยที่พบบ่อยในเอกสารธุรกิจ/การเงิน/SEO → คำค้นอังกฤษที่มักอยู่ในเอกสารจริง
+_EXPAND_MAP = {
+    "การเงิน": "financial revenue profit assets EBITDA",
+    "รายได้": "total revenue sales income", "ยอดขาย": "sales revenue",
+    "กำไร": "net profit income earnings margin", "ขาดทุน": "loss",
+    "สินทรัพย์": "total assets", "หนี้สิน": "total liabilities", "ทุน": "equity capital",
+    "ส่วนของผู้ถือหุ้น": "total equity shareholders", "เงินปันผล": "dividend",
+    "กระแสเงินสด": "cash flow", "งบการเงิน": "financial statement balance sheet income",
+    "ผลประกอบการ": "financial performance results revenue net profit EBITDA",
+    "ผลการดำเนินงาน": "operating performance results",
+    "อัตราส่วน": "ratio", "ต้นทุน": "cost expense", "ภาษี": "tax",
+    "ผู้บริหาร": "management executives directors", "คณะกรรมการ": "board of directors",
+    "ความเสี่ยง": "risk", "กลยุทธ์": "strategy", "ความยั่งยืน": "sustainability ESG",
+    "ปันผล": "dividend", "หุ้น": "share stock", "ลงทุน": "investment capex",
+}
+
+
+def _expand_query(q: str) -> str:
+    """คืน query ที่เติมศัพท์ค้นหา (ของเดิม + คำพ้อง/คำข้ามภาษา) — ใช้ทั้ง keyword & vector
+    1) map ฟรี (instant) 2) LLM expansion (gpt-4o-mini, ถูกมาก ~$0.0001) ถ้าเปิด+มี key"""
+    if not q:
+        return q
+    extra = [v for k, v in _EXPAND_MAP.items() if k in q]
+    if _RAG_LLM_EXPAND and _has_openai_key():
+        _saved = {k: os.environ.pop(k, None) for k in ['ALL_PROXY', 'all_proxy', 'FTP_PROXY', 'ftp_proxy']}
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+            resp = client.chat.completions.create(
+                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=80, temperature=0,
+                messages=[{"role": "user", "content":
+                    "ผู้ใช้กำลังค้นหาในเอกสาร. จากคำถามนี้ ให้คำค้น (keywords/วลี) ที่น่าจะปรากฏ"
+                    "ในเอกสารต้นฉบับ ทั้งภาษาไทยและอังกฤษ คั่นด้วยจุลภาค ตอบเฉพาะคำค้น ห้ามอธิบาย:\n" + q}])
+            terms = (resp.choices[0].message.content or "").strip().replace("\n", " ")
+            if terms:
+                extra.append(terms)
+        except Exception as e:
+            print(f"query expand failed: {e}", flush=True)
+        finally:
+            for k, v in _saved.items():
+                if v is not None:
+                    os.environ[k] = v
+    return (q + " " + " ".join(extra)).strip() if extra else q
+
+
 def _search_chunks(doc_id: int, query: str, k: int = 12) -> list:
     """Hybrid: pgvector cosine + keyword (ILIKE) สำหรับคำอังกฤษ/ตัวเลขในคำถาม
     (เอกสารอังกฤษ + ถามไทย → vector อ่อน; keyword ช่วยจับคำอังกฤษที่ผู้ใช้พิมพ์ เช่น S&P, Assessment)"""
@@ -969,6 +1019,7 @@ def _search_chunks(doc_id: int, query: str, k: int = 12) -> list:
         return []
     import re
     out, seen = [], set()
+    eq = _expand_query(query)   # เติมศัพท์ค้นหา (ข้ามภาษา) → ใช้ทั้ง keyword + vector
 
     def _add(rows):
         for r in rows:
@@ -978,10 +1029,13 @@ def _search_chunks(doc_id: int, query: str, k: int = 12) -> list:
             out.append({"heading": r[1], "page_start": r[2], "page_end": r[3], "content": r[4]})
 
     try:
-        # 1) keyword: token อังกฤษ/ตัวเลข (>=3 ตัว) — ให้คะแนนตามจำนวนคำที่ match
+        # 1) keyword: token อังกฤษ/ตัวเลข (>=3 ตัว) จาก query ที่ขยายแล้ว — ให้คะแนนตามจำนวนคำ match
         #    (chunk ที่ตรงหลายคำมาก่อน ไม่งั้น token ทั่วไป เช่น 2026/crude จะดึง chunk มั่ว)
-        toks = [t for t in re.findall(r"[A-Za-z0-9&]{3,}", query)
-                if t.lower() not in ("score", "the", "and", "for", "report", "page", "ปี")][:8]
+        toks = []
+        for t in re.findall(r"[A-Za-z0-9&]{3,}", eq):
+            if t.lower() not in ("score", "the", "and", "for", "report", "page", "ปี") and t not in toks:
+                toks.append(t)
+        toks = toks[:10]
         if toks:
             score_sql = " + ".join(f"(content ILIKE :t{i})::int" for i in range(len(toks)))
             conds = " OR ".join(f"content ILIKE :t{i}" for i in range(len(toks)))
@@ -992,8 +1046,8 @@ def _search_chunks(doc_id: int, query: str, k: int = 12) -> list:
                     f"SELECT id,heading,page_start,page_end,content FROM document_chunks "
                     f"WHERE document_id=:d AND ({conds}) ORDER BY ({score_sql}) DESC LIMIT 8"),
                     params).fetchall())
-        # 2) vector
-        qe = _embed_texts([query])
+        # 2) vector (embed query ที่ขยายแล้ว → cross-lingual match ดีขึ้น)
+        qe = _embed_texts([eq])
         if qe:
             with engine.connect() as conn:
                 _add(conn.execute(_sql_text(
@@ -1187,11 +1241,16 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
         print(f"index_document_images failed: {e}", flush=True)
 
 
+# threshold cosine distance ของรูป: เดิม 0.72 หลวมเกิน (≈ similarity แค่ 0.28) → ดึงรูปตึก/
+# ภาพมืดที่ไม่เกี่ยวมาตอบคำถามการเงิน. 0.58 = เข้มขึ้น โชว์เฉพาะที่เกี่ยวจริง (ตั้งผ่าน env ได้)
+_IMG_MATCH_MAX_DIST = float(os.getenv("IMG_MATCH_MAX_DIST", "0.58"))
+
+
 def _search_images(doc_id: int, query: str, k: int = 3) -> list:
-    """ค้นรูปที่เกี่ยวกับคำถาม (embedding ของ caption+surrounding) — คืนเฉพาะที่ใกล้พอ"""
+    """ค้นรูปที่เกี่ยวกับคำถาม (embedding ของ caption+surrounding) — คืนเฉพาะที่ใกล้พอจริง"""
     if not _IS_PG or not query:
         return []
-    qe = _embed_texts([query])
+    qe = _embed_texts([_expand_query(query)])   # ขยาย query เหมือน text → caption match แม่นขึ้น
     if not qe:
         return []
     try:
@@ -1202,7 +1261,7 @@ def _search_images(doc_id: int, query: str, k: int = 3) -> list:
                 "ORDER BY dist ASC LIMIT :k"),
                 {"q": _vec_literal(qe[0]), "d": doc_id, "k": k}).fetchall()
         return [{"id": r[0], "page": r[1], "caption": r[2]}
-                for r in rows if r[3] is not None and float(r[3]) < 0.72]
+                for r in rows if r[3] is not None and float(r[3]) < _IMG_MATCH_MAX_DIST]
     except Exception as e:
         print(f"search_images failed: {e}", flush=True)
         return []
@@ -1886,7 +1945,7 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
             _ctx = ""
             # RAG: ถ้ามี doc_id + index แล้ว → ดึงเฉพาะท่อนที่เกี่ยวกับคำถาม (รองรับไฟล์ใหญ่)
             if _doc_id_mem and req.message:
-                _hits = _search_chunks(_doc_id_mem, req.message, k=6)
+                _hits = _search_chunks(_doc_id_mem, req.message, k=12)  # 6→12: คำถามกว้าง/ข้ามภาษา ต้องการ recall สูงขึ้น (วัดแล้ว 71%→100%)
                 if _hits:
                     _ctx = "\n\n".join(
                         f"[หน้า {h['page_start']}{'-'+str(h['page_end']) if h['page_end']!=h['page_start'] else ''}]"
