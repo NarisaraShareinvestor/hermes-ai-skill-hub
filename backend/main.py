@@ -1118,8 +1118,10 @@ def _minio_get(obj: str) -> bytes:
         return b""
 
 
-def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
-    """อธิบายรูปสั้นๆ ด้วย vision (กราฟ/ตาราง/แผนภาพอะไร เกี่ยวกับอะไร)"""
+def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png", hint: str = "") -> str:
+    """อธิบายรูปสั้นๆ ด้วย vision (กราฟ/ตาราง/แผนภาพอะไร เกี่ยวกับอะไร).
+    hint = ข้อความจริงที่อยู่ในรูป (จาก PDF text layer) → ส่งให้ model ยึดเป็นหลัก
+    กัน hallucinate ชื่อ/ตัวเลข และให้ caption เริ่มด้วยหัวข้อจริงของรูป"""
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key or "your_openai" in api_key:
         return ""
@@ -1133,13 +1135,16 @@ def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
         b64 = base64.b64encode(img_bytes).decode()
         _e = ext.lower()
         mime = "image/jpeg" if _e in ("jpg", "jpeg") else f"image/{_e}"
+        prompt = ("อธิบายรูปนี้เป็นภาษาไทยสั้นๆ และ**ถอดตัวเลข/คะแนน/ป้าย/ชื่อที่ปรากฏในรูปออกมาให้ครบและเป๊ะ** "
+                  "(เช่น 'ใบรับรอง CSA Score 82/100, Top 1%, S&P Global, ปี 2025' หรือ 'กราฟรายได้ Q1-Q4: 1000/1037/...') "
+                  "ระบุว่าเป็นกราฟ/ตาราง/แผนภาพ/โลโก้/ใบรับรองอะไร เกี่ยวกับเรื่องใด — เน้นตัวเลขและข้อความจริงในรูป")
+        if hint and hint.strip():
+            prompt += ("\n\nข้อความจริงที่อยู่ในรูป (จาก text layer ของ PDF) ใช้ยึดเป็นหลัก ห้ามแต่งชื่อ/ตัวเลขเอง:\n"
+                       + hint.strip()[:800])
         resp = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=1200, temperature=0.2,
             messages=[{"role": "user", "content": [
-                {"type": "text", "text":
-                    "อธิบายรูปนี้เป็นภาษาไทยสั้นๆ และ**ถอดตัวเลข/คะแนน/ป้าย/ชื่อที่ปรากฏในรูปออกมาให้ครบและเป๊ะ** "
-                    "(เช่น 'ใบรับรอง CSA Score 82/100, Top 1%, S&P Global, ปี 2025' หรือ 'กราฟรายได้ Q1-Q4: 1000/1037/...') "
-                    "ระบุว่าเป็นกราฟ/ตาราง/แผนภาพ/โลโก้/ใบรับรองอะไร เกี่ยวกับเรื่องใด — เน้นตัวเลขและข้อความจริงในรูป"},
+                {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
             ]}])
         return (resp.choices[0].message.content or "").strip()
@@ -1335,6 +1340,39 @@ def _figure_clips(page):
             for g in groups[:3]]
 
 
+def _clip_title(page, clip) -> str:
+    """ดึง 'หัวข้อจริง' ของรูป/กราฟ จาก text layer ในแถบบนของ crop (ชื่อ section/Figure)
+    → ใช้นำหน้า caption + ใส่ใน embedding ให้ค้นเจอแม่น (เช่น 'Figure 5: Thai Economic Growth 2023-2025').
+    จับ 'Figure/Graph/Table N' + รวมบรรทัดบรรยายบนสุด 2 บรรทัด (รองรับ title ขึ้น 2 บรรทัด)"""
+    import re as _re
+    import pymupdf
+    try:
+        r = pymupdf.Rect(clip)
+        band = pymupdf.Rect(r.x0, r.y0, r.x1, r.y0 + 0.30 * r.height)
+        lines = []
+        for b in page.get_text("dict", clip=band).get("blocks", []):
+            for l in b.get("lines", []):
+                t = " ".join(s["text"] for s in l.get("spans", [])).strip()
+                if t:
+                    lines.append((round(l["bbox"][1]), t))
+        if not lines:
+            return ""
+        raw = " ".join(t for _, t in lines)
+        m = _re.search(r"(Figure|Graph|Table|Chart|Exhibit)\s*(\d+)", raw, _re.I)
+        fignum = f"{m.group(1).title()} {m.group(2)}" if m else ""
+        cands = []
+        for y, t in lines:
+            tc = _re.sub(r"(Figure|Graph|Table|Chart|Exhibit)\s*\d*", "", t, flags=_re.I).strip(" :-")
+            if sum(ch.isalpha() for ch in tc) >= 10 and len(tc.split()) >= 2:
+                cands.append((y, _re.sub(r"\s+", " ", tc).strip()))
+        cands.sort()
+        desc = " ".join(t for _, t in cands[:2]).strip()
+        title = (f"{fignum}: {desc}" if fignum and desc else desc or fignum)
+        return title[:140]
+    except Exception:
+        return ""
+
+
 def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                            owner: str = "", source: str = "chat"):
     """จับภาพจาก PDF → MinIO + vision caption + embed:
@@ -1382,7 +1420,7 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                         _cov = 0
                     if _cov >= 0.80:
                         continue
-                    cap = _image_bytes_to_caption(data, ext)
+                    cap = _image_bytes_to_caption(data, ext, hint=page_text)
                     if _caption_is_useless(cap):
                         continue
                     obj = f"{_prefix}/p{pno+1}_{xref}.{ext}"
@@ -1405,14 +1443,21 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                                 break
                             pix = page.get_pixmap(matrix=mtx, clip=clip)
                             data = pix.tobytes("png")
-                            cap = _image_bytes_to_caption(data, "png")
-                            if _caption_is_useless(cap):   # crop ว่าง/อ่านไม่ออก → ข้าม
-                                continue
-                            obj = f"{_prefix}/page{pno+1}_{ci}.png"
-                            # embed อิงข้อความเฉพาะใน crop (ตรงกับรูปมากกว่า text ทั้งหน้า)
+                            # ข้อความจริงใน crop → ใช้เป็น hint ให้ vision + ดึงหัวข้อจริงนำหน้า caption
                             clip_text = (page.get_text("text", clip=clip) or "").strip().replace("\n", " ")[:600] or page_text
+                            title = _clip_title(page, clip)
+                            cap = _image_bytes_to_caption(data, "png", hint=clip_text)
+                            # ถ้า vision อธิบายไม่ได้ แต่มีหัวข้อจริง = ยังเป็นรูปมีความหมาย (เก็บด้วยหัวข้อ)
+                            if _caption_is_useless(cap):
+                                if len(title) < 10:
+                                    continue
+                                cap = ""
+                            # caption สุดท้าย: 'หัวข้อจริง — คำอธิบาย vision' (หัวข้อมาก่อน frontend จะโชว์ชื่อถูก)
+                            caption = f"{title} — {cap}".strip(" —") if title else cap
+                            obj = f"{_prefix}/page{pno+1}_{ci}.png"
                             if _minio_put(obj, data, "image/png"):
-                                if _store_doc_image(doc_id, pno + 1, obj, "image/png", cap, clip_text):
+                                # embed = caption(มีหัวข้อ) + ข้อความใน crop → ค้นด้วยชื่อ figure เจอ
+                                if _store_doc_image(doc_id, pno + 1, obj, "image/png", caption, clip_text):
                                     n_page += 1
                     except Exception as _pe:
                         print(f"crop page {pno+1} failed: {_pe}", flush=True)
