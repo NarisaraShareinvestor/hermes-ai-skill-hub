@@ -647,7 +647,7 @@ _DOC_MAX_CHARS = 5_000_000
 # ตัวเลขติดกัน) — เราจึง (1) cleanup ในเครื่องทุกหน้า (ฟรี) แล้ว (2) ส่งเฉพาะหน้าที่ตรวจว่า
 # "พัง" ไป vision LLM แปลงใหม่ → ได้คุณภาพสูงโดยจ่ายเฉพาะหน้าที่จำเป็น (คุม cost)
 _PDF_VISION_MD        = os.getenv("PDF_VISION_MD", "1") != "0"      # ปิดด้วย PDF_VISION_MD=0
-_PDF_VISION_MAX_PAGES = int(os.getenv("PDF_VISION_MAX_PAGES", "40"))  # เพดานจำนวนหน้า vision/เอกสาร
+_PDF_VISION_MAX_PAGES = int(os.getenv("PDF_VISION_MAX_PAGES", "12"))  # เพดานหน้า vision/เอกสาร (คุมเวลา+cost; เดิม 40 ทำเอกสารการเงินใหญ่ค้าน)
 _PDF_VISION_DPI       = int(os.getenv("PDF_VISION_DPI", "130"))     # render ปานกลางพอให้ vision อ่านออก
 # หน้าที่ถูกแปลงด้วย vision แล้ว (path → set(page_no)) ให้ image indexer ข้าม ไม่ caption ซ้ำ
 _VISION_MD_PAGES: dict = {}
@@ -703,8 +703,10 @@ def _page_md_is_damaged(md: str) -> bool:
         t = l.split()
         if len(t) >= 6 and sum(1 for x in t if len(x) == 1) / len(t) > 0.5:
             return True
-    # (2) ตารางถูกแบน: หลายบรรทัดลงท้ายด้วยตัวเลข เช่น "Indexability 38"
-    if sum(1 for l in nb if not l.startswith("#") and re.search(r"\S\s+\d{1,4}$", l)) >= 4:
+    # (2) ตารางถูกแบน เฉพาะ 'หน้าสั้น' (dashboard/การ์ดคะแนน เช่น "Indexability 38") ที่ vision คุ้ม
+    #     — หน้างบการเงินหนาแน่น (บรรทัดเยอะ) ไม่ flag เพราะ pymupdf เก็บตัวเลขไว้อยู่แล้ว + จะเกิด
+    #     vision storm หลายสิบหน้าในรายงานประจำปี (ช้า/แพง). gate ที่ ≤22 บรรทัด
+    if len(nb) <= 22 and sum(1 for l in nb if not l.startswith("#") and re.search(r"\S\s+\d{1,4}$", l)) >= 4:
         return True
     # (3) หัวข้อขาดกลาง: heading ที่วงเล็บไม่ปิด/ลงท้ายด้วย "("
     for l in nb:
@@ -735,7 +737,10 @@ def _vision_page_to_markdown(png_bytes: bytes) -> str:
     try:
         import base64, re
         from openai import OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
+        # timeout สำคัญ: default ของ client = 600s/call → ถ้า call ค้าง 1 ครั้งจะ stall ทั้งเอกสาร
+        # (เคยทำ doc 233 หน้า ค้าง >25 นาที). ตั้ง timeout สั้น + retry น้อย → fail เร็ว ไปหน้าถัดไป
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""),
+                        timeout=float(os.getenv("PDF_VISION_TIMEOUT", "30")), max_retries=1)
         b64 = base64.b64encode(png_bytes).decode()
         resp = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=2000, temperature=0,
