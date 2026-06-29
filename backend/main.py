@@ -1182,6 +1182,77 @@ def _store_doc_image(doc_id: int, page: int, obj: str, ct: str, caption: str, su
         return False
 
 
+def _merge_rects(rects, gap):
+    """รวม rect ที่ทับกันหรืออยู่ใกล้กัน (ระยะห่าง < gap) เป็นกลุ่มเดียว — วนจนไม่มีอะไรรวมเพิ่ม"""
+    import pymupdf
+    rects = [pymupdf.Rect(r) for r in rects]
+    changed = True
+    while changed:
+        changed = False
+        out = []
+        while rects:
+            r = rects.pop()
+            grew = True
+            while grew:
+                grew = False
+                rest = []
+                for o in rects:
+                    er = pymupdf.Rect(r.x0 - gap, r.y0 - gap, r.x1 + gap, r.y1 + gap)
+                    if er.intersects(o):
+                        r = r | o
+                        grew = True
+                        changed = True
+                    else:
+                        rest.append(o)
+                rects = rest
+            out.append(r)
+        rects = out
+    return rects
+
+
+def _figure_clips(page):
+    """หา bounding box ของ 'รูป/แผนภาพจริง' ในหน้า เพื่อ crop เฉพาะส่วนนั้น (แทนการเอาทั้งหน้า):
+    รวม vector-drawing clusters + ตำแหน่งรูปฝัง → ทิ้ง noise เล็ก → รวมกลุ่มที่อยู่ติดกัน.
+    - ถ้ากลุ่มใหญ่สุดกินเกือบทั้งหน้า = infographic เต็มหน้า → คืน 1 กล่อง (content bbox, ตัด margin)
+    - ไม่งั้น = คืน figure เด่นๆ สูงสุด 3 กล่อง (เช่น กล่อง vision / กราฟ ที่อยู่มุมหน้า)
+    คืน list ของ pymupdf.Rect (clip regions); ว่าง = ให้ caller fallback เป็นทั้งหน้า"""
+    import pymupdf
+    PR = page.rect
+    PA = PR.get_area()
+    if PA <= 0:
+        return []
+    short = min(PR.width, PR.height)
+    cands = []
+    try:
+        for r in page.cluster_drawings():
+            cands.append(pymupdf.Rect(r))
+    except Exception:
+        pass
+    for img in page.get_images(full=True):
+        try:
+            for r in page.get_image_rects(img[0]):
+                cands.append(pymupdf.Rect(r))
+        except Exception:
+            pass
+    # ทิ้ง noise: เล็กกว่า 1.5% ของหน้า หรือด้านสั้นกว่า 60px (ไอคอน/เส้น/เศษ)
+    cands = [r for r in cands if r.get_area() >= 0.015 * PA and r.width >= 60 and r.height >= 60]
+    if not cands:
+        return []
+    groups = [(g & PR) for g in _merge_rects(cands, gap=0.02 * short)]
+    groups = [g for g in groups if g.get_area() >= 0.06 * PA]   # เก็บกลุ่มที่ใหญ่พอเป็น figure จริง
+    if not groups:
+        return []
+    groups.sort(key=lambda r: r.get_area(), reverse=True)
+    if groups[0].get_area() >= 0.85 * PA:
+        content = groups[0]
+        for g in groups[1:]:
+            content = content | g
+        return [content & PR]                                   # เต็มหน้า → trim margin
+    pad = 0.015 * short
+    return [pymupdf.Rect(g.x0 - pad, g.y0 - pad, g.x1 + pad, g.y1 + pad) & PR
+            for g in groups[:3]]
+
+
 def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                            owner: str = "", source: str = "chat"):
     """จับภาพจาก PDF → MinIO + vision caption + embed:
@@ -1197,6 +1268,7 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
         # ลด cap (เดิม 25/35 ~60 vision/เอกสาร) ตั้งผ่าน env ได้
         RASTER_CAP = int(os.getenv("DOC_IMG_RASTER_CAP", "10"))
         PAGE_CAP   = int(os.getenv("DOC_IMG_PAGE_CAP", "12"))
+        CROP_DPI   = int(os.getenv("DOC_IMG_CROP_DPI", "180"))   # crop figure คมกว่าทั้งหน้า (เดิม 160)
         # หน้าที่ _pdf_to_markdown ถอดด้วย vision ไปแล้ว → ไม่ต้อง caption ซ้ำ (กันจ่าย vision 2 รอบ)
         _vpages = _VISION_MD_PAGES.pop(str(pdf_path), set())
         for pno in range(len(doc)):
@@ -1224,7 +1296,8 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                         cap = _image_bytes_to_caption(data, ext)
                         if _store_doc_image(doc_id, pno + 1, obj, f"image/{ext}", cap, page_text):
                             n_raster += 1
-            # (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ) → render ทั้งหน้าแล้ว vision
+            # (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ) → crop เฉพาะ figure region แล้ว vision
+            #     (เดิม render ทั้งหน้า = การ์ดโชว์ทั้งหน้าไม่ตรงคำถาม; ตอนนี้ตัดเฉพาะกล่อง vision/กราฟ/แผนภาพ)
             if n_page < PAGE_CAP:
                 try:
                     ndraw = len(page.get_drawings())
@@ -1232,15 +1305,22 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                     ndraw = 0
                 if ndraw >= 60:   # หน้ากราฟ/แผนภาพ มักมีเส้น/กล่องเยอะ (หน้า text ปกติน้อย)
                     try:
-                        pix = page.get_pixmap(dpi=160)
-                        data = pix.tobytes("png")
-                        obj = f"{_prefix}/page{pno+1}.png"
-                        if _minio_put(obj, data, "image/png"):
-                            cap = _image_bytes_to_caption(data, "png")
-                            if _store_doc_image(doc_id, pno + 1, obj, "image/png", cap, page_text):
-                                n_page += 1
+                        clips = _figure_clips(page) or [page.rect]   # ไม่เจอ figure → fallback ทั้งหน้า
+                        mtx = pymupdf.Matrix(CROP_DPI / 72, CROP_DPI / 72)
+                        for ci, clip in enumerate(clips):
+                            if n_page >= PAGE_CAP:
+                                break
+                            pix = page.get_pixmap(matrix=mtx, clip=clip)
+                            data = pix.tobytes("png")
+                            obj = f"{_prefix}/page{pno+1}_{ci}.png"
+                            # caption + embed อิงข้อความเฉพาะใน crop (ตรงกับรูปมากกว่า text ทั้งหน้า)
+                            clip_text = (page.get_text("text", clip=clip) or "").strip().replace("\n", " ")[:600] or page_text
+                            if _minio_put(obj, data, "image/png"):
+                                cap = _image_bytes_to_caption(data, "png")
+                                if _store_doc_image(doc_id, pno + 1, obj, "image/png", cap, clip_text):
+                                    n_page += 1
                     except Exception as _pe:
-                        print(f"render page {pno+1} failed: {_pe}", flush=True)
+                        print(f"crop page {pno+1} failed: {_pe}", flush=True)
         print(f"indexed images doc {doc_id}: {n_raster} raster + {n_page} diagram pages", flush=True)
     except Exception as e:
         print(f"index_document_images failed: {e}", flush=True)
