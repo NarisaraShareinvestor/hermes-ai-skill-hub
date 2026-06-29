@@ -1127,7 +1127,9 @@ def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png") -> str:
     try:
         import base64
         from openai import OpenAI
-        client = OpenAI(api_key=api_key)
+        # timeout กัน 1 call ค้าง → block ทั้ง indexer (มีหลาย crop/หน้า) — บทเรียนเดียวกับ vision-md
+        client = OpenAI(api_key=api_key,
+                        timeout=float(os.getenv("CAPTION_TIMEOUT", "30")), max_retries=1)
         b64 = base64.b64encode(img_bytes).decode()
         _e = ext.lower()
         mime = "image/jpeg" if _e in ("jpg", "jpeg") else f"image/{_e}"
@@ -1182,6 +1184,18 @@ def _store_doc_image(doc_id: int, page: int, obj: str, ct: str, caption: str, su
         return False
 
 
+def _caption_is_useless(cap: str) -> bool:
+    """vision บางทีคืน 'ไม่สามารถให้รายละเอียด/ไม่มีข้อมูลชัดเจน' กับรูปพื้นหลัง/ว่าง → ไม่ควรเก็บ/โชว์"""
+    c = (cap or "").strip()
+    if len(c) < 8:
+        return True
+    low = c.lower()
+    bad = ["ไม่สามารถให้รายละเอียด", "ไม่มีข้อมูลที่ชัดเจน", "ไม่สามารถอธิบาย", "ไม่สามารถระบุ",
+           "ไม่มีรายละเอียด", "ไม่มีข้อความ", "ไม่มีเนื้อหา", "cannot provide", "unable to",
+           "no clear", "no information", "no discernible", "i'm sorry", "i cannot"]
+    return any(b in c or b in low for b in bad)
+
+
 def _merge_rects(rects, gap):
     """รวม rect ที่ทับกันหรืออยู่ใกล้กัน (ระยะห่าง < gap) เป็นกลุ่มเดียว — วนจนไม่มีอะไรรวมเพิ่ม"""
     import pymupdf
@@ -1210,11 +1224,45 @@ def _merge_rects(rects, gap):
     return rects
 
 
+def _content_cards(page):
+    """ตรวจจับ 'การ์ดเนื้อหา' = กล่อง fill สีขาวบริสุทธิ์ (≥0.97) ที่ใหญ่พอเป็น figure.
+    ในรายงานดีไซน์ (annual report/56-1) กราฟ/แผนภาพแต่ละอันมักวางในการ์ดขาวบนพื้นหลังภาพ
+    → ตัดทีละการ์ด = ได้กราฟเดี่ยวๆ (เช่น Figure 5/6/7) แทนทั้งสเปรด.
+    (กล่องตกแต่งโปร่งแสง fill ~0.95 ไม่ใช่การ์ดเนื้อหา → ตัดทิ้งด้วย threshold 0.97)"""
+    import pymupdf
+    PR = page.rect
+    PA = PR.get_area()
+    try:
+        draws = page.get_drawings()
+    except Exception:
+        return []
+    out = []
+    for d in draws:
+        f = d.get("fill")
+        if not f or len(f) < 3 or not all(c >= 0.97 for c in f[:3]):
+            continue
+        r = pymupdf.Rect(d["rect"]) & PR
+        a = r.get_area()
+        if a < 0.04 * PA or a > 0.7 * PA:
+            continue
+        if r.width < 0.12 * PR.width or r.height < 0.10 * PR.height:
+            continue
+        out.append(r)
+    out.sort(key=lambda r: r.get_area(), reverse=True)
+    kept = []
+    for b in out:
+        if any((b & k).get_area() >= 0.8 * b.get_area() for k in kept):
+            continue   # ซ้ำ/ซ้อนในกล่องที่เก็บแล้ว (เงา/กล่องซ้อน)
+        kept.append(b)
+    return kept[:6]
+
+
 def _figure_clips(page):
     """หา bounding box ของ 'รูป/แผนภาพจริง' ในหน้า เพื่อ crop เฉพาะส่วนนั้น (แทนการเอาทั้งหน้า):
-    รวม vector-drawing clusters + ตำแหน่งรูปฝัง → ทิ้ง noise เล็ก → รวมกลุ่มที่อยู่ติดกัน.
-    - ถ้ากลุ่มใหญ่สุดกินเกือบทั้งหน้า = infographic เต็มหน้า → คืน 1 กล่อง (content bbox, ตัด margin)
-    - ไม่งั้น = คืน figure เด่นๆ สูงสุด 3 กล่อง (เช่น กล่อง vision / กราฟ ที่อยู่มุมหน้า)
+    1) ถ้าเจอการ์ดขาว ≥2 ใบ (หน้ารวมหลายกราฟ เช่น Figure 5/6/7) → crop ทีละการ์ด
+    2) ไม่งั้น รวม vector-drawing clusters + ตำแหน่งรูปฝัง → ทิ้ง noise เล็ก → รวมกลุ่มติดกัน:
+       - กลุ่มใหญ่สุดกินเกือบทั้งหน้า = infographic เต็มหน้า → คืน 1 กล่อง (trim margin)
+       - ไม่งั้น = คืน figure เด่นสูงสุด 3 กล่อง (เช่น กล่อง vision / กราฟมุมหน้า)
     คืน list ของ pymupdf.Rect (clip regions); ว่าง = ให้ caller fallback เป็นทั้งหน้า"""
     import pymupdf
     PR = page.rect
@@ -1222,6 +1270,14 @@ def _figure_clips(page):
     if PA <= 0:
         return []
     short = min(PR.width, PR.height)
+    # (1) หน้ารวมหลายกราฟในการ์ดขาว → ตัดทีละใบ (เรียงบน→ล่าง, ซ้าย→ขวา)
+    cards = _content_cards(page)
+    if len(cards) >= 2:
+        cards.sort(key=lambda r: (round(r.y0 / 40), r.x0))
+        pad = 0.008 * short
+        return [pymupdf.Rect(c.x0 - pad, c.y0 - pad, c.x1 + pad, c.y1 + pad) & PR
+                for c in cards]
+    # (2) fallback: cluster vector-drawing + รูปฝัง
     cands = []
     try:
         for r in page.cluster_drawings():
@@ -1280,6 +1336,7 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
             # (A) รูปฝัง raster ใหญ่จริง (>=20KB, >=250px) → ข้ามโลโก้/ไอคอน/ภาพประดับ
             if n_raster < RASTER_CAP:
+                _parea = page.rect.get_area() or 1
                 for img in page.get_images(full=True):
                     if n_raster >= RASTER_CAP:
                         break
@@ -1291,9 +1348,19 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                     data, ext = base.get("image"), base.get("ext", "png")
                     if not data or len(data) < 20000 or base.get("width", 0) < 250 or base.get("height", 0) < 250:
                         continue
+                    # ข้ามภาพ "พื้นหลังเต็มหน้า" (วางคลุม >=80% ของหน้า เช่น ภาพป่า/ท้องฟ้า/พื้นมืด)
+                    # — เป็นภาพประดับ ไม่ใช่เนื้อหา และมักถูก caption ว่า "ไม่มีข้อมูล"
+                    try:
+                        _cov = max((r.get_area() for r in page.get_image_rects(xref)), default=0) / _parea
+                    except Exception:
+                        _cov = 0
+                    if _cov >= 0.80:
+                        continue
+                    cap = _image_bytes_to_caption(data, ext)
+                    if _caption_is_useless(cap):
+                        continue
                     obj = f"{_prefix}/p{pno+1}_{xref}.{ext}"
                     if _minio_put(obj, data, f"image/{ext}"):
-                        cap = _image_bytes_to_caption(data, ext)
                         if _store_doc_image(doc_id, pno + 1, obj, f"image/{ext}", cap, page_text):
                             n_raster += 1
             # (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ) → crop เฉพาะ figure region แล้ว vision
@@ -1312,11 +1379,13 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                                 break
                             pix = page.get_pixmap(matrix=mtx, clip=clip)
                             data = pix.tobytes("png")
+                            cap = _image_bytes_to_caption(data, "png")
+                            if _caption_is_useless(cap):   # crop ว่าง/อ่านไม่ออก → ข้าม
+                                continue
                             obj = f"{_prefix}/page{pno+1}_{ci}.png"
-                            # caption + embed อิงข้อความเฉพาะใน crop (ตรงกับรูปมากกว่า text ทั้งหน้า)
+                            # embed อิงข้อความเฉพาะใน crop (ตรงกับรูปมากกว่า text ทั้งหน้า)
                             clip_text = (page.get_text("text", clip=clip) or "").strip().replace("\n", " ")[:600] or page_text
                             if _minio_put(obj, data, "image/png"):
-                                cap = _image_bytes_to_caption(data, "png")
                                 if _store_doc_image(doc_id, pno + 1, obj, "image/png", cap, clip_text):
                                     n_page += 1
                     except Exception as _pe:
