@@ -1254,7 +1254,33 @@ def _content_cards(page):
         if any((b & k).get_area() >= 0.8 * b.get_area() for k in kept):
             continue   # ซ้ำ/ซ้อนในกล่องที่เก็บแล้ว (เงา/กล่องซ้อน)
         kept.append(b)
-    return kept[:6]
+    if not kept:
+        return []
+    # กรองเอาเฉพาะ "การ์ดที่เป็นกราฟ/แผนภาพ" — ทิ้งการ์ดข้อความล้วน (เช่นคอลัมน์ prose บนพื้นหลังภาพ)
+    # สัญญาณ: การ์ดกราฟมี drawing ย่อยเยอะ (แท่ง/เส้น/marker ndraw_in สูง) หรือมีรูปฝังข้างใน;
+    #         การ์ดข้อความมี ndraw_in ~0-2 → ตัดทิ้ง (ข้อความอยู่ใน RAG อยู่แล้ว ไม่ต้องโชว์เป็นรูป)
+    img_rects = []
+    for im in page.get_images(full=True):
+        try:
+            img_rects += list(page.get_image_rects(im[0]))
+        except Exception:
+            pass
+    MIN_DRAW = int(os.getenv("DOC_IMG_CARD_MIN_DRAW", "30"))
+    figs = []
+    for r in kept:
+        A = r.get_area() or 1
+        ndraw_in = 0
+        for d in draws:
+            dr = pymupdf.Rect(d["rect"])
+            if r.intersects(dr) and 0.0001 * A <= dr.get_area() <= 0.5 * A:
+                ndraw_in += 1
+                if ndraw_in >= MIN_DRAW:
+                    break
+        has_img = any((r & ir).get_area() >= 0.3 * ir.get_area() and ir.get_area() < 0.6 * A
+                      for ir in img_rects)
+        if ndraw_in >= MIN_DRAW or has_img:
+            figs.append(r)
+    return figs[:6]
 
 
 def _figure_clips(page):
