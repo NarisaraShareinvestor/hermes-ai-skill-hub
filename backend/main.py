@@ -1341,32 +1341,47 @@ def _figure_clips(page):
 
 
 def _clip_title(page, clip) -> str:
-    """ดึง 'หัวข้อจริง' ของรูป/กราฟ จาก text layer ในแถบบนของ crop (ชื่อ section/Figure)
-    → ใช้นำหน้า caption + ใส่ใน embedding ให้ค้นเจอแม่น (เช่น 'Figure 5: Thai Economic Growth 2023-2025').
-    จับ 'Figure/Graph/Table N' + รวมบรรทัดบรรยายบนสุด 2 บรรทัด (รองรับ title ขึ้น 2 บรรทัด)"""
+    """ดึง 'หัวข้อจริง' ของรูป/กราฟ จาก text layer → ใช้นำหน้า caption + ใส่ใน embedding ให้ค้นเจอแม่น
+    (เช่น 'Figure 5: Thai Economic Growth 2023-2025', 'Sales and Service Revenue').
+    หา heading จาก 2 ที่: แถบ 'เหนือกล่อง' (heading section มักลอยอยู่เหนือกราฟ เช่น Docling box ที่
+    เริ่มที่ตัวกราฟ) + แถบ 'บนในกล่อง' (การ์ดที่ title อยู่ในกราฟ). จับ 'Figure/Graph/Table N' +
+    เลือกบรรทัด font ใหญ่สุด (=heading). **รับเป็น title เฉพาะมี Figure N หรือมี heading ตัวใหญ่จริง
+    (≥12pt)** — ไม่งั้นคืน '' ปล่อยให้ caption ของ vision ยืนเดี่ยว (กัน legend/ข้อความ body มาเป็น title ผิด)"""
     import re as _re
     import pymupdf
     try:
         r = pymupdf.Rect(clip)
-        band = pymupdf.Rect(r.x0, r.y0, r.x1, r.y0 + 0.30 * r.height)
+        H = page.rect.height
+        HEADING_MIN = float(os.getenv("DOC_IMG_TITLE_MIN_PT", "12"))
+        above = pymupdf.Rect(r.x0, max(0, r.y0 - 0.15 * H), r.x1, r.y0)
+        inside = pymupdf.Rect(r.x0, r.y0, r.x1, r.y0 + 0.30 * r.height)
         lines = []
-        for b in page.get_text("dict", clip=band).get("blocks", []):
-            for l in b.get("lines", []):
-                t = " ".join(s["text"] for s in l.get("spans", [])).strip()
-                if t:
-                    lines.append((round(l["bbox"][1]), t))
+        for band in (above, inside):
+            for b in page.get_text("dict", clip=band).get("blocks", []):
+                for l in b.get("lines", []):
+                    t = " ".join(s["text"] for s in l.get("spans", [])).strip()
+                    sz = max((s["size"] for s in l.get("spans", [])), default=0)
+                    if t:
+                        lines.append((round(l["bbox"][1]), round(sz, 1), t))
         if not lines:
             return ""
-        raw = " ".join(t for _, t in lines)
+        raw = " ".join(t for _, _, t in lines)
         m = _re.search(r"(Figure|Graph|Table|Chart|Exhibit)\s*(\d+)", raw, _re.I)
         fignum = f"{m.group(1).title()} {m.group(2)}" if m else ""
         cands = []
-        for y, t in lines:
+        for y, sz, t in lines:
             tc = _re.sub(r"(Figure|Graph|Table|Chart|Exhibit)\s*\d*", "", t, flags=_re.I).strip(" :-")
+            if tc.lower().startswith(("unit", "source", "note", "remark", "หน่วย", "ที่มา")):
+                continue
             if sum(ch.isalpha() for ch in tc) >= 10 and len(tc.split()) >= 2:
-                cands.append((y, _re.sub(r"\s+", " ", tc).strip()))
-        cands.sort()
-        desc = " ".join(t for _, t in cands[:2]).strip()
+                cands.append((sz, y, _re.sub(r"\s+", " ", tc).strip()))
+        if not cands:
+            return fignum[:140]
+        maxsz = max(s for s, _, _ in cands)
+        if not fignum and maxsz < HEADING_MIN:   # ไม่มี Figure N + ไม่มี heading ใหญ่ = ไม่ชัวร์ → ปล่อยว่าง
+            return ""
+        top = sorted((y, t) for s, y, t in cands if s >= maxsz - 0.5)   # บรรทัด font ใหญ่สุด
+        desc = " ".join(t for _, t in top[:2]).strip()
         title = (f"{fignum}: {desc}" if fignum and desc else desc or fignum)
         return title[:140]
     except Exception:
