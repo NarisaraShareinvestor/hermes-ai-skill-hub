@@ -1410,31 +1410,29 @@ def _crop_and_store_clip(page, clip, doc_id, pno, prefix, ci, crop_dpi, page_tex
 
 
 def _docling_figure_boxes(pdf_path):
-    """เรียก Docling layout model (subprocess แยก venv) ดึง bbox ของรูป/กราฟ/ตารางต่อหน้า.
+    """เรียก Docling sidecar (HTTP, POST PDF multipart) ดึง bbox ของรูป/กราฟ/ตารางต่อหน้า.
     ใช้กับหน้า dashboard ที่กราฟหลายอันวางบนพื้นหลังเดียวกันไม่มีการ์ด — heuristic เชิงเรขาคณิต
     (cluster/การ์ดขาว) แยกไม่ได้ แต่ Docling เห็น layout จึงแยก Picture/Table ได้แม่น.
-    คืน {pageno(str): [{type,box[x0,y0,x1,y1] normalize 0..1}]} หรือ None (ปิดใช้/ไม่มี/พลาด → fallback heuristic).
-    flag-gated: ต้องตั้ง DOC_IMG_USE_DOCLING=1 + DOC_IMG_DOCLING_PYTHON=path ของ docling venv python"""
+    คืน {pageno(str): [{type,box[x0,y0,x1,y1] normalize 0..1}]} หรือ None (ปิดใช้/sidecar ล่ม/พลาด → fallback heuristic).
+    flag-gated: ตั้ง DOC_IMG_USE_DOCLING=1 + DOC_IMG_DOCLING_URL=http://docling:8000/figures"""
     if os.getenv("DOC_IMG_USE_DOCLING", "0") != "1":
         return None
-    py = os.getenv("DOC_IMG_DOCLING_PYTHON", "")
-    if not py or not os.path.exists(py):
+    url = os.getenv("DOC_IMG_DOCLING_URL", "")
+    if not url:
         return None
-    import subprocess
-    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
-                          "tools", "docling", "docling_figures.py")
     maxp = os.getenv("DOC_IMG_DOCLING_MAX_PAGES", "60")
     try:
-        out = subprocess.run([py, script, str(pdf_path), "--pages", f"1-{maxp}"],
-                             capture_output=True, text=True,
-                             timeout=int(os.getenv("DOC_IMG_DOCLING_TIMEOUT", "1800")))
-        if out.returncode != 0:
-            print(f"docling figures rc={out.returncode}: {out.stderr[-300:]}", flush=True)
+        with open(pdf_path, "rb") as fh:
+            resp = requests.post(url,
+                                 files={"file": ("doc.pdf", fh, "application/pdf")},
+                                 params={"pages": f"1-{maxp}"},
+                                 timeout=int(os.getenv("DOC_IMG_DOCLING_TIMEOUT", "1800")))
+        if resp.status_code != 200:
+            print(f"docling http {resp.status_code}: {resp.text[:200]}", flush=True)
             return None
-        import json as _json
-        return _json.loads(out.stdout).get("pages", {})
+        return resp.json().get("pages", {})
     except Exception as e:
-        print(f"docling figures error: {e}", flush=True)
+        print(f"docling request failed: {e}", flush=True)
         return None
 
 

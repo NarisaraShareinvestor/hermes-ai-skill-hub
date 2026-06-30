@@ -46,6 +46,11 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-hermes_minio}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change_me_minio_secret}
       MINIO_BUCKET: ${MINIO_BUCKET:-hermes-docs}
+      # Docling sidecar — ดึง bbox รูป/กราฟ หน้า dashboard ที่ heuristic แยกไม่ได้
+      # เปิดใช้: ตั้ง DOC_IMG_USE_DOCLING=1 ใน .env (ค่าเริ่มต้น 0 = heuristic เดิม ไม่ regression)
+      DOC_IMG_USE_DOCLING: ${DOC_IMG_USE_DOCLING:-0}
+      DOC_IMG_DOCLING_URL: http://docling:8000/figures
+      DOC_IMG_DOCLING_MAX_PAGES: ${DOC_IMG_DOCLING_MAX_PAGES:-60}
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,6 +167,25 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Docling sidecar - layout model ดึง bbox รูป/กราฟ/ตาราง (ฟีเจอร์ "รูปที่เกี่ยวข้อง")
+  # backend POST PDF (multipart) ผ่าน hermes_network → คืน bbox; ไม่เปิด port public
+  # หนัก (torch) แต่ idle เกือบตลอด (สไปก์เฉพาะตอน index เอกสารใหม่) → จำกัด RAM กัน OOM ทั้ง VPS
+  docling:
+    build:
+      context: ./tools/docling
+      dockerfile: Dockerfile
+    container_name: hermes_docling
+    networks:
+      - hermes_network
+    restart: always
+    mem_limit: 3g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
 networks:
   hermes_network:

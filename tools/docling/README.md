@@ -65,12 +65,21 @@ tools/docling/.venv/bin/python tools/docling/docling_figures.py FILE.pdf --pages
 #   box = normalize 0..1, origin มุมซ้ายบน → backend เอาไป crop ด้วย pymupdf
 ```
 
-### เปิดใช้ใน backend (`_index_document_images`)
-ตั้ง env (ปิดเป็นค่าเริ่มต้น — ไม่ตั้ง = ใช้ heuristic เดิม ไม่ regression):
-- `DOC_IMG_USE_DOCLING=1`
-- `DOC_IMG_DOCLING_PYTHON=/path/to/tools/docling/.venv/bin/python`
-- `DOC_IMG_DOCLING_MAX_PAGES=60` (จำกัดหน้ากัน bg ช้า), `DOC_IMG_DOCLING_TABLES=0` (1=ดึงตารางเป็นรูปด้วย)
+### deploy เป็น sidecar container (production)
+Docling หนัก (torch) + ช้า → แยกเป็น service `docling` ใน `docker-compose.prod.yml` (ไม่บวม backend).
+backend POST ไฟล์ PDF (multipart) ผ่าน `hermes_network` → sidecar คืน bbox JSON → backend crop ด้วย pymupdf.
 
-**ข้อควรระวัง deploy:** backend รันใน Docker (mount แค่ `./backend`) → ต้องทำให้ container เข้าถึง
-ทั้ง `tools/docling/` + docling venv (mount เพิ่ม หรือ install docling ในอิมเมจ) ถึงจะเปิด flag ได้.
-Docling ช้า (~7วิ/หน้า) — รันใน bg thread ของ `_process_document_full_bg` เท่านั้น
+ไฟล์ที่เกี่ยว: `tools/docling/Dockerfile` (build sidecar), `docling_server.py` (FastAPI `/figures`,
+warm model ตอน startup), `docling_figures.py` (`extract_figures()` ปิด OCR + table-structure ให้เร็ว/เบา).
+
+**เปิดใช้:**
+1. build + start sidecar: `docker-compose -f docker-compose.prod.yml up -d --build docling`
+   (build ครั้งแรกนาน — โหลด torch + layout model ลงอิมเมจ)
+2. ตั้ง `DOC_IMG_USE_DOCLING=1` ใน `.env` → `up -d backend` (recreate รับ env ใหม่) + `restart nginx`
+3. ปิดกลับ: `DOC_IMG_USE_DOCLING=0` → backend ใช้ heuristic เดิม (และถ้า sidecar ล่ม/ตอบช้า backend fallback อัตโนมัติ)
+
+env (ตั้งใน compose ให้แล้ว): `DOC_IMG_DOCLING_URL=http://docling:8000/figures`,
+`DOC_IMG_DOCLING_MAX_PAGES=60` (จำกัดหน้ากันช้า), `DOC_IMG_DOCLING_TIMEOUT=1800`.
+
+**ข้อควรระวัง:** sidecar กิน RAM ตอน inference (จำกัด `mem_limit: 3g`) — เช็ค RAM รวม VPS ว่าพอ;
+idle ระหว่างไม่มีงาน สไปก์เฉพาะตอน index เอกสารใหม่. มีผลเฉพาะเอกสารที่อัปใหม่หลังเปิด flag.
