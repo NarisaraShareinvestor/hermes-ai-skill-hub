@@ -1373,11 +1373,61 @@ def _clip_title(page, clip) -> str:
         return ""
 
 
+def _crop_and_store_clip(page, clip, doc_id, pno, prefix, ci, crop_dpi, page_text) -> bool:
+    """crop region หนึ่ง → vision caption (ground ด้วยข้อความใน crop) + หัวข้อจริงนำหน้า → MinIO + embed.
+    ใช้ร่วมกันทั้ง heuristic clips และ Docling figure boxes. คืน True ถ้าเก็บสำเร็จ"""
+    import pymupdf
+    mtx = pymupdf.Matrix(crop_dpi / 72, crop_dpi / 72)
+    pix = page.get_pixmap(matrix=mtx, clip=clip)
+    data = pix.tobytes("png")
+    clip_text = (page.get_text("text", clip=clip) or "").strip().replace("\n", " ")[:600] or page_text
+    title = _clip_title(page, clip)
+    cap = _image_bytes_to_caption(data, "png", hint=clip_text)
+    if _caption_is_useless(cap):
+        if len(title) < 10:          # vision อธิบายไม่ได้ + ไม่มีหัวข้อจริง → ข้าม
+            return False
+        cap = ""
+    caption = f"{title} — {cap}".strip(" —") if title else cap
+    obj = f"{prefix}/page{pno+1}_{ci}.png"
+    if _minio_put(obj, data, "image/png"):
+        return _store_doc_image(doc_id, pno + 1, obj, "image/png", caption, clip_text)
+    return False
+
+
+def _docling_figure_boxes(pdf_path):
+    """เรียก Docling layout model (subprocess แยก venv) ดึง bbox ของรูป/กราฟ/ตารางต่อหน้า.
+    ใช้กับหน้า dashboard ที่กราฟหลายอันวางบนพื้นหลังเดียวกันไม่มีการ์ด — heuristic เชิงเรขาคณิต
+    (cluster/การ์ดขาว) แยกไม่ได้ แต่ Docling เห็น layout จึงแยก Picture/Table ได้แม่น.
+    คืน {pageno(str): [{type,box[x0,y0,x1,y1] normalize 0..1}]} หรือ None (ปิดใช้/ไม่มี/พลาด → fallback heuristic).
+    flag-gated: ต้องตั้ง DOC_IMG_USE_DOCLING=1 + DOC_IMG_DOCLING_PYTHON=path ของ docling venv python"""
+    if os.getenv("DOC_IMG_USE_DOCLING", "0") != "1":
+        return None
+    py = os.getenv("DOC_IMG_DOCLING_PYTHON", "")
+    if not py or not os.path.exists(py):
+        return None
+    import subprocess
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
+                          "tools", "docling", "docling_figures.py")
+    maxp = os.getenv("DOC_IMG_DOCLING_MAX_PAGES", "60")
+    try:
+        out = subprocess.run([py, script, str(pdf_path), "--pages", f"1-{maxp}"],
+                             capture_output=True, text=True,
+                             timeout=int(os.getenv("DOC_IMG_DOCLING_TIMEOUT", "1800")))
+        if out.returncode != 0:
+            print(f"docling figures rc={out.returncode}: {out.stderr[-300:]}", flush=True)
+            return None
+        import json as _json
+        return _json.loads(out.stdout).get("pages", {})
+    except Exception as e:
+        print(f"docling figures error: {e}", flush=True)
+        return None
+
+
 def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                            owner: str = "", source: str = "chat"):
     """จับภาพจาก PDF → MinIO + vision caption + embed:
     (A) รูปฝัง raster ที่ใหญ่จริง (ภาพถ่าย/ใบรับรอง — ข้าม decorative)
-    (B) หน้าที่เป็น diagram/chart (vector drawings เยอะ เช่น Figure flow) → render หน้าเป็นรูปแล้ว vision ถอดตัวเลข"""
+    (B) หน้าที่เป็น diagram/chart → crop figure (Docling ถ้าเปิด ไม่งั้น heuristic การ์ด/cluster)"""
     if not _IS_PG or mime != "application/pdf":
         return
     try:
@@ -1391,6 +1441,11 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
         CROP_DPI   = int(os.getenv("DOC_IMG_CROP_DPI", "180"))   # crop figure คมกว่าทั้งหน้า (เดิม 160)
         # หน้าที่ _pdf_to_markdown ถอดด้วย vision ไปแล้ว → ไม่ต้อง caption ซ้ำ (กันจ่าย vision 2 รอบ)
         _vpages = _VISION_MD_PAGES.pop(str(pdf_path), set())
+        # ถ้าเปิด Docling: ดึง figure box ทั้งเอกสารทีเดียว (โหลด model ครั้งเดียว) แล้วใช้แทน heuristic
+        _dbox = _docling_figure_boxes(pdf_path)
+        _docling_tables = os.getenv("DOC_IMG_DOCLING_TABLES", "0") == "1"
+        if _dbox is not None:
+            print(f"docling figures: {sum(len(v) for v in _dbox.values())} boxes / {len(_dbox)} pages", flush=True)
         for pno in range(len(doc)):
             if n_raster >= RASTER_CAP and n_page >= PAGE_CAP:
                 break
@@ -1398,6 +1453,26 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
             if (pno + 1) in _vpages:          # หน้านี้ถูก vision แปลงเป็น markdown ครบแล้ว
                 continue
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
+            # โหมด Docling: ใช้ figure/table box ที่ layout model จับ (crop ทีละอัน) — ข้าม heuristic A/B
+            if _dbox is not None:
+                PR = page.rect
+                ci = 0
+                for it in _dbox.get(str(pno + 1), []):
+                    if n_page >= PAGE_CAP:
+                        break
+                    if it.get("type") == "table" and not _docling_tables:
+                        continue
+                    b = it.get("box") or []
+                    if len(b) != 4:
+                        continue
+                    clip = pymupdf.Rect(b[0] * PR.width, b[1] * PR.height,
+                                        b[2] * PR.width, b[3] * PR.height) & PR
+                    if clip.width < 40 or clip.height < 40:
+                        continue
+                    if _crop_and_store_clip(page, clip, doc_id, pno, _prefix, ci, CROP_DPI, page_text):
+                        n_page += 1
+                        ci += 1
+                continue
             # (A) รูปฝัง raster ใหญ่จริง (>=20KB, >=250px) → ข้ามโลโก้/ไอคอน/ภาพประดับ
             if n_raster < RASTER_CAP:
                 _parea = page.rect.get_area() or 1
@@ -1437,28 +1512,11 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                 if ndraw >= 60:   # หน้ากราฟ/แผนภาพ มักมีเส้น/กล่องเยอะ (หน้า text ปกติน้อย)
                     try:
                         clips = _figure_clips(page) or [page.rect]   # ไม่เจอ figure → fallback ทั้งหน้า
-                        mtx = pymupdf.Matrix(CROP_DPI / 72, CROP_DPI / 72)
                         for ci, clip in enumerate(clips):
                             if n_page >= PAGE_CAP:
                                 break
-                            pix = page.get_pixmap(matrix=mtx, clip=clip)
-                            data = pix.tobytes("png")
-                            # ข้อความจริงใน crop → ใช้เป็น hint ให้ vision + ดึงหัวข้อจริงนำหน้า caption
-                            clip_text = (page.get_text("text", clip=clip) or "").strip().replace("\n", " ")[:600] or page_text
-                            title = _clip_title(page, clip)
-                            cap = _image_bytes_to_caption(data, "png", hint=clip_text)
-                            # ถ้า vision อธิบายไม่ได้ แต่มีหัวข้อจริง = ยังเป็นรูปมีความหมาย (เก็บด้วยหัวข้อ)
-                            if _caption_is_useless(cap):
-                                if len(title) < 10:
-                                    continue
-                                cap = ""
-                            # caption สุดท้าย: 'หัวข้อจริง — คำอธิบาย vision' (หัวข้อมาก่อน frontend จะโชว์ชื่อถูก)
-                            caption = f"{title} — {cap}".strip(" —") if title else cap
-                            obj = f"{_prefix}/page{pno+1}_{ci}.png"
-                            if _minio_put(obj, data, "image/png"):
-                                # embed = caption(มีหัวข้อ) + ข้อความใน crop → ค้นด้วยชื่อ figure เจอ
-                                if _store_doc_image(doc_id, pno + 1, obj, "image/png", caption, clip_text):
-                                    n_page += 1
+                            if _crop_and_store_clip(page, clip, doc_id, pno, _prefix, ci, CROP_DPI, page_text):
+                                n_page += 1
                     except Exception as _pe:
                         print(f"crop page {pno+1} failed: {_pe}", flush=True)
         print(f"indexed images doc {doc_id}: {n_raster} raster + {n_page} diagram pages", flush=True)
