@@ -52,34 +52,42 @@ python tools/docling/docling_convert.py report.pdf -o report.md --pages 1-50
 
 ---
 
-## docling_figures.py — ดึง bbox ของรูป/กราฟ/ตาราง (สำหรับฟีเจอร์ "รูปที่เกี่ยวข้อง")
+## layout_figures.py — ดึง bbox ของกราฟ/ตาราง ด้วย DocLayout-YOLO (ฟีเจอร์ "รูปที่เกี่ยวข้อง")
 
 ใช้กับหน้า dashboard ที่กราฟหลายอันวางบนพื้นหลังเดียวกัน **โดยไม่มีการ์ด** (เช่นหน้า Financial
 Highlights) ซึ่ง heuristic เชิงเรขาคณิตของ backend (การ์ดขาว / cluster_drawings) แยกกราฟไม่ได้
-(cluster รวมเป็นก้อนเดียว ~90% → ได้เกือบทั้งหน้า). Docling เห็น layout จริงจึงแยก Picture/Table
-ได้แม่น เช่นตัด "แถวโดนัท Sales & Service Revenue" ออกมาเป็นรูปเดียวได้
+(cluster รวมเป็นก้อนเดียว ~90% → ได้เกือบทั้งหน้า). **DocLayout-YOLO** (YOLOv10 เทรนบน DocStructBench,
+model `juliozhao/DocLayout-YOLO-DocStructBench`) มี class `figure`/`table` โดยตรง → แยกกราฟแต่ละอัน
+ได้แม่นและเร็ว (~0.3-0.5s/หน้า) เช่นตัดโดนัท Sales / Net Income / bar chart แยกกัน, หน้า 18 แยก
+Figure 5/6/7 ครบ (Docling รวม Fig6+7).
+
+**ทำไมไม่ใช้ YOLO ล้วน:** YOLO เก่งเฉพาะกราฟ/ตาราง/รูปถ่ายชัดๆ — หน้า infographic ดีไซน์เต็มหน้า /
+กล่อง vision / รูป portrait มันคืน 0 figure → **backend fallback ไป heuristic เดิมรายหน้า** (path A
+raster + การ์ดขาว/cluster) ดังนั้นได้ทั้งความแม่นของ YOLO บนหน้ากราฟ + ครอบคลุมของ heuristic บนหน้าอื่น.
 
 ```bash
-tools/docling/.venv/bin/python tools/docling/docling_figures.py FILE.pdf --pages 1-60
-# stdout: {"page_count":N,"pages":{"6":[{"type":"picture","box":[x0,y0,x1,y1]},...]}}
+tools/docling/.venv/bin/python tools/docling/layout_figures.py FILE.pdf --pages 1-60
+# stdout: {"page_count":N,"pages":{"6":[{"type":"figure","conf":0.93,"box":[x0,y0,x1,y1]},...]}}
 #   box = normalize 0..1, origin มุมซ้ายบน → backend เอาไป crop ด้วย pymupdf
 ```
 
 ### deploy เป็น sidecar container (production)
-Docling หนัก (torch) + ช้า → แยกเป็น service `docling` ใน `docker-compose.prod.yml` (ไม่บวม backend).
+YOLO+torch หนัก → แยกเป็น service `doclayout` ใน `docker-compose.prod.yml` (ไม่บวม backend).
 backend POST ไฟล์ PDF (multipart) ผ่าน `hermes_network` → sidecar คืน bbox JSON → backend crop ด้วย pymupdf.
 
-ไฟล์ที่เกี่ยว: `tools/docling/Dockerfile` (build sidecar), `docling_server.py` (FastAPI `/figures`,
-warm model ตอน startup), `docling_figures.py` (`extract_figures()` ปิด OCR + table-structure ให้เร็ว/เบา).
+ไฟล์: `tools/docling/Dockerfile` (build sidecar, torch CPU-only + doclayout-yolo, pre-download weights),
+`layout_server.py` (FastAPI `/figures`, warm model ตอน startup), `layout_figures.py`
+(`extract_figures()`: render หน้า → YOLO → filter conf/ขนาด + NMS → normalize box).
 
 **เปิดใช้:**
-1. build + start sidecar: `docker-compose -f docker-compose.prod.yml up -d --build docling`
-   (build ครั้งแรกนาน — โหลด torch + layout model ลงอิมเมจ)
+1. build + start sidecar: `docker-compose -f docker-compose.prod.yml up -d --build doclayout`
+   (build ครั้งแรกนาน — โหลด torch + YOLO weights)
 2. ตั้ง `DOC_IMG_USE_DOCLING=1` ใน `.env` → `up -d backend` (recreate รับ env ใหม่) + `restart nginx`
-3. ปิดกลับ: `DOC_IMG_USE_DOCLING=0` → backend ใช้ heuristic เดิม (และถ้า sidecar ล่ม/ตอบช้า backend fallback อัตโนมัติ)
+3. ปิดกลับ: `DOC_IMG_USE_DOCLING=0` → heuristic เดิม (และถ้า sidecar ล่ม/ช้า backend fallback อัตโนมัติ)
 
-env (ตั้งใน compose ให้แล้ว): `DOC_IMG_DOCLING_URL=http://docling:8000/figures`,
-`DOC_IMG_DOCLING_MAX_PAGES=60` (จำกัดหน้ากันช้า), `DOC_IMG_DOCLING_TIMEOUT=1800`.
+env (ตั้งใน compose แล้ว): `DOC_IMG_DOCLING_URL=http://doclayout:8000/figures`,
+`DOC_IMG_DOCLING_MAX_PAGES=60`, `DOC_IMG_DOCLING_TIMEOUT=1800`. tuning YOLO (ใน sidecar):
+`LAYOUT_CONF` (0.3), `LAYOUT_MIN_FRAC` (0.05 = ตัดไอคอนเล็ก), `LAYOUT_RENDER_DPI` (150).
 
 **ข้อควรระวัง:** sidecar กิน RAM ตอน inference (จำกัด `mem_limit: 3g`) — เช็ค RAM รวม VPS ว่าพอ;
 idle ระหว่างไม่มีงาน สไปก์เฉพาะตอน index เอกสารใหม่. มีผลเฉพาะเอกสารที่อัปใหม่หลังเปิด flag.

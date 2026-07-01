@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""docling_server.py — HTTP sidecar รอบ Docling layout model สำหรับ Hermes backend.
+"""layout_server.py — HTTP sidecar รอบ DocLayout-YOLO สำหรับ Hermes backend.
 
 backend POST ไฟล์ PDF (multipart) มา → คืน bbox ของรูป/กราฟ/ตารางต่อหน้า (normalize 0..1)
-ให้ backend crop ด้วย pymupdf. แยกเป็น container ต่างหากเพราะ Docling หนัก (torch+layout model)
-+ ช้า — ไม่อยากให้ถ่วง/บวม backend หลัก. โหลด model ครั้งเดียวตอน startup (warm) แล้ว reuse.
+ให้ backend crop ด้วย pymupdf. แยกเป็น container เพราะ torch + YOLO model หนัก — ไม่ให้ถ่วง backend.
+โหลด model ครั้งเดียวตอน startup (warm) แล้ว reuse ทุก request.
 
-รันใน container: uvicorn docling_server:app --host 0.0.0.0 --port 8000
-backend เรียกผ่าน hermes_network: http://docling:8000/figures
+รันใน container: uvicorn layout_server:app --host 0.0.0.0 --port 8000
+backend เรียกผ่าน hermes_network: http://doclayout:8000/figures
 """
-import os
 import tempfile
 
 from fastapi import FastAPI, UploadFile, File, Query
 
-from docling_figures import extract_figures, _get_converter
+from layout_figures import extract_figures, _get_model
 
-app = FastAPI(title="Hermes Docling Figures")
+app = FastAPI(title="Hermes DocLayout-YOLO Figures")
 
 
 @app.on_event("startup")
 def _warm():
     try:
-        _get_converter()   # โหลด layout model ล่วงหน้า → request แรกไม่ช้า
-        print("docling converter warmed", flush=True)
+        _get_model()
+        print("doclayout-yolo model warmed", flush=True)
     except Exception as e:
         print(f"warm failed: {e}", flush=True)
 

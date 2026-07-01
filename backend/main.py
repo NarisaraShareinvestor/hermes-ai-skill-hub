@@ -1466,13 +1466,12 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
             if (pno + 1) in _vpages:          # หน้านี้ถูก vision แปลงเป็น markdown ครบแล้ว
                 continue
             page_text = (page.get_text() or "").strip().replace("\n", " ")[:600]
-            # โหมด Docling: ใช้ figure/table box ที่ layout model จับ (crop ทีละอัน) — ข้าม heuristic A/B
+            # โหมด layout (DocLayout-YOLO): ถ้าหน้านี้ layout จับกราฟได้ → crop ทีละอัน แล้วข้าม heuristic;
+            # ถ้าไม่เจอ (vision/infographic/portrait ที่ YOLO มองไม่เห็น) → ปล่อยตกไป heuristic A/B รายหน้า
             if _dbox is not None:
                 PR = page.rect
-                ci = 0
+                _clips = []
                 for it in _dbox.get(str(pno + 1), []):
-                    if n_page >= PAGE_CAP:
-                        break
                     if it.get("type") == "table" and not _docling_tables:
                         continue
                     b = it.get("box") or []
@@ -1480,12 +1479,18 @@ def _index_document_images(doc_id: int, pdf_path: str, mime: str,
                         continue
                     clip = pymupdf.Rect(b[0] * PR.width, b[1] * PR.height,
                                         b[2] * PR.width, b[3] * PR.height) & PR
-                    if clip.width < 40 or clip.height < 40:
-                        continue
-                    if _crop_and_store_clip(page, clip, doc_id, pno, _prefix, ci, CROP_DPI, page_text):
-                        n_page += 1
-                        ci += 1
-                continue
+                    if clip.width >= 40 and clip.height >= 40:
+                        _clips.append(clip)
+                if _clips:                       # layout เจอกราฟ → ใช้ แล้วข้าม heuristic หน้านี้
+                    ci = 0
+                    for clip in _clips:
+                        if n_page >= PAGE_CAP:
+                            break
+                        if _crop_and_store_clip(page, clip, doc_id, pno, _prefix, ci, CROP_DPI, page_text):
+                            n_page += 1
+                            ci += 1
+                    continue
+                # ไม่เจอกราฟจาก layout → ตกไป heuristic A/B ด้านล่าง
             # (A) รูปฝัง raster ใหญ่จริง (>=20KB, >=250px) → ข้ามโลโก้/ไอคอน/ภาพประดับ
             if n_raster < RASTER_CAP:
                 _parea = page.rect.get_area() or 1
