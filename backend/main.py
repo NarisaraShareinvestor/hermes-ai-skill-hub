@@ -768,13 +768,64 @@ def _vision_page_to_markdown(png_bytes: bytes) -> str:
                 os.environ[k] = v
 
 
+def _pdf_to_markdown_mistral(path) -> str:
+    """PDF → Markdown ผ่าน Mistral OCR API (hosted, extractive แม่น ไม่ hallucinate เหมือน VLM,
+    ~$1/1000 หน้า) — ไม่กิน RAM/CPU ของ VPS เลย (เหมาะ Hostinger CPU ≤8GB ที่รันหลาย container).
+    flow: upload → signed url → /v1/ocr. คืน md + marker [หน้า N]; คืน '' ถ้าพลาด → caller fallback pipeline เดิม.
+    ลิมิต Mistral: ~50MB/1000 หน้า/ไฟล์ (เกิน → พลาด → fallback)"""
+    key = os.getenv("MISTRAL_API_KEY", "")
+    if not key:
+        return ""
+    H = {"Authorization": f"Bearer {key}"}
+    model = os.getenv("MISTRAL_OCR_MODEL", "mistral-ocr-latest")
+    fid = None
+    try:
+        with open(path, "rb") as f:
+            up = requests.post("https://api.mistral.ai/v1/files", headers=H,
+                               files={"file": (os.path.basename(str(path)), f, "application/pdf")},
+                               data={"purpose": "ocr"}, timeout=120)
+        up.raise_for_status()
+        fid = up.json()["id"]
+        su = requests.get(f"https://api.mistral.ai/v1/files/{fid}/url", headers=H,
+                          params={"expiry": 1}, timeout=60)
+        su.raise_for_status()
+        oc = requests.post("https://api.mistral.ai/v1/ocr",
+                           headers={**H, "Content-Type": "application/json"},
+                           json={"model": model,
+                                 "document": {"type": "document_url", "document_url": su.json()["url"]}},
+                           timeout=int(os.getenv("MISTRAL_OCR_TIMEOUT", "600")))
+        oc.raise_for_status()
+        parts = []
+        for i, pg in enumerate(oc.json().get("pages", [])):
+            md = (pg.get("markdown") or "").strip()
+            if md:
+                parts.append(f"[หน้า {int(pg.get('index', i)) + 1}]\n{md}")
+        return "\n\n".join(parts).strip()
+    except Exception as e:
+        print(f"mistral ocr failed: {e}", flush=True)
+        return ""
+    finally:
+        if fid:      # ลบไฟล์ที่อัปทิ้ง (best-effort, ไม่ให้ค้างใน Mistral storage)
+            try:
+                requests.delete(f"https://api.mistral.ai/v1/files/{fid}", headers=H, timeout=30)
+            except Exception:
+                pass
+
+
 def _pdf_to_markdown(path: pathlib.Path, allow_vision: bool = True) -> str:
     """PDF → Markdown แบบ hybrid + marker [หน้า N] ทุกหน้า:
+    0) ถ้า PDF_MD_PROVIDER=mistral + allow_vision (bg) → ใช้ Mistral OCR (คุณภาพสูงสุด, extractive) ก่อน
     1) pymupdf4llm ต่อหน้า (ฟรี) → cleanup ในเครื่อง (ต่อบรรทัด/ยุบ heading/ทิ้งเส้นคั่น)
     2) หน้าไหน 'พัง' (ตาราง/หัวข้อขาด/ขยะ) หรือเป็นภาพล้วน → ส่ง vision LLM แปลงใหม่ (คุมเพดาน)
     ถ้าทั้งหมดพังให้ fallback เป็น pypdf (text เปล่า)
-    allow_vision: เปิด vision ได้เฉพาะ background (bg index/RAG); path แบบ sync (inject เข้า prompt)
-    ต้องปิด ไม่งั้น vision หลายหน้า = ช้าเกิน Cloudflare timeout 524 (ดู _extract_text)"""
+    allow_vision: เปิด vision/Mistral ได้เฉพาะ background (bg index/RAG); path แบบ sync (inject เข้า prompt)
+    ต้องปิด ไม่งั้นช้าเกิน Cloudflare timeout 524 (ดู _extract_text)"""
+    # (0) Mistral OCR — เฉพาะ bg (allow_vision) เพราะเป็น API call อาจนานกับเอกสารใหญ่
+    if allow_vision and os.getenv("PDF_MD_PROVIDER", "").lower() == "mistral":
+        _m = _pdf_to_markdown_mistral(path)
+        if _m:
+            return _m
+        print("mistral ocr ว่าง/พลาด → fallback pymupdf4llm", flush=True)
     try:
         import pymupdf, pymupdf4llm
         doc = pymupdf.open(str(path))

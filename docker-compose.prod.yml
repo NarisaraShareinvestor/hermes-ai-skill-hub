@@ -52,6 +52,10 @@ services:
       DOC_IMG_USE_DOCLING: ${DOC_IMG_USE_DOCLING:-0}
       DOC_IMG_DOCLING_URL: http://doclayout:8000/figures
       DOC_IMG_DOCLING_MAX_PAGES: ${DOC_IMG_DOCLING_MAX_PAGES:-60}
+      # PDF→Markdown provider: ว่าง=pymupdf4llm+cleanup+vision (เดิม), mistral=Mistral OCR API
+      # (hosted, คุณภาพสูง extractive, ไม่กิน RAM/CPU — เหมาะ VPS CPU เล็ก) ใช้เฉพาะ bg conversion
+      PDF_MD_PROVIDER: ${PDF_MD_PROVIDER:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
