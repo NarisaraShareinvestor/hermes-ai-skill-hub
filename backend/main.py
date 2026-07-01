@@ -1135,19 +1135,27 @@ def _image_bytes_to_caption(img_bytes: bytes, ext: str = "png", hint: str = "") 
         b64 = base64.b64encode(img_bytes).decode()
         _e = ext.lower()
         mime = "image/jpeg" if _e in ("jpg", "jpeg") else f"image/{_e}"
-        prompt = ("อธิบายรูปนี้เป็นภาษาไทยสั้นๆ และ**ถอดตัวเลข/คะแนน/ป้าย/ชื่อที่ปรากฏในรูปออกมาให้ครบและเป๊ะ** "
-                  "(เช่น 'ใบรับรอง CSA Score 82/100, Top 1%, S&P Global, ปี 2025' หรือ 'กราฟรายได้ Q1-Q4: 1000/1037/...') "
-                  "ระบุว่าเป็นกราฟ/ตาราง/แผนภาพ/โลโก้/ใบรับรองอะไร เกี่ยวกับเรื่องใด — เน้นตัวเลขและข้อความจริงในรูป")
+        prompt = ("อธิบายรูปนี้เป็นภาษาไทยแบบ**กระชับ 1-2 ประโยคในบรรทัดเดียว** "
+                  "ระบุว่าเป็นกราฟ/ตาราง/แผนภาพ/โลโก้/ใบรับรองอะไร เกี่ยวกับเรื่องใด + ถอดตัวเลข/คะแนน/ป้ายเด่นที่ปรากฏจริงให้เป๊ะ "
+                  "(เช่น 'กราฟโดนัทรายได้ตามกลุ่มธุรกิจ ปี 2023-2025: การค้าระหว่างประเทศ 38-39%, ปิโตรเคมี/กลั่น 25-27%' "
+                  "หรือ 'ใบรับรอง CSA Score 82/100 Top 1% S&P Global ปี 2025'). "
+                  "**ห้ามใช้ markdown, bullet, ** หรือขึ้นหัวข้อย่อย — ตอบเป็นข้อความล้วนประโยคเดียว**")
         if hint and hint.strip():
             prompt += ("\n\nข้อความจริงที่อยู่ในรูป (จาก text layer ของ PDF) ใช้ยึดเป็นหลัก ห้ามแต่งชื่อ/ตัวเลขเอง:\n"
                        + hint.strip()[:800])
         resp = client.chat.completions.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=1200, temperature=0.2,
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), max_tokens=400, temperature=0.2,
             messages=[{"role": "user", "content": [
                 {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
             ]}])
-        return (resp.choices[0].message.content or "").strip()
+        cap = (resp.choices[0].message.content or "").strip()
+        # กัน markdown หลุด: ตัด **/##/บุลเล็ต ยุบขึ้นบรรทัด → ข้อความล้วนประโยคเดียว (การ์ดในแชตอ่านง่าย)
+        import re as _re
+        cap = _re.sub(r"[*#`]+", "", cap)
+        cap = _re.sub(r"\s*\n\s*[-•]?\s*", " ", cap)
+        cap = _re.sub(r"\s{2,}", " ", cap).strip()
+        return cap
     except Exception as e:
         print(f"caption failed: {e}", flush=True)
         return ""
